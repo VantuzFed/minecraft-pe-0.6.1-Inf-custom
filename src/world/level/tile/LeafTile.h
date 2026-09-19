@@ -56,6 +56,11 @@ public:
         if (data == BIRCH_LEAF) {
             return FoliageColor::getBirchColor();
         }
+		// Beta worlds tint oak leaves from the beta biome, like Beta 1.7.3.
+		float betaTemp, betaHumid;
+		if (level->getBetaTempHumid(x, z, betaTemp, betaHumid)) {
+			return FoliageColor::get(betaTemp, betaHumid);
+		}
 		if (!FoliageColor::useTint){
 			return FoliageColor::getDefaultColor();
 		}

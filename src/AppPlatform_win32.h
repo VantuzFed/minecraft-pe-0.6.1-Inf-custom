@@ -23,8 +23,16 @@ class AppPlatform_win32: public AppPlatform
 {
 public:
     AppPlatform_win32()
+	:	hwnd(NULL)
     {
     }
+
+	virtual void setWindowTitle(const std::string& title) override {
+		if (hwnd)
+			SetWindowTextA(hwnd, title.c_str());
+	}
+
+	HWND hwnd;
 
 	BinaryBlob readAssetFile(const std::string& filename) {
 		FILE* fp = fopen(("data/" + filename).c_str(), "r");

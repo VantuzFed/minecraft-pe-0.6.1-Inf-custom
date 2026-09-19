@@ -19,6 +19,7 @@
 #include "tile/LiquidTile.h"
 
 #include "biome/Biome.h"
+#include "levelgen/Beta173Biome.h"
 #include "MobSpawner.h"
 #include "../../network/packet/SetEntityDataPacket.h"
 #include "../../network/RakNetInstance.h"
@@ -50,13 +51,15 @@ Level::Level(LevelStorage* levelStorage, const std::string& levelName, const Lev
 	raknetInstance(0),
 	updatingTileEntities(false),
 	allPlayersAreSleeping(false),
-	_nightMode(false)
+	_nightMode(false),
+	betaBiomeSource(NULL)
 {
 	_init(levelName, settings, generatorVersion, fixedDimension);
 }
 
 Level::~Level() {
 	LOGI("Erasing chunk source\n");
+	delete betaBiomeSource;
 	delete _chunkSource;
 	LOGI("Erasing dimension\n");
 	delete dimension;
@@ -93,6 +96,12 @@ void Level::_init(const std::string& levelName, const LevelSettings& settings, i
 		levelData = *preparedData;
 		levelData.setLevelName(levelName);
 	}
+
+	// Render-time beta foliage tint needs beta temp/humidity per column.
+	delete betaBiomeSource;
+	betaBiomeSource = NULL;
+	if (levelData.getGeneratorVersion() == (int)LGV_BETA173)
+		betaBiomeSource = new BetaBiomeSource((int64_t)levelData.getSeed());
 
 	if (fixedDimension != NULL) {
 		dimension = fixedDimension;
@@ -817,6 +826,20 @@ int Level::getHeightmap(int x, int z) {
 
 BiomeSource* Level::getBiomeSource() {
 	return dimension->biomeSource;
+}
+
+bool Level::isBetaWorld() const {
+	return levelData.getGeneratorVersion() == (int)LGV_BETA173;
+}
+
+bool Level::getBetaTempHumid(int x, int z, float& temp, float& humid) {
+	if (!betaBiomeSource) return false;
+	betaBiomeSource->getBiomeBlock(betaBiomeScratch, x, z, 1, 1);
+	if (betaBiomeSource->temperatures.empty() || betaBiomeSource->humidities.empty())
+		return false;
+	temp = (float)betaBiomeSource->temperatures[0];
+	humid = (float)betaBiomeSource->humidities[0];
+	return true;
 }
 Biome* Level::getBiome( int x, int z ) {
 	return dimension->biomeSource->getBiome(x, z);

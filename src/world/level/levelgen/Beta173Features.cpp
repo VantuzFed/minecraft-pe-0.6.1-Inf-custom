@@ -1,6 +1,7 @@
 #include "Beta173Features.h"
 
 #include <cmath>
+#include <vector>
 
 #include "../Level.h"
 #include "../LightLayer.h"
@@ -121,139 +122,194 @@ bool placeOak(Level* level, JavaRandom& rand, int x, int y, int z) {
 }
 
 // ---------------------------------------------------------------------------
-// Big oak (ih). Field mapping: d[3]=origin, e=height, g=0.618, h=1.0,
-// i=0.381, j=angle(1.0), k=len(1.0), l=1, m=12, n=4, o=branch table.
+// Big oak (ih). Faithful port from the original jar:
+//  - the generator keeps an INTERNAL Random seeded with exactly one
+//    nextLong() from the populate stream, so every big-tree attempt shifts
+//    the populate stream by one nextLong no matter the outcome;
+//  - populate calls a(1,1,1) first, which sets m=12, n=5, j=k=1.0;
+//  - e() checks soil/clearance (shortening height when blocked far up);
+//  - a() lays out branches, b() stacks leaves at their ends,
+//    c() draws the trunk, d() draws the branch segments.
 // ---------------------------------------------------------------------------
 struct BigTreeState {
 	Level* level;
-	JavaRandom* rand;
-	int ox, oy, oz;
+	JavaRandom b;    // internal RNG, seeded from the populate stream
+	int ox, oy, oz;  // d[3] origin
 	int height;      // e
-	double g, h, i, j, k;
-	int l;
-	int m, n;
+	int trunkTop;    // f
+	int n;           // leafDistanceLimit (5 after a(1,1,1))
+	struct Node { int x, y, z, baseY; };
+	std::vector<Node> nodes; // o
 };
 
-static double bigTaper(BigTreeState& t, int y) {
-	// Mirrors ih.a(int)F: bell curve, -1.618 below 30% height.
-	if ((double)y < (double)t.height * 0.3)
-		return -1.618;
-	double half = (double)t.height / 2.0;
-	double d = half - (double)y;
-	double r = sqrt(half * half - d * d);
-	if (d == 0.0) r = half;
-	else if (fabs(d) >= half) return 0.0;
-	return r * 0.5;
+// Mirrors ih.a(int)F. Float arithmetic like the original.
+static float bigLayerSize(int height, int y) {
+	if ((double)y < (double)height * 0.3)
+		return -1.618f;
+	float half = (float)height / 2.0f;
+	float dy = (float)height / 2.0f - (float)y;
+	float r;
+	if (dy == 0.0f) r = half;
+	else if (fabsf(dy) >= half) r = 0.0f;
+	else r = (float)sqrt(pow((double)fabsf(half), 2.0) - pow((double)fabsf(dy), 2.0));
+	return r * 0.5f;
 }
 
-static void bigLeafDisc(BigTreeState& t, int x, int y, int z, float radius, int leafId) {
-	int r = (int)(radius + 0.618);
+// Mirrors ih.b(int)F: leaf-stack radius profile.
+static float bigLeafProfile(int n, int y) {
+	if (y < 0 || y >= n) return -1.0f;
+	if (y == 0 || y == n - 1) return 2.0f;
+	return 3.0f;
+}
+
+// Mirrors ih.a(int,int,int,float,byte,int) for the XZ plane (axis 1).
+static void bigLeafDisc(Level* level, int x, int y, int z, float radius) {
+	int r = (int)((double)radius + 0.618);
 	for (int dx = -r; dx <= r; dx++) {
 		for (int dz = -r; dz <= r; dz++) {
-			double dd = sqrt(((double)(sgnAbs(dx)) + 0.5) * ((double)(sgnAbs(dx)) + 0.5)
-				+ ((double)(sgnAbs(dz)) + 0.5) * ((double)(sgnAbs(dz)) + 0.5));
+			double dd = sqrt(pow((double)sgnAbs(dx) + 0.5, 2.0)
+				+ pow((double)sgnAbs(dz) + 0.5, 2.0));
 			if (dd > (double)radius) continue;
-			int id = t.level->getTile(x + dx, y, z + dz);
-			if (id == 0 || id == BB_LEAVES || id == LEAF_ID())
-				t.level->setTile(x + dx, y, z + dz, leafId);
+			int id = level->getTile(x + dx, y, z + dz);
+			if (id == 0 || id == BB_LEAVES)
+				level->setTile(x + dx, y, z + dz, LEAF_ID());
 		}
 	}
 }
 
-static void bigTrunkColumn(BigTreeState& t, int x, int y, int z, int top) {
-	for (int yy = y; yy < y + top; yy++)
-		bigLeafDisc(t, x, yy, z, 2.0f, LEAF_ID());
+// Mirrors ih.a(int,int,int): n leaf layers with the b(int) profile.
+static void bigLeafStack(Level* level, int x, int y, int z, int n) {
+	for (int i = 0; i < n; i++) {
+		float r = bigLeafProfile(n, i);
+		if (r < 0.0f) continue;
+		bigLeafDisc(level, x, y + i, z, r);
+	}
 }
 
-static void bigSegment(BigTreeState& t, int x0, int y0, int z0, int x1, int y1, int z1) {
+// Dominant-axis helper shared by the line check/draw (otherCoordPairs).
+static int bigDominantAxis(int dx, int dy, int dz) {
+	int d[3] = { dx, dy, dz };
+	int best = 0;
+	for (int i = 1; i < 3; i++)
+		if (sgnAbs(d[i]) > sgnAbs(d[best])) best = i;
+	return best;
+}
+
+// Mirrors ih.a(int[],int[])I: -1 when the whole line is air/leaves,
+// otherwise the walked distance where it got blocked.
+static int bigCheckLine(Level* level,
+	int x0, int y0, int z0, int x1, int y1, int z1) {
+	static const int PAIRS[6] = { 2, 0, 0, 1, 2, 1 };
 	int dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
-	int steps = sgnAbs(dx);
-	if (sgnAbs(dy) > steps) steps = sgnAbs(dy);
-	if (sgnAbs(dz) > steps) steps = sgnAbs(dz);
-	if (steps == 0) steps = 1;
-	for (int s = 0; s <= steps; s++) {
-		int x = x0 + dx * s / steps;
-		int y = y0 + dy * s / steps;
-		int z = z0 + dz * s / steps;
-		int id = t.level->getTile(x, y, z);
-		if (id == 0 || id == LEAF_ID())
-			t.level->setTileAndData(x, y, z, LOG_ID(), 0);
+	int d[3] = { dx, dy, dz };
+	int s[3] = { x0, y0, z0 };
+	int dom = bigDominantAxis(dx, dy, dz);
+	if (d[dom] == 0) return -1;
+	int a2 = PAIRS[dom], a3 = PAIRS[dom + 3];
+	int sign = d[dom] > 0 ? 1 : -1;
+	double r2 = (double)d[a2] / (double)d[dom];
+	double r3 = (double)d[a3] / (double)d[dom];
+	int end = d[dom] + sign;
+	for (int i = 0; i != end; i += sign) {
+		int p[3];
+		p[dom] = s[dom] + i;
+		p[a2] = BetaMath::floor((double)s[a2] + (double)i * r2 + 0.5);
+		p[a3] = BetaMath::floor((double)s[a3] + (double)i * r3 + 0.5);
+		int id = level->getTile(p[0], p[1], p[2]);
+		if (id != 0 && id != BB_LEAVES) return sgnAbs(i);
+	}
+	return -1;
+}
+
+// Mirrors ih.a(int[],int[],int)V: unconditional log line along the same walk.
+static void bigDrawLine(Level* level,
+	int x0, int y0, int z0, int x1, int y1, int z1) {
+	static const int PAIRS[6] = { 2, 0, 0, 1, 2, 1 };
+	int dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+	int d[3] = { dx, dy, dz };
+	int s[3] = { x0, y0, z0 };
+	int dom = bigDominantAxis(dx, dy, dz);
+	if (d[dom] == 0) return;
+	int a2 = PAIRS[dom], a3 = PAIRS[dom + 3];
+	int sign = d[dom] > 0 ? 1 : -1;
+	double r2 = (double)d[a2] / (double)d[dom];
+	double r3 = (double)d[a3] / (double)d[dom];
+	int end = d[dom] + sign;
+	for (int i = 0; i != end; i += sign) {
+		int p[3];
+		p[dom] = s[dom] + i;
+		p[a2] = BetaMath::floor((double)s[a2] + (double)i * r2 + 0.5);
+		p[a3] = BetaMath::floor((double)s[a3] + (double)i * r3 + 0.5);
+		level->setTile(p[0], p[1], p[2], LOG_ID());
+	}
+}
+
+// Mirrors ih.e()Z: grass/dirt soil, trunk column must be clear
+// (shortens the height when blocked 6+ up).
+static bool bigValidLocation(BigTreeState& t) {
+	Level* level = t.level;
+	int soil = level->getTile(t.ox, t.oy - 1, t.oz);
+	if (soil != Tile::grass->id && soil != Tile::dirt->id) return false;
+	int dist = bigCheckLine(level,
+		t.ox, t.oy, t.oz, t.ox, t.oy + t.height - 1, t.oz);
+	if (dist == -1) return true;
+	if (dist < 6) return false;
+	t.height = dist;
+	return true;
+}
+
+// Mirrors ih.a()V: branch layout from the top down.
+static void bigLayout(BigTreeState& t) {
+	t.trunkTop = (int)((double)t.height * 0.618);
+	if (t.trunkTop >= t.height) t.trunkTop = t.height - 1;
+	int branchCount = (int)(1.382 + pow((double)t.height / 13.0, 2.0));
+	if (branchCount < 1) branchCount = 1;
+	t.nodes.clear();
+	t.nodes.reserve((size_t)branchCount * (size_t)t.height);
+	int top = t.oy + t.height - t.n;
+	for (int lvl = top, rel = lvl - t.oy; rel >= 0; --lvl, --rel) {
+		float taper = bigLayerSize(t.height, rel);
+		if (taper < 0.0f) continue;
+		for (int i = 0; i < branchCount; i++) {
+			double spread = (double)taper * ((double)t.b.nextFloat() + 0.328);
+			double ang = (double)t.b.nextFloat() * 2.0 * 3.14159;
+			int bx = BetaMath::floor(spread * sin(ang) + (double)t.ox + 0.5);
+			int bz = BetaMath::floor(spread * cos(ang) + (double)t.oz + 0.5);
+			double dist = sqrt(pow((double)sgnAbs(t.ox - bx), 2.0)
+				+ pow((double)sgnAbs(t.oz - bz), 2.0));
+			double lowered = (double)lvl - dist * 0.381;
+			int baseY = (lowered > (double)(t.oy + t.trunkTop))
+				? (t.oy + t.trunkTop) : (int)lowered;
+			if (bigCheckLine(t.level, t.ox, baseY, t.oz, bx, lvl, bz) != -1)
+				continue;
+			BigTreeState::Node nd;
+			nd.x = bx; nd.y = lvl; nd.z = bz; nd.baseY = baseY;
+			t.nodes.push_back(nd);
+		}
 	}
 }
 
 bool placeBigTree(Level* level, JavaRandom& rand, int x, int y, int z) {
 	BigTreeState t;
-	t.level = level; t.rand = &rand;
+	t.level = level;
+	// The original funnels all branch randomness through an internal
+	// Random: exactly one nextLong() leaves the populate stream here.
+	t.b.setSeed(rand.nextLong());
 	t.ox = x; t.oy = y; t.oz = z;
-	t.g = 0.618; t.h = 1.0; t.i = 0.381; t.j = 1.0; t.k = 1.0;
-	t.l = 1; t.m = 12; t.n = 4;
 	t.height = 0;
-	// e(): soil must be grass/dirt; height = 5 + nextInt(12); need 6+ clearance.
-	int soil = level->getTile(x, y - 1, z);
-	if (soil != Tile::grass->id && soil != Tile::dirt->id) return false;
-	t.height = 5 + rand.nextInt(12);
-	// clearance: trunk column of height e must be air/leaves.
-	for (int yy = y; yy < y + t.height; yy++) {
-		int id = level->getTile(x, yy, z);
-		if (id != 0 && id != LEAF_ID() && id != BB_LEAVES) return false;
-	}
-	if (t.height < 6) return false;
-
-	// Branch layout (ih.a()): levels from top.
-	int top = y + t.height - t.n;
-	int branchCount = (int)(1.382 + (t.k * t.height / 13.0) * (t.k * t.height / 13.0));
-	if (branchCount < 1) branchCount = 1;
-	struct Branch { int x0, y0, z0, x1, y1, z1, leafR; };
-	Branch branches[64];
-	int nBranches = 0;
-	for (int lvl = top; lvl >= y && nBranches < 60; lvl--) {
-		double taper = bigTaper(t, lvl - y);
-		if (taper < 0.0) continue;
-		for (int b = 0; b < branchCount && nBranches < 60; b++) {
-			double spread = t.j * taper * (rand.nextDouble() + 0.328);
-			double angled = rand.nextDouble() * 2.0 * 3.141592653589793;
-			float angle = (float)angled;
-			int bx = BetaMath::floor(spread * (double)BetaMath::sin(angle) + (double)x + 0.5);
-			int bz = BetaMath::floor(spread * (double)BetaMath::cos(angle) + (double)z + 0.5);
-			int by = lvl;
-			// clearance walk from trunk top to endpoint must be free
-			bool blocked = false;
-			{
-				int dx = bx - x, dy = by - (y + t.height), dz = bz - z;
-				int steps = sgnAbs(dx);
-				if (sgnAbs(dy) > steps) steps = sgnAbs(dy);
-				if (sgnAbs(dz) > steps) steps = sgnAbs(dz);
-				if (steps < 1) steps = 1;
-				for (int s = 0; s <= steps && !blocked; s++) {
-					int px = x + dx * s / steps;
-					int py = (y + t.height) + dy * s / steps;
-					int pz = z + dz * s / steps;
-					int id = level->getTile(px, py, pz);
-					if (id != 0 && id != LEAF_ID() && id != BB_LEAVES) blocked = true;
-				}
-			}
-			if (blocked) continue;
-			branches[nBranches].x0 = x; branches[nBranches].y0 = y + t.height;
-			branches[nBranches].z0 = z;
-			branches[nBranches].x1 = bx; branches[nBranches].y1 = by;
-			branches[nBranches].z1 = bz;
-			branches[nBranches].leafR = 2;
-			nBranches++;
-		}
-	}
-	// Trunk-side leaves + branches + trunk.
-	bigTrunkColumn(t, x, y, z, t.height - t.n);
-	for (int i = 0; i < nBranches; i++) {
-		bigLeafDisc(t, branches[i].x1, branches[i].y1, branches[i].z1, 2.0f, LEAF_ID());
-		bigSegment(t, branches[i].x0, branches[i].y0, branches[i].z0,
-			branches[i].x1, branches[i].y1, branches[i].z1);
-	}
-	// Trunk.
-	level->setTile(x, y - 1, z, Tile::dirt->id);
-	for (int yy = y; yy < y + t.height; yy++) {
-		int id = level->getTile(x, yy, z);
-		if (id == 0 || id == LEAF_ID())
-			level->setTileAndData(x, yy, z, LOG_ID(), 0);
+	t.trunkTop = 0;
+	// pg.a(1,1,1) as done by populate for every tree: m=12, n=5, j=k=1.0.
+	t.n = 5;
+	t.height = 5 + t.b.nextInt(12);
+	if (!bigValidLocation(t)) return false;
+	bigLayout(t);
+	for (size_t i = 0; i < t.nodes.size(); i++) // b(): leaf stacks
+		bigLeafStack(level, t.nodes[i].x, t.nodes[i].y, t.nodes[i].z, t.n);
+	bigDrawLine(level, x, y, z, x, y + t.trunkTop, z); // c(): trunk
+	for (size_t i = 0; i < t.nodes.size(); i++) { // d(): branches
+		if ((double)(t.nodes[i].baseY - y) < (double)t.height * 0.2) continue;
+		bigDrawLine(level, x, t.nodes[i].baseY, z,
+			t.nodes[i].x, t.nodes[i].y, t.nodes[i].z);
 	}
 	return true;
 }
@@ -312,7 +368,9 @@ bool placeBirch(Level* level, JavaRandom& rand, int x, int y, int z) {
 }
 
 // ---------------------------------------------------------------------------
-// Taiga1 (pw): tall spruce 7..11, meta 1
+// Taiga1 (pw): tall spruce 7..11, meta 1. Leaf layers carry no RNG:
+// corners are cut deterministically, so the whole tree costs exactly
+// the 3 header nextInts no matter the outcome.
 // ---------------------------------------------------------------------------
 bool placeTaiga1(Level* level, JavaRandom& rand, int x, int y, int z) {
 	int h = rand.nextInt(5) + 7;
@@ -321,7 +379,7 @@ bool placeTaiga1(Level* level, JavaRandom& rand, int x, int y, int z) {
 	if (y < 1 || y + h + 1 > 128) return false;
 	int canGrow = 1;
 	for (int yy = y; yy <= y + 1 + h && canGrow; yy++) {
-		int r = (yy - y >= j) ? 0 : kk;
+		int r = (yy - y >= j) ? kk : 0;
 		for (int xx = x - r; xx <= x + r && canGrow; xx++)
 			for (int zz = z - r; zz <= z + r && canGrow; zz++) {
 				if (yy < 0 || yy >= 128) { canGrow = 0; break; }
@@ -334,24 +392,22 @@ bool placeTaiga1(Level* level, JavaRandom& rand, int x, int y, int z) {
 	if (soil != Tile::grass->id && soil != Tile::dirt->id) return false;
 	if (y >= 128 - h - 1) return false;
 	level->setTile(x, y - 1, z, Tile::dirt->id);
-	// fixed cone pass like birch but meta 1
-	for (int yy = y - 3 + h; yy <= y + h; yy++) {
-		int off = yy - (y + h);
-		int r = 1 - off / 2;
+	// Cone widening downward: radius 0 at the tip, up to kk.
+	int r = 0;
+	for (int yy = y + h; yy >= y + j; yy--) {
 		for (int xx = x - r; xx <= x + r; xx++) {
-			int dx = xx - x;
 			for (int zz = z - r; zz <= z + r; zz++) {
-				int dz = zz - z;
-				if (sgnAbs(dx) == r && sgnAbs(dz) == r) {
-					if (rand.nextInt(2) == 0) continue;
-					if (off == 0) continue;
-				}
+				int dx = sgnAbs(xx - x);
+				int dz = sgnAbs(zz - z);
+				if (dx == r && dz == r && r > 0) continue;
 				if (isOpaque(level->getTile(xx, yy, zz))) continue;
 				level->setTileAndData(xx, yy, zz, LEAF_ID(), 1);
 			}
 		}
+		if (r >= 1 && yy == y + j + 1) r--;
+		else if (r < kk) r++;
 	}
-	for (int i = 0; i < h; i++) {
+	for (int i = 0; i < h - 1; i++) {
 		int id = level->getTile(x, y + i, z);
 		if (id == 0 || id == LEAF_ID())
 			level->setTileAndData(x, y + i, z, LOG_ID(), 1);
@@ -360,13 +416,13 @@ bool placeTaiga1(Level* level, JavaRandom& rand, int x, int y, int z) {
 }
 
 // ---------------------------------------------------------------------------
-// Taiga2 (ws): pine cone 6..9, meta 1
+// Taiga2 (ws): pine 6..9, meta 1. Layer radii walk r/top/old with one
+// nextInt(2) header; the trunk is shortened by nextInt(3).
 // ---------------------------------------------------------------------------
 bool placeTaiga2(Level* level, JavaRandom& rand, int x, int y, int z) {
 	int h = rand.nextInt(4) + 6;
 	int j = 1 + rand.nextInt(2);
 	int kk = 2 + rand.nextInt(2);
-	(void)kk;
 	if (y < 1 || y + h + 1 > 128) return false;
 	int canGrow = 1;
 	for (int yy = y; yy <= y + 1 + h && canGrow; yy++) {
@@ -385,23 +441,29 @@ bool placeTaiga2(Level* level, JavaRandom& rand, int x, int y, int z) {
 	if (soil != Tile::grass->id && soil != Tile::dirt->id) return false;
 	if (y >= 128 - h - 1) return false;
 	level->setTile(x, y - 1, z, Tile::dirt->id);
-	// descending layers from y+h down to y+j, radius shrinks upward
-	int r = 1;
-	for (int yy = y + h; yy >= y + j; yy--) {
+	int r = rand.nextInt(2);
+	int top = 1;
+	int old = 0;
+	for (int i = 0; i <= h - j; i++) {
+		int yy = y + h - i;
 		for (int xx = x - r; xx <= x + r; xx++) {
-			int dx = xx - x;
 			for (int zz = z - r; zz <= z + r; zz++) {
-				int dz = zz - z;
-				if (sgnAbs(dx) == r && sgnAbs(dz) == r) {
-					if (rand.nextInt(2) == 0) continue;
-				}
+				int dx = sgnAbs(xx - x);
+				int dz = sgnAbs(zz - z);
+				if (dx == r && dz == r && r > 0) continue;
 				if (isOpaque(level->getTile(xx, yy, zz))) continue;
 				level->setTileAndData(xx, yy, zz, LEAF_ID(), 1);
 			}
 		}
-		if (r < 2 && yy > y + j + 1) r++;
+		if (r < top) r++;
+		else {
+			r = old;
+			old = 1;
+			if (++top > kk) top = kk;
+		}
 	}
-	for (int i = 0; i < h; i++) {
+	int d = rand.nextInt(3);
+	for (int i = 0; i < h - d; i++) {
 		int id = level->getTile(x, y + i, z);
 		if (id == 0 || id == LEAF_ID())
 			level->setTileAndData(x, y + i, z, LOG_ID(), 1);

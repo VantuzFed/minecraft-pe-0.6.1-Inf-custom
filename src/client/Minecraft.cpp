@@ -300,8 +300,19 @@ void Minecraft::setLevel(Level* level, const std::string& message /* ="" */, Loc
 		player = NULL;
 	}
 
-	this->lastTickTime = 0;
+		this->lastTickTime = 0;
 	this->_running = true;
+	applyWorldPresentation(level);
+}
+
+void Minecraft::applyWorldPresentation(Level* level) {
+	bool beta = level
+		&& level->getLevelData()->getGeneratorVersion() == (int)LGV_BETA173;
+	platform()->setWindowTitle(beta ? "Minecraft Beta 1.7.3" : "Minecraft PE 0.6.1");
+#ifndef STANDALONE_SERVER
+	if (textures)
+		textures->setBetaFlowers(beta);
+#endif
 }
 
 void Minecraft::leaveGame(bool renameLevel /*=false*/)
@@ -335,6 +346,7 @@ void Minecraft::leaveGame(bool renameLevel /*=false*/)
 		delete level;
 		level = NULL;
 	}
+	applyWorldPresentation(NULL);
 	//delete player;
 	player = NULL;
 	cameraTargetPlayer = NULL;

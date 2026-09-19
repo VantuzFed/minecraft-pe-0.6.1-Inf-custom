@@ -41,6 +41,11 @@ public:
 	TextureId loadTexture(const std::string& resourceName, bool inTextureFolder = true);
 	TextureId loadAndBindTexture(const std::string& resourceName);
 
+	// Beta worlds use the red Beta 1.7.3 rose instead of the PE cyan
+	// flower (same sprite shape, recolored flower head). Applied lazily
+	// in tick() so it always runs with a GL context current.
+	void setBetaFlowers(bool beta);
+
     TextureId assignTexture(const std::string& resourceName, const TextureData& img);
 	const TextureData* getTemporaryTextureData(TextureId id);
 
@@ -74,6 +79,11 @@ private:
 
 	int lastBoundTexture;
 	std::vector<DynamicTexture*> dynamicTextures;
+
+	bool betaFlowers;
+	bool pendingFlowerPatch;
+	void applyFlowerPatch();
+	TextureData* getEditableTextureData(TextureId id);
 };
 
 #endif /*NET_MINECRAFT_CLIENT_RENDERER__Textures_H__*/

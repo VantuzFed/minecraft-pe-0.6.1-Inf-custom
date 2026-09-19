@@ -16,7 +16,9 @@ Textures::Textures( Options* options_, AppPlatform* platform_ )
 	blur(false),
 	options(options_),
 	platform(platform_),
-	lastBoundTexture(Textures::InvalidId)
+	lastBoundTexture(Textures::InvalidId),
+	betaFlowers(false),
+	pendingFlowerPatch(false)
 {
 }
 
@@ -40,6 +42,9 @@ void Textures::clear()
 	}
 	idMap.clear();
 	loadedImages.clear();
+
+	// The reloaded atlas comes from the PE asset; re-apply the beta rose.
+	pendingFlowerPatch = betaFlowers;
 
 	lastBoundTexture = Textures::InvalidId;
 }
@@ -154,8 +159,76 @@ const TextureData* Textures::getTemporaryTextureData( TextureId id )
 	return &it->second;
 }
 
+TextureData* Textures::getEditableTextureData( TextureId id )
+{
+	TextureImageMap::iterator it = loadedImages.find(id);
+	if (it == loadedImages.end())
+		return NULL;
+
+	return &it->second;
+}
+
+void Textures::setBetaFlowers(bool beta)
+{
+	if (beta == betaFlowers && !pendingFlowerPatch)
+		return;
+	betaFlowers = beta;
+	pendingFlowerPatch = true;
+}
+
+// PE 0.6.1 replaced the red rose with a cyan flower: same 16x16 sprite
+// shape, only the flower-head pixels differ. Recolor them in the loaded
+// terrain atlas (and re-upload) while a beta world is active.
+void Textures::applyFlowerPatch()
+{
+	TextureId id = loadTexture("terrain.png");
+	TextureData* tex = getEditableTextureData(id);
+	if (!tex || !tex->data || tex->w != 256 || tex->h != 256
+		|| tex->format != TEXF_UNCOMPRESSED_8888) {
+		// Atlas not ready yet; retry on a later tick.
+		return;
+	}
+
+	// (PE cyan <-> beta red) pairs, matched by sprite frequency rank.
+	static const unsigned char PE_HEAD[4][3] = {
+		{ 0x3c, 0xa2, 0xcb }, { 0x3d, 0xb9, 0xe7 },
+		{ 0x37, 0x7f, 0x9b }, { 0x3b, 0x98, 0xba },
+	};
+	static const unsigned char BETA_HEAD[4][3] = {
+		{ 0xd1, 0x06, 0x09 }, { 0xf7, 0x07, 0x0f },
+		{ 0x91, 0x02, 0x05 }, { 0xba, 0x05, 0x0b },
+	};
+
+	const int tileX = (12 % 16) * 16;
+	const int tileY = (12 / 16) * 16;
+	for (int y = 0; y < 16; y++) {
+		for (int x = 0; x < 16; x++) {
+			unsigned char* px = tex->data + ((tileY + y) * tex->w + (tileX + x)) * 4;
+			if (px[3] == 0)
+				continue;
+			const unsigned char (*from)[3] = betaFlowers ? PE_HEAD : BETA_HEAD;
+			const unsigned char (*to)[3] = betaFlowers ? BETA_HEAD : PE_HEAD;
+			for (int i = 0; i < 4; i++) {
+				if (px[0] == from[i][0] && px[1] == from[i][1] && px[2] == from[i][2]) {
+					px[0] = to[i][0];
+					px[1] = to[i][1];
+					px[2] = to[i][2];
+					break;
+				}
+			}
+		}
+	}
+
+	bind(id);
+	glTexSubImage2D2(GL_TEXTURE_2D, 0, 0, 0, tex->w, tex->h,
+		GL_RGBA, GL_UNSIGNED_BYTE, tex->data);
+	pendingFlowerPatch = false;
+}
+
 void Textures::tick(bool uploadToGraphicsCard)
 {
+	if (pendingFlowerPatch)
+		applyFlowerPatch();
 	for (unsigned int i = 0; i < dynamicTextures.size(); ++i ) {
 		DynamicTexture* tex = dynamicTextures[i];
 		tex->tick();

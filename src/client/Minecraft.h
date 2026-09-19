@@ -106,6 +106,8 @@ public:
 
 	void prepareLevel(const std::string& message);
 
+	void applyWorldPresentation(Level* level);
+
 	void leaveGame(bool renameLevel = false);
 
 	int getProgressStatusId();

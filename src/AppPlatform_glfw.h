@@ -137,6 +137,11 @@ public:
 		glfwSetInputMode(window, GLFW_CURSOR, isHide);
 	}
 
+	virtual void setWindowTitle(const std::string& title) override {
+		if (window)
+			glfwSetWindowTitle(window, title.c_str());
+	}
+
 	virtual void openURL(const std::string& url) override {
 #ifdef _WIN32
 		ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);

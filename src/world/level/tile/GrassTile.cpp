@@ -34,6 +34,12 @@ int GrassTile::getColor( LevelSource* level, int x, int y, int z ) {
 		return 0x339933;
 	}
 
+	// Beta worlds tint grass from the beta biome, like Beta 1.7.3.
+	float betaTemp, betaHumid;
+	if (level->getBetaTempHumid(x, z, betaTemp, betaHumid)) {
+		return GrassColor::get(betaTemp, betaHumid);
+	}
+
 	level->getBiomeSource()->getBiomeBlock(x, z, 1, 1);
 	float temp = level->getBiomeSource()->temperatures[0];
 	float rain = level->getBiomeSource()->downfalls[0];

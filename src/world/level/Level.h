@@ -21,6 +21,8 @@
 #include "biome/Biome.h"
 
 class BiomeSource;
+class BetaBiomeSource;
+struct BetaBiome;
 class Dimension;
 class ChunkSource;
 class LevelStorage;
@@ -129,6 +131,8 @@ public:
     int getHeightmap(int x, int z);
 	BiomeSource* getBiomeSource();
 	Biome* getBiome(int x, int z);
+	bool isBetaWorld() const;
+	bool getBetaTempHumid(int x, int z, float& temp, float& humid);
 
 	int getRawBrightness(int x, int y, int z);
 	int getRawBrightness(int x, int y, int z, bool propagate);
@@ -317,6 +321,8 @@ protected:
 	ChunkSource* _chunkSource;
 	LevelStorage* const levelStorage;
 	LevelData levelData;
+	BetaBiomeSource* betaBiomeSource;
+	std::vector<const BetaBiome*> betaBiomeScratch;
 
 	bool allPlayersAreSleeping;
 

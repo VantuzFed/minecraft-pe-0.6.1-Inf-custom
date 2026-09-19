@@ -32,6 +32,13 @@ public:
 
     virtual BiomeSource* getBiomeSource() = 0;
 	virtual Biome* getBiome(int x, int z) = 0;
+
+	// Beta 1.7.3 foliage tint: fills temp/humidity from the beta biome
+	// source. Returns false on non-beta worlds (use the PE tint instead).
+	virtual bool getBetaTempHumid(int x, int z, float& temp, float& humid) {
+		(void)x; (void)z; (void)temp; (void)humid;
+		return false;
+	}
 };
 
 #endif /*NET_MINECRAFT_WORLD_LEVEL__LevelSource_H__*/

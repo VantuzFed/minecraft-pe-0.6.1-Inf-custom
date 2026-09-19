@@ -79,6 +79,7 @@ public:
 
 	virtual void showDialog(int dialogId) {}
     virtual void createUserInput() {}
+	virtual void setWindowTitle(const std::string& title) { (void)title; }
 	
 	bool is_big_endian(void)  {
 		union {

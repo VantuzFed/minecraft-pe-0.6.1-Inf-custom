@@ -252,6 +252,7 @@ int main(void) {
 	// Platform init.
 	appContext.platform = new AppPlatform_win32();
 	platform(&hwnd, appContext.platform->getScreenWidth(), appContext.platform->getScreenHeight());
+	((AppPlatform_win32*)appContext.platform)->hwnd = hwnd;
 	ShowWindow(hwnd, SW_SHOW);
 	SetForegroundWindow(hwnd);
 	SetFocus(hwnd);
