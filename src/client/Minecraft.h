@@ -69,7 +69,7 @@ public:
 	void setIsCreativeMode(bool isCreative);
 	void setScreen(Screen*);
 
- 	virtual void selectLevel(const std::string& levelId, const std::string& levelName, const LevelSettings& settings, int generatorVersion = SharedConstants::GeneratorVersion);
+ 	virtual bool selectLevel(const std::string& levelId, const std::string& levelName, const LevelSettings& settings, int generatorVersion = SharedConstants::GeneratorVersion);
 	virtual void setLevel(Level* level, const std::string& message = "", LocalPlayer* forceInsertPlayer = NULL);
 
 	void generateLevel( const std::string& message, Level* level );

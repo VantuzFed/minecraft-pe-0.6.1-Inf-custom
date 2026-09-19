@@ -176,7 +176,7 @@ void ClientSideNetworkHandler::handle(const RakNet::RakNetGUID& source, StartGam
 		storageSource->selectLevel(levelId, true),
 		"temp",
 		LevelSettings(packet->levelSeed, LevelSettings::validateGameType(packet->gameType)),
-		SharedConstants::StorageVersion);
+		packet->levelGeneratorVersion);
 	level->isClientSide = true;
 
 	bool isCreative = (packet->gameType == GameType::Creative);

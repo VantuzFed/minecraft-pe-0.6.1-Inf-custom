@@ -62,6 +62,9 @@ public:
 
     int			getGeneratorVersion() const;
     void		setGeneratorVersion(int version);
+    // False when the world file predates the explicit generator version
+    // (such worlds are treated as incompatible).
+    bool		hasGeneratorVersion() const;
 
     long		getLastPlayed() const;
 
@@ -93,9 +96,12 @@ private:
 	int storageVersion;
 	bool spawnMobs;
 	bool allowCheats;
-	//@note: This version is never written or loaded to disk. The only purpose
-	//       is to use it in the level generator on server and clients.
+	// Written to level.dat as "GeneratorVersion" so the right chunk
+	// generator is picked on server and clients.
 	int generatorVersion;
+	// Whether the version came from an explicit source (fresh world or
+	// a world file carrying the tag). Worlds without it are incompatible.
+	bool generatorVersionKnown;
 };
 
 #endif /*NET_MINECRAFT_WORLD_LEVEL_STORAGE__LevelData_H__*/

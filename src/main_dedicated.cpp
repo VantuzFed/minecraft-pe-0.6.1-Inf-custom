@@ -55,7 +55,10 @@ int main(int numArguments, char* pszArgs[]) {
 	g_app->init(appContext);
 	LevelSettings settings(getEpochTimeS(), GameType::Creative);
 	float startTime = getTimeS();
-	((MAIN_CLASS*)g_app)->selectLevel(aSettings.getLevelDir(), aSettings.getLevelName(),  settings);
+	if (!((MAIN_CLASS*)g_app)->selectLevel(aSettings.getLevelDir(), aSettings.getLevelName(),  settings)) {
+		std::cout << "Incompatible world: missing generator version." << std::endl;
+		return 1;
+	}
 	((MAIN_CLASS*)g_app)->hostMultiplayer(aSettings.getPort());
 
 	std::cout << "Level has been generated in " << getTimeS() - startTime << std::endl;

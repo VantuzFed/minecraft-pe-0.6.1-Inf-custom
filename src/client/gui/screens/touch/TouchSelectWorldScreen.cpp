@@ -491,7 +491,10 @@ void SelectWorldScreen::tick()
 			std::string name = getUniqueLevelName("World");
 			minecraft->setScreen(new SimpleChooseLevelScreen(name));
 		} else {
-			minecraft->selectLevel(worldsList->pickedLevel.id, worldsList->pickedLevel.name, LevelSettings::None());
+			if (!minecraft->selectLevel(worldsList->pickedLevel.id, worldsList->pickedLevel.name, LevelSettings::None())) {
+				worldsList->hasPickedLevel = false;
+				return;
+			}
 			minecraft->hostMultiplayer();
 			minecraft->setScreen(new ProgressScreen());
 			_hasStartedLevel = true;

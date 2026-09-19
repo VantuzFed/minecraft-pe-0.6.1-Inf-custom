@@ -8,6 +8,7 @@ LevelData::LevelData()
 	seed(0),
 	lastPlayed(0),
 	generatorVersion(SharedConstants::GeneratorVersion),
+	generatorVersionKnown(true),
 	time(0),
 	dimension(Dimension::NORMAL),
 	playerDataVersion(-1),
@@ -37,11 +38,14 @@ LevelData::LevelData( const LevelSettings& settings, const std::string& levelNam
 		generatorVersion = SharedConstants::GeneratorVersion;
 
 	this->generatorVersion = generatorVersion;
+	generatorVersionKnown = true;
 	spawnMobs = (gameType == GameType::Survival);
 }
 
 LevelData::LevelData( CompoundTag* tag )
-:	loadedPlayerTag(NULL)
+:	loadedPlayerTag(NULL),
+	generatorVersion((int)LGV_ORIGINAL),
+	generatorVersionKnown(false)
 {
 	//LOGI("ctor 3: %p (%p)\n", this, tag);
 	getTagData(tag);
@@ -60,6 +64,7 @@ LevelData::LevelData( const LevelData& rhs )
 	storageVersion(rhs.storageVersion),
 	playerDataVersion(rhs.playerDataVersion),
 	generatorVersion(rhs.generatorVersion),
+	generatorVersionKnown(rhs.generatorVersionKnown),
 	spawnMobs(rhs.spawnMobs),
 	allowCheats(rhs.allowCheats),
 	loadedPlayerTag(NULL),
@@ -88,6 +93,7 @@ LevelData& LevelData::operator=( const LevelData& rhs )
 		playerData  = rhs.playerData;
 		playerDataVersion	= rhs.playerDataVersion;
 		generatorVersion	= rhs.generatorVersion;
+		generatorVersionKnown = rhs.generatorVersionKnown;
 		storageVersion		= rhs.storageVersion;
 		setPlayerTag(rhs.loadedPlayerTag);
 	}
@@ -193,11 +199,15 @@ void LevelData::getTagData( const CompoundTag* tag )
 	sizeOnDisk = (int)tag->getLong("SizeOnDisk");
 	levelName = tag->getString("LevelName");
 	storageVersion = tag->getInt("StorageVersion");
-	// Worlds saved before GeneratorVersion existed always use the original generator.
-	if (tag->contains("GeneratorVersion", Tag::TAG_Int))
+	// Worlds saved before GeneratorVersion existed carry no explicit
+	// type and are reported incompatible (see hasGeneratorVersion()).
+	if (tag->contains("GeneratorVersion", Tag::TAG_Int)) {
 		generatorVersion = tag->getInt("GeneratorVersion");
-	else
+		generatorVersionKnown = true;
+	} else {
 		generatorVersion = (int)LGV_ORIGINAL;
+		generatorVersionKnown = false;
+	}
 
 	spawnMobs = (gameType == GameType::Survival);
 
@@ -335,6 +345,12 @@ int LevelData::getGeneratorVersion() const
 void LevelData::setGeneratorVersion( int version )
 {
 	this->generatorVersion = version;
+	generatorVersionKnown = true;
+}
+
+bool LevelData::hasGeneratorVersion() const
+{
+	return generatorVersionKnown;
 }
 
 long LevelData::getLastPlayed() const

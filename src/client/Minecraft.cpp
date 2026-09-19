@@ -34,6 +34,9 @@
 #include "particle/ParticleEngine.h"
 #include "gui/Screen.h"
 #include "gui/Font.h"
+#ifndef STANDALONE_SERVER
+#include "gui/screens/DisconnectionScreen.h"
+#endif
 #include "gui/screens/RenameMPLevelScreen.h"
 #include "gui/screens/ConsoleScreen.h"
 #include "gui/screens/ChatScreen.h"
@@ -240,7 +243,7 @@ Minecraft::~Minecraft()
 }
 
 // Only called by server
-void Minecraft::selectLevel( const std::string& levelId, const std::string& levelName, const LevelSettings& settings, int generatorVersion )
+bool Minecraft::selectLevel( const std::string& levelId, const std::string& levelName, const LevelSettings& settings, int generatorVersion )
 {
 #if defined(CREATORMODE)
 	level = new CreatorLevel(
@@ -252,11 +255,24 @@ void Minecraft::selectLevel( const std::string& levelId, const std::string& leve
 		settings,
 		generatorVersion);
 
+	// Worlds without an explicit generator version predate world types
+	// and are refused with a message instead of loading halfway.
+	if (!level->isNew() && !level->getLevelData()->hasGeneratorVersion()) {
+		delete level->getLevelStorage();
+		delete level;
+		level = NULL;
+#ifndef STANDALONE_SERVER
+		setScreen(new DisconnectionScreen("Incompatible world: missing generator version."));
+#endif
+		return false;
+	}
+
 	// note: settings is useless beyond this point, since it's
 	//       either copied to LevelData (or LevelData read from file)
 	setLevel(level, "Generating level");
 	setIsCreativeMode(level->getLevelData()->getGameType() == GameType::Creative);
 	_running = true;
+	return true;
 }
 
 void Minecraft::setLevel(Level* level, const std::string& message /* ="" */, LocalPlayer* forceInsertPlayer /* = NULL */) {
