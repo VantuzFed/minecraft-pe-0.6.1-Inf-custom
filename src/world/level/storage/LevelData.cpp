@@ -172,6 +172,7 @@ void LevelData::setTagData( CompoundTag* tag, CompoundTag* playerTag )
 	tag->putString("LevelName", levelName);
 	tag->putInt("StorageVersion", storageVersion);
 	tag->putInt("Platform", 2);
+	tag->putInt("GeneratorVersion", generatorVersion);
 
 	if (playerTag != NULL) {
 		tag->putCompound("Player", playerTag);
@@ -192,6 +193,11 @@ void LevelData::getTagData( const CompoundTag* tag )
 	sizeOnDisk = (int)tag->getLong("SizeOnDisk");
 	levelName = tag->getString("LevelName");
 	storageVersion = tag->getInt("StorageVersion");
+	// Worlds saved before GeneratorVersion existed always use the original generator.
+	if (tag->contains("GeneratorVersion", Tag::TAG_Int))
+		generatorVersion = tag->getInt("GeneratorVersion");
+	else
+		generatorVersion = (int)LGV_ORIGINAL;
 
 	spawnMobs = (gameType == GameType::Survival);
 

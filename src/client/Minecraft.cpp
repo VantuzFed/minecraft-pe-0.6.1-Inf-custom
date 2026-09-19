@@ -240,7 +240,7 @@ Minecraft::~Minecraft()
 }
 
 // Only called by server
-void Minecraft::selectLevel( const std::string& levelId, const std::string& levelName, const LevelSettings& settings )
+void Minecraft::selectLevel( const std::string& levelId, const std::string& levelName, const LevelSettings& settings, int generatorVersion )
 {
 #if defined(CREATORMODE)
 	level = new CreatorLevel(
@@ -250,7 +250,7 @@ void Minecraft::selectLevel( const std::string& levelId, const std::string& leve
 		storageSource->selectLevel(levelId, false),
 		levelName,
 		settings,
-		SharedConstants::GeneratorVersion);
+		generatorVersion);
 
 	// note: settings is useless beyond this point, since it's
 	//       either copied to LevelData (or LevelData read from file)

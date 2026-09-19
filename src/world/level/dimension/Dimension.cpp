@@ -3,6 +3,7 @@
 
 //#include "../levelgen/SimpleLevelSource.h"
 #include "../levelgen/RandomLevelSource.h"
+#include "../levelgen/Beta173LevelSource.h"
 #include "../Level.h"
 #include "../biome/BiomeSource.h"
 #include "../chunk/ChunkSource.h"
@@ -55,10 +56,16 @@ float Dimension::getTimeOfDay(long time, float a) {
 }
 
 ChunkSource* Dimension::createRandomLevelSource() {
+	int version = level->getLevelData()->getGeneratorVersion();
+	if (version == (int)LGV_BETA173)
+		return new Beta173LevelSource(
+			level,
+			level->getSeed(),
+			!level->isClientSide && level->getLevelData()->getSpawnMobs());
 	return new RandomLevelSource(
 		level,
 		level->getSeed(),
-		level->getLevelData()->getGeneratorVersion(),
+		version,
 		!level->isClientSide && level->getLevelData()->getSpawnMobs());
 	//return new PerformanceTestChunkSource(level);
 }

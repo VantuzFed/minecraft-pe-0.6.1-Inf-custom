@@ -5,20 +5,24 @@
 #include "../components/ImageButton.h"
 #include "../../Minecraft.h"
 #include "../../../world/level/LevelSettings.h"
+#include "../../../SharedConstants.h"
 #include "../../../platform/time.h"
 #include "../../../platform/input/Keyboard.h"
 #include "../../../platform/log.h"
+#include <cstdlib>
 
 SimpleChooseLevelScreen::SimpleChooseLevelScreen(const std::string& levelName)
 :   bHeader(0),
     bGamemode(0),
     bCheats(0),
+    bWorldType(0),
     bBack(0),
     bCreate(0),
     levelName(levelName),
     hasChosen(false),
     gamemode(GameType::Survival),
     cheatsEnabled(false),
+    worldType(LGV_ORIGINAL),
     tLevelName(0, "World name"),
     tSeed(1, "World seed")
 {
@@ -29,6 +33,7 @@ SimpleChooseLevelScreen::~SimpleChooseLevelScreen()
     if (bHeader) delete bHeader;
     delete bGamemode;
     delete bCheats;
+    delete bWorldType;
     delete bBack;
     delete bCreate;
 }
@@ -59,10 +64,12 @@ void SimpleChooseLevelScreen::init()
     if (/* minecraft->useTouchscreen() */ true) {
         bGamemode = new Touch::TButton(1, "Survival mode");
         bCheats  = new Touch::TButton(4, "Cheats: Off");
+        bWorldType = new Touch::TButton(5, "World: PE 0.6.1");
         bCreate  = new Touch::TButton(3, "Create");
     } else {
         bGamemode = new Button(1, "Survival mode");
         bCheats  = new Button(4, "Cheats: Off");
+        bWorldType = new Button(5, "World: PE 0.6.1");
         bCreate  = new Button(3, "Create");
     }
 
@@ -70,10 +77,12 @@ void SimpleChooseLevelScreen::init()
     buttons.push_back(bBack);
     buttons.push_back(bGamemode);
     buttons.push_back(bCheats);
+    buttons.push_back(bWorldType);
     buttons.push_back(bCreate);
 
     tabButtons.push_back(bGamemode);
     tabButtons.push_back(bCheats);
+    tabButtons.push_back(bWorldType);
     tabButtons.push_back(bBack);
     tabButtons.push_back(bCreate);
 
@@ -108,15 +117,22 @@ void SimpleChooseLevelScreen::setupPositions()
     tSeed.x = tLevelName.x;
     tSeed.y = tLevelName.y + 30;
 
-    const int buttonWidth = 120;
+    int buttonWidth = 120;
     const int buttonSpacing = 10;
-    const int totalButtonWidth = buttonWidth * 2 + buttonSpacing;
+    int totalButtonWidth = buttonWidth * 3 + buttonSpacing * 2;
+    if (totalButtonWidth > width - 20) {
+        buttonWidth = (width - 20 - buttonSpacing * 2) / 3;
+        if (buttonWidth < 60) buttonWidth = 60;
+        totalButtonWidth = buttonWidth * 3 + buttonSpacing * 2;
+    }
 
     bGamemode->width = buttonWidth;
     bCheats->width = buttonWidth;
+    bWorldType->width = buttonWidth;
 
     bGamemode->x = centerX - totalButtonWidth / 2;
     bCheats->x = bGamemode->x + buttonWidth + buttonSpacing;
+    bWorldType->x = bCheats->x + buttonWidth + buttonSpacing;
 
     // compute vertical centre for buttons in remaining space
     {
@@ -128,6 +144,7 @@ void SimpleChooseLevelScreen::setupPositions()
         int y = availTop + (availHeight - bGamemode->height) / 2;
         bGamemode->y = y;
         bCheats->y = y;
+        bWorldType->y = y;
     }
 
     bCreate->width = 100;
@@ -156,6 +173,9 @@ void SimpleChooseLevelScreen::render( int xm, int ym, float a )
     }
     if (modeDesc) {
         drawCenteredString(minecraft->font, modeDesc, width / 2, bGamemode->y + bGamemode->height + 4, 0xffcccccc);
+    }
+    if (bWorldType && worldType == LGV_BETA173) {
+        drawCenteredString(minecraft->font, "Classic Beta 1.7.3 terrain", width / 2, bWorldType->y + bWorldType->height + 4, 0xffcccccc);
     }
 
     drawString(minecraft->font, "World name:", tLevelName.x, tLevelName.y - Font::DefaultLineHeight - 2, 0xffcccccc);
@@ -218,20 +238,27 @@ void SimpleChooseLevelScreen::buttonClicked( Button* button )
         return;
     }
 
+    if (button == bWorldType) {
+        worldType = (worldType == LGV_ORIGINAL) ? LGV_BETA173 : LGV_ORIGINAL;
+        bWorldType->msg = (worldType == LGV_BETA173) ? "World: Beta 1.7.3" : "World: PE 0.6.1";
+        return;
+    }
+
     if (button == bCreate && !tLevelName.text.empty()) {
-        int seed = getEpochTimeS();
+        int64_t seed = getEpochTimeS();
         if (!tSeed.text.empty()) {
             std::string seedString = Util::stringTrim(tSeed.text);
-            int tmpSeed;
-            if (sscanf(seedString.c_str(), "%d", &tmpSeed) > 0) {
-                seed = tmpSeed;
+            char* end = NULL;
+            long long parsed = strtoll(seedString.c_str(), &end, 10);
+            if (end != seedString.c_str() && *end == '\0') {
+                seed = (int64_t)parsed;
             } else {
-                seed = Util::hashCode(seedString);
+                seed = (int64_t)Util::hashCode(seedString);
             }
         }
         std::string levelId = getUniqueLevelName(tLevelName.text);
-        LevelSettings settings(seed, gamemode, cheatsEnabled);
-        minecraft->selectLevel(levelId, levelId, settings);
+        LevelSettings settings((long)seed, gamemode, cheatsEnabled);
+        minecraft->selectLevel(levelId, levelId, settings, worldType);
         minecraft->hostMultiplayer();
         minecraft->setScreen(new ProgressScreen());
         hasChosen = true;

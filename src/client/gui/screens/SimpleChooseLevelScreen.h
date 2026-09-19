@@ -29,6 +29,7 @@ private:
 	Touch::THeader* bHeader;
 	Button* bGamemode;
 	Button* bCheats;
+	Button* bWorldType;
 	ImageButton* bBack;
 	Button* bCreate;
 	bool hasChosen;
@@ -36,6 +37,7 @@ private:
 	std::string levelName;
 	int gamemode;
 	bool cheatsEnabled;
+	int worldType;
 
 	TextBox tLevelName;
 	TextBox tSeed;
