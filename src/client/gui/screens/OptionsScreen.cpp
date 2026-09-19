@@ -10,12 +10,18 @@
 #include "../components/ImageButton.h"
 #include "../components/OptionsGroup.h"
 #include "platform/input/Keyboard.h"
+#include "platform/input/Mouse.h"
 
 OptionsScreen::OptionsScreen()
 	: btnClose(NULL),
 	bHeader(NULL),
 	btnCredits(NULL),
-	selectedCategory(0) {
+	currentOptionsGroup(NULL),
+	selectedCategory(0),
+	m_dragActive(false),
+	m_dragScrolling(false),
+	m_dragStartY(0),
+	m_dragStartScroll(0) {
 }
 
 OptionsScreen::~OptionsScreen() {
@@ -108,10 +114,11 @@ void OptionsScreen::setupPositions() {
 	bHeader->width = width - btnClose->width;
 	bHeader->height = btnClose->height;
 
-	// Credits button (bottom-right)
+	// Credits button: same left column as General/Game/Controls/etc.,
+	// right below the categories, so it never overlaps the option list.
 	if (btnCredits != NULL) {
-		btnCredits->x = width - btnCredits->width;
-		btnCredits->y = height - btnCredits->height;
+		btnCredits->x = 0;
+		btnCredits->y = offsetNum * buttonHeight;
 	}
 
 	for (std::vector<OptionsGroup*>::iterator it = optionPanes.begin(); it != optionPanes.end(); ++it) {
@@ -122,7 +129,7 @@ void OptionsScreen::setupPositions() {
 			(*it)->y = bHeader->height;
 			(*it)->width = width - categoryButtons[0]->width;
 
-			(*it)->setupPositions();
+			(*it)->setViewHeight(height - bHeader->height);
 		}
 	}
 
@@ -176,8 +183,14 @@ void OptionsScreen::selectCategory(int index) {
 		currentIndex++;
 	}
 
-	if (index < (int)optionPanes.size())
+	selectedCategory = index;
+	m_dragActive = false;
+	m_dragScrolling = false;
+
+	if (index >= 0 && index < (int)optionPanes.size()) {
 		currentOptionsGroup = optionPanes[index];
+		currentOptionsGroup->resetScroll();
+	}
 }
 
 void OptionsScreen::generateOptionScreens() {
@@ -213,7 +226,7 @@ void OptionsScreen::generateOptionScreens() {
 		.addOptionItem(OPTIONS_BLOCK_OUTLINE, minecraft)
 		.addOptionItem(OPTIONS_IS_JOY_TOUCH_AREA, minecraft);
 
-	for (int i = OPTIONS_KEY_FORWARD; i <= OPTIONS_KEY_USE; i++) {
+	for (int i = OPTIONS_KEY_FORWARD; i <= OPTIONS_KEY_SPRINT; i++) {
 		optionPanes[2]->addOptionItem((OptionId)i, minecraft);
 	}
 
@@ -253,6 +266,21 @@ void OptionsScreen::mouseClicked(int x, int y, int buttonNum) {
 		currentOptionsGroup->mouseClicked(minecraft, x, y, buttonNum);
 
 	super::mouseClicked(x, y, buttonNum);
+
+	// Begin potential drag-scroll only when the press is inside the list
+	// but NOT on an interactive control (slider/toggle/textbox/key).
+	// This way dragging a slider still adjusts it, while dragging the
+	// label/empty area scrolls the list (works for mouse + touch).
+	m_dragActive = false;
+	m_dragScrolling = false;
+	if (buttonNum == MouseAction::ACTION_LEFT && currentOptionsGroup != NULL) {
+		if (currentOptionsGroup->isInsideView(x, y)
+			&& !currentOptionsGroup->hitsControl(x, y)) {
+			m_dragActive = true;
+			m_dragStartY = y;
+			m_dragStartScroll = currentOptionsGroup->getScrollY();
+		}
+	}
 }
 
 void OptionsScreen::mouseReleased(int x, int y, int buttonNum) {
@@ -260,6 +288,18 @@ void OptionsScreen::mouseReleased(int x, int y, int buttonNum) {
 		currentOptionsGroup->mouseReleased(minecraft, x, y, buttonNum);
 
 	super::mouseReleased(x, y, buttonNum);
+
+	m_dragActive = false;
+	m_dragScrolling = false;
+}
+
+void OptionsScreen::mouseWheel(int dx, int dy, int xm, int ym) {
+	if (currentOptionsGroup == NULL) return;
+	if (dy == 0 && dx == 0) return;
+	// GLFW: dy > 0 = wheel up. Scrolling up shows earlier items (scrollY down).
+	int delta = -dy * 20;
+	if (delta == 0) delta = -dx * 20;
+	currentOptionsGroup->scrollBy(delta);
 }
 
 void OptionsScreen::keyPressed(int eventKey) {
@@ -282,6 +322,19 @@ void OptionsScreen::tick() {
 
 	if (currentOptionsGroup != NULL)
 		currentOptionsGroup->tick(minecraft);
+
+	// Continue drag-scroll while the button is held.
+	if (m_dragActive && currentOptionsGroup != NULL
+		&& Mouse::isButtonDown(MouseAction::ACTION_LEFT)) {
+		int mx = Mouse::getX();
+		int my = Mouse::getY();
+		toGUICoordinate(mx, my);
+		int dy = my - m_dragStartY;
+		if (!m_dragScrolling && (dy > 4 || dy < -4))
+			m_dragScrolling = true;
+		if (m_dragScrolling)
+			currentOptionsGroup->setScrollY(m_dragStartScroll - dy);
+	}
 
 	super::tick();
 }

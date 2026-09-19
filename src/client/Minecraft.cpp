@@ -716,6 +716,10 @@ void Minecraft::tickInput() {
 		bool isPressed = (Keyboard::getEventKeyState() == KeyboardAction::KEYDOWN);
 		player->setKey(key, isPressed);
 
+		if (key == options.getIntValue(OPTIONS_KEY_SPRINT)) {
+			player->setSprinting(isPressed);
+		}
+
 		if (isPressed) {
 			gui.handleKeyPressed(key);
 
@@ -740,10 +744,6 @@ void Minecraft::tickInput() {
 					raknetInstance->send(p);
 				}
 #endif
-			}
-
-			if (key == Keyboard::KEY_LEFT_CTRL) {
-				player->setSprinting(true);
 			}
 
 			if (key == Keyboard::KEY_E) {

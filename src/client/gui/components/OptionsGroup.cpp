@@ -7,13 +7,92 @@
 #include "TextOption.h"
 #include "KeyOption.h"
 
-OptionsGroup::OptionsGroup( std::string labelID )  {
+OptionsGroup::OptionsGroup( std::string labelID )
+	: m_scrollY(0), m_viewHeight(10000), m_contentHeight(0) {
 	label = I18n::get(labelID);
 }
 
+void OptionsGroup::setViewHeight(int h) {
+	if (h < 1) h = 1;
+	if (h != m_viewHeight) {
+		m_viewHeight = h;
+		setupPositions();
+	}
+}
+
+void OptionsGroup::resetScroll() {
+	if (m_scrollY != 0) {
+		m_scrollY = 0;
+		setupPositions();
+	}
+}
+
+int OptionsGroup::getMaxScroll() const {
+	int max = m_contentHeight - m_viewHeight;
+	if (max < 0) max = 0;
+	return max;
+}
+
+void OptionsGroup::clampScroll() {
+	int max = getMaxScroll();
+	if (m_scrollY < 0) m_scrollY = 0;
+	if (m_scrollY > max) m_scrollY = max;
+}
+
+void OptionsGroup::scrollBy(int dy) {
+	if (dy == 0) return;
+	m_scrollY += dy;
+	clampScroll();
+	setupPositions();
+}
+
+void OptionsGroup::setScrollY(int y) {
+	if (y == m_scrollY) return;
+	m_scrollY = y;
+	clampScroll();
+	setupPositions();
+}
+
+bool OptionsGroup::isInsideView(int x, int y) const {
+	return x >= this->x && x < this->x + this->width
+		&& y >= this->y && y < this->y + m_viewHeight;
+}
+
+bool OptionsGroup::hitsControl(int x, int y) const {
+	for (std::vector<GuiElement*>::const_iterator it = children.begin(); it != children.end(); ++it) {
+		OptionsItem* item = dynamic_cast<OptionsItem*>(*it);
+		if (!item) continue;
+		// only consider visible rows
+		if (item->y + item->height < this->y) continue;
+		if (item->y >= this->y + m_viewHeight) continue;
+		if (item->isControlAt(x, y)) return true;
+	}
+	return false;
+}
+
+void OptionsGroup::mouseClicked(Minecraft* minecraft, int x, int y, int buttonNum) {
+	if (!isInsideView(x, y)) return;
+	for (std::vector<GuiElement*>::iterator it = children.begin(); it != children.end(); ++it) {
+		GuiElement* child = *it;
+		if (child->y + child->height < this->y) continue;
+		if (child->y >= this->y + m_viewHeight) continue;
+		child->mouseClicked(minecraft, x, y, buttonNum);
+	}
+}
+
+void OptionsGroup::mouseReleased(Minecraft* minecraft, int x, int y, int buttonNum) {
+	for (std::vector<GuiElement*>::iterator it = children.begin(); it != children.end(); ++it) {
+		GuiElement* child = *it;
+		if (child->y + child->height < this->y) continue;
+		if (child->y >= this->y + m_viewHeight) continue;
+		child->mouseReleased(minecraft, x, y, buttonNum);
+	}
+}
+
 void OptionsGroup::setupPositions() {
-	// First we write the header and then we add the items
-	int curY = y + 18;
+	// First we write the header and then we add the items.
+	// Content is shifted up by m_scrollY so the user can see items below the fold.
+	int curY = y + 18 - m_scrollY;
 	for(std::vector<GuiElement*>::iterator it = children.begin(); it != children.end(); ++it) {
 		(*it)->width = width - 5;
 		
@@ -22,7 +101,26 @@ void OptionsGroup::setupPositions() {
 		(*it)->setupPositions();
 		curY += (*it)->height + 3;
 	}
-	height = curY;
+	m_contentHeight = curY - y + m_scrollY;
+	if (m_contentHeight < 0) m_contentHeight = 0;
+	height = m_contentHeight;
+
+	int oldScroll = m_scrollY;
+	clampScroll();
+	if (m_scrollY != oldScroll) {
+		// scroll was out of range (e.g. view resized) -> relayout with clamped value
+		curY = y + 18 - m_scrollY;
+		for(std::vector<GuiElement*>::iterator it = children.begin(); it != children.end(); ++it) {
+			(*it)->width = width - 5;
+			(*it)->y = curY;
+			(*it)->x = x + 10;
+			(*it)->setupPositions();
+			curY += (*it)->height + 3;
+		}
+		m_contentHeight = curY - y + m_scrollY;
+		if (m_contentHeight < 0) m_contentHeight = 0;
+		height = m_contentHeight;
+	}
 }
 
 void OptionsGroup::render( Minecraft* minecraft, int xm, int ym ) {
@@ -31,7 +129,32 @@ void OptionsGroup::render( Minecraft* minecraft, int xm, int ym ) {
 	
 	minecraft->font->draw(label, (float)x + padX, (float)y + padY, 0xffffffff, false);
 
-	super::render(minecraft, xm, ym);
+	int viewBottom = y + m_viewHeight;
+	for(std::vector<GuiElement*>::iterator it = children.begin(); it != children.end(); ++it) {
+		GuiElement* child = *it;
+		if (child->y + child->height < y) continue;
+		if (child->y >= viewBottom) continue;
+		child->render(minecraft, xm, ym);
+	}
+
+	int maxScroll = getMaxScroll();
+	if (maxScroll > 0 && m_viewHeight > 0) {
+		int sbX0 = x + width - 4;
+		int sbX1 = x + width - 1;
+		int sbY0 = y + 18;
+		int sbY1 = y + m_viewHeight - 2;
+		if (sbY1 > sbY0) {
+			fill(sbX0, sbY0, sbX1, sbY1, 0xFF000000);
+			int barH = (m_viewHeight * (sbY1 - sbY0)) / m_contentHeight;
+			if (barH < 8) barH = 8;
+			if (barH > (sbY1 - sbY0)) barH = sbY1 - sbY0;
+			int travel = (sbY1 - sbY0) - barH;
+			int barY = sbY0;
+			if (travel > 0)
+				barY = sbY0 + (m_scrollY * travel) / maxScroll;
+			fill(sbX0, barY, sbX1, barY + barH, 0xFF808080);
+		}
+	}
 }
 
 OptionsGroup& OptionsGroup::addOptionItem(OptionId optId, Minecraft* minecraft ) {

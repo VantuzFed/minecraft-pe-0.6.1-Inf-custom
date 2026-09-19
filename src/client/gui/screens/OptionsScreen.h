@@ -27,6 +27,7 @@ public:
 
 	virtual void mouseClicked(int x, int y, int buttonNum);
 	virtual void mouseReleased(int x, int y, int buttonNum);
+	virtual void mouseWheel(int dx, int dy, int xm, int ym) override;
 	virtual void keyPressed(int eventKey);
 	virtual void charPressed(char inputChar);
 	
@@ -44,6 +45,12 @@ private:
 	OptionsGroup* currentOptionsGroup;
 
 	int selectedCategory;
+
+	// drag-to-scroll state (mouse + touch, touch emulates left button)
+	bool m_dragActive;
+	bool m_dragScrolling;
+	int m_dragStartY;
+	int m_dragStartScroll;
 };
 
 #endif /*NET_MINECRAFT_CLIENT_GUI_SCREENS__OptionsScreen_H__*/

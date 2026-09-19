@@ -19,6 +19,16 @@ void OptionsItem::setupPositions() {
 	height = currentHeight;
 }
 
+bool OptionsItem::isControlAt(int x, int y) const {
+	for (std::vector<GuiElement*>::const_iterator it = children.begin(); it != children.end(); ++it) {
+		const GuiElement* child = *it;
+		if (x >= child->x && x < child->x + child->width
+			&& y >= child->y && y < child->y + child->height)
+			return true;
+	}
+	return false;
+}
+
 void OptionsItem::render( Minecraft* minecraft, int xm, int ym ) {
 	int yOffset = (height - 8) / 2;
 	std::string text = m_label;

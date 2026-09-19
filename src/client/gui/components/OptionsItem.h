@@ -18,6 +18,7 @@ public:
 	OptionsItem(OptionId optionId, std::string label, GuiElement* element);
 	virtual void render(Minecraft* minecraft, int xm, int ym);
 	void setupPositions();
+	bool isControlAt(int x, int y) const;
 
 private:
 	OptionId m_optionId;

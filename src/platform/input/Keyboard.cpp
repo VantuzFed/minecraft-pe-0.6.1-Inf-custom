@@ -54,6 +54,7 @@ const char* Keyboard::getKeyName(int key) {
 		case KEY_ESCAPE: return "Esc";
 		case KEY_SPACE: return "Space";
 		case KEY_LSHIFT: return "Left Shift";
+		case KEY_LEFT_CTRL: return "Left Ctrl";
 		default: return "Unknown";
 	}
 }

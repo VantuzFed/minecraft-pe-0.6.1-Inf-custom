@@ -99,6 +99,7 @@ OptionInt keyDrop("key.drop", Keyboard::KEY_Q);
 OptionInt keyChat("key.chat", Keyboard::KEY_T);
 OptionInt keyFog("key.fog", Keyboard::KEY_F);
 OptionInt keyUse("key.use", Keyboard::KEY_U);
+OptionInt keySprint("key.sprint", Keyboard::KEY_LEFT_CTRL);
 
 // TODO: make human readable keycodes here
 OptionInt keyMenuNext("key.menu.next", 40);
@@ -190,6 +191,7 @@ void Options::initTable() {
     m_options[OPTIONS_KEY_CHAT] = &keyChat;
     m_options[OPTIONS_KEY_FOG] = &keyFog;
     m_options[OPTIONS_KEY_USE] = &keyUse;
+    m_options[OPTIONS_KEY_SPRINT] = &keySprint;
 
     m_options[OPTIONS_KEY_MENU_NEXT] = &keyMenuNext;
     m_options[OPTIONS_KEY_MENU_PREV] = &keyMenuPrev;

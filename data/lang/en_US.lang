@@ -256,6 +256,7 @@ options.key.drop=Drop
 options.key.chat=Chat
 options.key.fog=Toggle Fog
 options.key.sneak=Sneak
+options.key.sprint=Sprint
 options.key.playerlist=List Players
 options.key.attack=Attack
 options.key.use=Use Item
