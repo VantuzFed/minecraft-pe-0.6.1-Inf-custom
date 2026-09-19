@@ -386,7 +386,10 @@ void ServerSideNetworkHandler::handle(const RakNet::RakNetGUID& source, RequestC
 	if (!chunk)
         return;
 
-	ChunkDataPacket cpacket(chunk->x, chunk->z, chunk);
+	// Full chunk: the client predicts terrain locally, but any divergence
+	// (generator build, seed, version) would show through wherever the
+	// delta has no bits. Send everything so both sides match exactly.
+	ChunkDataPacket cpacket(chunk->x, chunk->z, chunk, true);
 
 	RakNet::BitStream bitStream;
 	cpacket.write(&bitStream);

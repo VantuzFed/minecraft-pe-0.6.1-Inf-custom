@@ -11,15 +11,24 @@ public:
 	int x, z;
 	RakNet::BitStream chunkData;
 	LevelChunk* chunk;
+	// Full send: every column goes out, not just updateMap-dirty ones.
+	// Used for initial chunk sync so the client renders exactly the
+	// server blocks even if its local prediction diverged (other
+	// generator build, seed or version). Live edits keep using deltas
+	// via UpdateBlockPacket.
+	bool full;
 
 	ChunkDataPacket()
+	:	chunk(NULL),
+		full(false)
 	{
 	}
 
-	ChunkDataPacket(int x, int z, LevelChunk* chunk)
+	ChunkDataPacket(int x, int z, LevelChunk* chunk, bool full = false)
 	:	x(x),
 		z(z),
-		chunk(chunk)
+		chunk(chunk),
+		full(full)
 	{
 	}
 
@@ -39,7 +48,7 @@ public:
 		chunkData.Reset();
 		for (int i = 0; i < CHUNK_COLUMNS; i++)
 		{
-			unsigned char updateBits = chunk->updateMap[i];
+			unsigned char updateBits = full ? 0xFF : chunk->updateMap[i];
 			chunkData.Write(updateBits);
 
 			if (updateBits > 0)
