@@ -388,7 +388,7 @@ void GameRenderer::renderLevel(double a) {
 				TIMER_POP_PUSH("select");
 				Player* player = (Player*) cameraEntity;
 				// if (mc->useTouchscreen()) {
-				if (mc->options.getBooleanValue(OPTIONS_BLOCK_OUTLINE)){
+				if (mc->options.getIntValue(OPTIONS_BLOCK_OUTLINE) == 1){
 					levelRenderer->renderHitOutline(player, mc->hitResult, 0, NULL, a); //player.inventory->getSelected(), a); // java block outline one
 				} else {
 					levelRenderer->renderHitSelect(player, mc->hitResult, 0, NULL, a); //player.inventory->getSelected(), a); // normal pe one - shredder

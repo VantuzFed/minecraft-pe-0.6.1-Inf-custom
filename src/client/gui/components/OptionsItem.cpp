@@ -87,6 +87,15 @@ void OptionsItem::render( Minecraft* minecraft, int xm, int ym ) {
 		}
 		text += ": " + scaleText;
 	}
+	if (m_optionId == OPTIONS_BLOCK_OUTLINE) {
+		int value = minecraft->options.getIntValue(OPTIONS_BLOCK_OUTLINE);
+		std::string scaleText;
+		switch (value) {
+		case 1: scaleText = I18n::get("options.blockOutline.desktop"); break;
+		default: scaleText = I18n::get("options.blockOutline.mobile"); break;
+		}
+		text += ": " + scaleText;
+	}
 	if (m_optionId == OPTIONS_VIEW_DISTANCE) {
 		int value = minecraft->options.getIntValue(OPTIONS_VIEW_DISTANCE);
 		std::string scaleText;

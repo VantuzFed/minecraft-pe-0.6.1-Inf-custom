@@ -10,6 +10,10 @@ GuiElement::GuiElement( bool active/*=false*/, bool visible/*=true*/, int x /*= 
 		
 }
 
+void GuiElement::setVisible(bool visible) {
+	this->visible = visible;
+}
+
 bool GuiElement::pointInside( int x, int y ) {
 	if(x >= this->x && x < this->x + this->width) {
 		if(y >= this->y && y < this->y + this->height) {

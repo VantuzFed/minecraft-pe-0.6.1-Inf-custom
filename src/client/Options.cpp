@@ -77,7 +77,8 @@ OptionBool betaSky("betaSky", false);
 
 OptionBool tintedSide("tintedSide", false);
 
-OptionBool blockOutline("blockOutline", false);
+// Block outline style: 0 = mobile white highlight, 1 = desktop black border.
+OptionInt blockOutline("blockOutline", 0, 0, 1);
 
 OptionBool restoredAnims("restoredAnims", true);
 
@@ -242,6 +243,15 @@ void Options::set(OptionId key, float value) {
 
 void Options::set(OptionId key, int value) {
 	auto option = opt<OptionInt>(key);
+
+	if (option) {
+		option->set(value);
+		notifyOptionUpdate(key, value);
+	}
+}
+
+void Options::set(OptionId key, bool value) {
+	auto option = opt<OptionBool>(key);
 
 	if (option) {
 		option->set(value);

@@ -6,6 +6,7 @@
 #include <string>
 #include <map>
 #include <utility>
+#include <vector>
 #include "gles.h"
 #include "TextureData.h"
 
@@ -41,10 +42,10 @@ public:
 	TextureId loadTexture(const std::string& resourceName, bool inTextureFolder = true);
 	TextureId loadAndBindTexture(const std::string& resourceName);
 
-	// Beta worlds use the red Beta 1.7.3 rose instead of the PE cyan
-	// flower (same sprite shape, recolored flower head). Applied lazily
-	// in tick() so it always runs with a GL context current.
-	void setBetaFlowers(bool beta);
+	// Beta worlds use Beta 1.7.3 terrain sprites: red rose, grayscale
+	// leaves and the beta grass-side overlay (PE keeps its own).
+	// Applied lazily in tick() so it always runs with GL context current.
+	void setBetaTerrain(bool beta);
 
     TextureId assignTexture(const std::string& resourceName, const TextureData& img);
 	const TextureData* getTemporaryTextureData(TextureId id);
@@ -80,9 +81,13 @@ private:
 	int lastBoundTexture;
 	std::vector<DynamicTexture*> dynamicTextures;
 
-	bool betaFlowers;
-	bool pendingFlowerPatch;
-	void applyFlowerPatch();
+	bool betaTerrain;
+	bool pendingTerrainPatch;
+	// PE originals of the patched tiles, saved on first patch.
+	std::vector<unsigned char> origTile52;
+	std::vector<unsigned char> origTile53;
+	std::vector<unsigned char> origTile3;
+	void applyBetaTerrainPatch();
 	TextureData* getEditableTextureData(TextureId id);
 };
 

@@ -9,6 +9,7 @@
 
 #include "../components/ImageButton.h"
 #include "../components/OptionsGroup.h"
+#include "../../../locale/I18n.h"
 #include "platform/input/Keyboard.h"
 #include "platform/input/Mouse.h"
 
@@ -16,6 +17,8 @@ OptionsScreen::OptionsScreen()
 	: btnClose(NULL),
 	bHeader(NULL),
 	btnCredits(NULL),
+	btnBetaPreset(NULL),
+	btnPePreset(NULL),
 	currentOptionsGroup(NULL),
 	selectedCategory(0),
 	m_dragActive(false),
@@ -38,6 +41,16 @@ OptionsScreen::~OptionsScreen() {
 	if (btnCredits != NULL) {
 		delete btnCredits;
 		btnCredits = NULL;
+	}
+
+	if (btnBetaPreset != NULL) {
+		delete btnBetaPreset;
+		btnBetaPreset = NULL;
+	}
+
+	if (btnPePreset != NULL) {
+		delete btnPePreset;
+		btnPePreset = NULL;
 	}
 
 	for (std::vector<Touch::TButton*>::iterator it = categoryButtons.begin(); it != categoryButtons.end(); ++it) {
@@ -78,9 +91,14 @@ void OptionsScreen::init() {
 
 	btnCredits = new Touch::TButton(11, "Credits");
 
+	btnBetaPreset = new Touch::TButton(12, I18n::get("options.visualPreset.beta"));
+	btnPePreset = new Touch::TButton(13, I18n::get("options.visualPreset.pe"));
+
 	buttons.push_back(bHeader);
 	buttons.push_back(btnClose);
 	buttons.push_back(btnCredits);
+	buttons.push_back(btnBetaPreset);
+	buttons.push_back(btnPePreset);
 
 	for (std::vector<Touch::TButton*>::iterator it = categoryButtons.begin(); it != categoryButtons.end(); ++it) {
 		buttons.push_back(*it);
@@ -119,6 +137,25 @@ void OptionsScreen::setupPositions() {
 	if (btnCredits != NULL) {
 		btnCredits->x = 0;
 		btnCredits->y = offsetNum * buttonHeight;
+		offsetNum++;
+	}
+
+	// Visual preset buttons live under Credits, visible on Tweaks only.
+	// Both visible and active are toggled: hidden buttons must not
+	// react to clicks (Button::clicked only checks active).
+	bool showPresets = (selectedCategory == 4);
+	if (btnBetaPreset != NULL) {
+		btnBetaPreset->x = 0;
+		btnBetaPreset->y = offsetNum * buttonHeight;
+		btnBetaPreset->setVisible(showPresets);
+		btnBetaPreset->active = showPresets;
+		offsetNum++;
+	}
+	if (btnPePreset != NULL) {
+		btnPePreset->x = 0;
+		btnPePreset->y = offsetNum * buttonHeight;
+		btnPePreset->setVisible(showPresets);
+		btnPePreset->active = showPresets;
 	}
 
 	for (std::vector<OptionsGroup*>::iterator it = optionPanes.begin(); it != optionPanes.end(); ++it) {
@@ -168,6 +205,31 @@ void OptionsScreen::buttonClicked(Button* button) {
 	else if (button == btnCredits) {
 		minecraft->setScreen(new CreditsScreen());
 	}
+	else if ((button == btnBetaPreset || button == btnPePreset) && selectedCategory == 4) {
+		applyVisualPreset(button == btnBetaPreset);
+	}
+}
+
+void OptionsScreen::applyVisualPreset(bool beta) {
+	Minecraft* mc = minecraft;
+	Options& o = mc->options;
+	// One click bundles the scattered beta/PE-look settings.
+	o.set(OPTIONS_FOLIAGE_TINT, true);
+	o.set(OPTIONS_TINTED_SIDE, beta);
+	o.set(OPTIONS_JAVA_HUD, beta);
+	o.set(OPTIONS_FOG_TYPE, beta ? 1 : 0);
+	o.set(OPTIONS_BETA_SKY, beta);
+	o.set(OPTIONS_BEAUTIFUL_SKY, !beta);
+	o.set(OPTIONS_BLOCK_OUTLINE, beta ? 1 : 0);
+	o.set(OPTIONS_VIGNETTE, !beta);
+	o.set(OPTIONS_RESTORED_ANIMS, beta);
+	o.set(OPTIONS_MENU_STYLE, beta ? 2 : 0);
+	o.save();
+	// Rebuild the screen so sliders/toggles show the new values,
+	// staying on the Tweaks category.
+	OptionsScreen* s = new OptionsScreen();
+	mc->setScreen(s);
+	s->selectCategory(4);
 }
 
 void OptionsScreen::selectCategory(int index) {
@@ -191,6 +253,9 @@ void OptionsScreen::selectCategory(int index) {
 		currentOptionsGroup = optionPanes[index];
 		currentOptionsGroup->resetScroll();
 	}
+
+	// Refresh preset button visibility (and clickability) on category switch.
+	setupPositions();
 }
 
 void OptionsScreen::generateOptionScreens() {
@@ -222,8 +287,7 @@ void OptionsScreen::generateOptionScreens() {
 	// // Controls Pane
 	optionPanes[2]->addOptionItem(OPTIONS_INVERT_Y_MOUSE, minecraft)
 		.addOptionItem(OPTIONS_USE_TOUCHSCREEN, minecraft)
-		.addOptionItem(OPTIONS_AUTOJUMP, minecraft)	
-		.addOptionItem(OPTIONS_BLOCK_OUTLINE, minecraft)
+		.addOptionItem(OPTIONS_AUTOJUMP, minecraft)
 		.addOptionItem(OPTIONS_IS_JOY_TOUCH_AREA, minecraft);
 
 	for (int i = OPTIONS_KEY_FORWARD; i <= OPTIONS_KEY_SPRINT; i++) {
@@ -232,6 +296,7 @@ void OptionsScreen::generateOptionScreens() {
 
 	// // Graphics Pane
 	optionPanes[3]->addOptionItem(OPTIONS_FANCY_GRAPHICS, minecraft)
+		.addOptionItem(OPTIONS_BLOCK_OUTLINE, minecraft)
 		// .addOptionItem(&Option::VIEW_BOBBING, minecraft)
 		// .addOptionItem(&Option::AMBIENT_OCCLUSION, minecraft)
 		// .addOptionItem(&Option::ANAGLYPH, minecraft)

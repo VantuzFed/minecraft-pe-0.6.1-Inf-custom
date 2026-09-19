@@ -21,6 +21,7 @@ public:
 
 	void setupPositions();
 	void buttonClicked(Button* button);
+	void applyVisualPreset(bool beta);
 	void render(int xm, int ym, float a);
 	void removed();
 	void selectCategory(int index);
@@ -38,6 +39,9 @@ private:
 	ImageButton* btnClose;
 
 	Button* btnCredits;   // <-- ADD THIS
+
+	Button* btnBetaPreset;
+	Button* btnPePreset;
 
 	std::vector<Touch::TButton*> categoryButtons;
 	std::vector<OptionsGroup*> optionPanes;

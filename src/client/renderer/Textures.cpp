@@ -1,5 +1,6 @@
 #include "Textures.h"
 
+#include "BetaTerrainPatch.h"
 #include "TextureData.h"
 #include "ptexture/DynamicTexture.h"
 #include "../Options.h"
@@ -17,8 +18,8 @@ Textures::Textures( Options* options_, AppPlatform* platform_ )
 	options(options_),
 	platform(platform_),
 	lastBoundTexture(Textures::InvalidId),
-	betaFlowers(false),
-	pendingFlowerPatch(false)
+	betaTerrain(false),
+	pendingTerrainPatch(false)
 {
 }
 
@@ -43,8 +44,8 @@ void Textures::clear()
 	idMap.clear();
 	loadedImages.clear();
 
-	// The reloaded atlas comes from the PE asset; re-apply the beta rose.
-	pendingFlowerPatch = betaFlowers;
+	// The reloaded atlas comes from the PE asset; re-apply beta sprites.
+	pendingTerrainPatch = betaTerrain;
 
 	lastBoundTexture = Textures::InvalidId;
 }
@@ -168,18 +169,50 @@ TextureData* Textures::getEditableTextureData( TextureId id )
 	return &it->second;
 }
 
-void Textures::setBetaFlowers(bool beta)
+void Textures::setBetaTerrain(bool beta)
 {
-	if (beta == betaFlowers && !pendingFlowerPatch)
+	if (beta == betaTerrain && !pendingTerrainPatch)
 		return;
-	betaFlowers = beta;
-	pendingFlowerPatch = true;
+	betaTerrain = beta;
+	pendingTerrainPatch = true;
 }
 
-// PE 0.6.1 replaced the red rose with a cyan flower: same 16x16 sprite
-// shape, only the flower-head pixels differ. Recolor them in the loaded
-// terrain atlas (and re-upload) while a beta world is active.
-void Textures::applyFlowerPatch()
+static void saveTile(const TextureData* tex, int tile, std::vector<unsigned char>& out)
+{
+	out.resize(16 * 16 * 4);
+	const int tileX = (tile % 16) * 16;
+	const int tileY = (tile / 16) * 16;
+	for (int y = 0; y < 16; y++) {
+		for (int x = 0; x < 16; x++) {
+			const unsigned char* px = tex->data + ((tileY + y) * tex->w + (tileX + x)) * 4;
+			unsigned char* dst = &out[(y * 16 + x) * 4];
+			dst[0] = px[0]; dst[1] = px[1]; dst[2] = px[2]; dst[3] = px[3];
+		}
+	}
+}
+
+static void restoreTile(TextureData* tex, int tile, const std::vector<unsigned char>& src)
+{
+	if (src.size() != 16 * 16 * 4)
+		return;
+	const int tileX = (tile % 16) * 16;
+	const int tileY = (tile / 16) * 16;
+	for (int y = 0; y < 16; y++) {
+		for (int x = 0; x < 16; x++) {
+			unsigned char* px = tex->data + ((tileY + y) * tex->w + (tileX + x)) * 4;
+			const unsigned char* s = &src[(y * 16 + x) * 4];
+			px[0] = s[0]; px[1] = s[1]; px[2] = s[2]; px[3] = s[3];
+		}
+	}
+}
+
+// PE 0.6.1 terrain deltas vs Beta 1.7.3, applied while a beta world is
+// active (PE sprites restored afterwards):
+//  - rose (tile 12): cyan flower head -> red (same shape, recolored);
+//  - leaves (tiles 52/53): pre-greened opaque sprites -> grayscale
+//    beta sprites with transparency holes, so the code tint applies;
+//  - grass side (tile 3): green overlay strip -> beta shades.
+void Textures::applyBetaTerrainPatch()
 {
 	TextureId id = loadTexture("terrain.png");
 	TextureData* tex = getEditableTextureData(id);
@@ -189,31 +222,87 @@ void Textures::applyFlowerPatch()
 		return;
 	}
 
-	// (PE cyan <-> beta red) pairs, matched by sprite frequency rank.
-	static const unsigned char PE_HEAD[4][3] = {
-		{ 0x3c, 0xa2, 0xcb }, { 0x3d, 0xb9, 0xe7 },
-		{ 0x37, 0x7f, 0x9b }, { 0x3b, 0x98, 0xba },
-	};
-	static const unsigned char BETA_HEAD[4][3] = {
-		{ 0xd1, 0x06, 0x09 }, { 0xf7, 0x07, 0x0f },
-		{ 0x91, 0x02, 0x05 }, { 0xba, 0x05, 0x0b },
-	};
+	if (origTile52.empty()) {
+		saveTile(tex, 52, origTile52);
+		saveTile(tex, 53, origTile53);
+		saveTile(tex, 3, origTile3);
+	}
 
-	const int tileX = (12 % 16) * 16;
-	const int tileY = (12 / 16) * 16;
-	for (int y = 0; y < 16; y++) {
-		for (int x = 0; x < 16; x++) {
-			unsigned char* px = tex->data + ((tileY + y) * tex->w + (tileX + x)) * 4;
-			if (px[3] == 0)
-				continue;
-			const unsigned char (*from)[3] = betaFlowers ? PE_HEAD : BETA_HEAD;
-			const unsigned char (*to)[3] = betaFlowers ? BETA_HEAD : PE_HEAD;
-			for (int i = 0; i < 4; i++) {
-				if (px[0] == from[i][0] && px[1] == from[i][1] && px[2] == from[i][2]) {
-					px[0] = to[i][0];
-					px[1] = to[i][1];
-					px[2] = to[i][2];
-					break;
+	if (betaTerrain) {
+		// Leaves: wholesale beta sprites (shape differs too).
+		restoreTile(tex, 52, std::vector<unsigned char>(
+			BETA_TILE_52, BETA_TILE_52 + 16 * 16 * 4));
+		restoreTile(tex, 53, std::vector<unsigned char>(
+			BETA_TILE_53, BETA_TILE_53 + 16 * 16 * 4));
+		// Grass side: only the green overlay, dirt stays PE.
+		{
+			const int tileX = (3 % 16) * 16;
+			const int tileY = (3 / 16) * 16;
+			for (int y = 0; y < 16; y++) {
+				for (int x = 0; x < 16; x++) {
+					unsigned char* px = tex->data + ((tileY + y) * tex->w + (tileX + x)) * 4;
+					if (px[3] == 0)
+						continue;
+					if (px[1] > px[0] && px[1] > px[2]) {
+						const unsigned char* s = &BETA_TILE_3[(y * 16 + x) * 4];
+						px[0] = s[0]; px[1] = s[1]; px[2] = s[2]; px[3] = s[3];
+					}
+				}
+			}
+		}
+		// Rose head: PE cyan -> beta red.
+		static const unsigned char PE_HEAD[4][3] = {
+			{ 0x3c, 0xa2, 0xcb }, { 0x3d, 0xb9, 0xe7 },
+			{ 0x37, 0x7f, 0x9b }, { 0x3b, 0x98, 0xba },
+		};
+		static const unsigned char BETA_HEAD[4][3] = {
+			{ 0xd1, 0x06, 0x09 }, { 0xf7, 0x07, 0x0f },
+			{ 0x91, 0x02, 0x05 }, { 0xba, 0x05, 0x0b },
+		};
+		const int tileX = (12 % 16) * 16;
+		const int tileY = (12 / 16) * 16;
+		for (int y = 0; y < 16; y++) {
+			for (int x = 0; x < 16; x++) {
+				unsigned char* px = tex->data + ((tileY + y) * tex->w + (tileX + x)) * 4;
+				if (px[3] == 0)
+					continue;
+				for (int i = 0; i < 4; i++) {
+					if (px[0] == PE_HEAD[i][0] && px[1] == PE_HEAD[i][1] && px[2] == PE_HEAD[i][2]) {
+						px[0] = BETA_HEAD[i][0];
+						px[1] = BETA_HEAD[i][1];
+						px[2] = BETA_HEAD[i][2];
+						break;
+					}
+				}
+			}
+		}
+	} else {
+		restoreTile(tex, 52, origTile52);
+		restoreTile(tex, 53, origTile53);
+		restoreTile(tex, 3, origTile3);
+		// Rose back: beta red -> PE cyan.
+		static const unsigned char PE_HEAD[4][3] = {
+			{ 0x3c, 0xa2, 0xcb }, { 0x3d, 0xb9, 0xe7 },
+			{ 0x37, 0x7f, 0x9b }, { 0x3b, 0x98, 0xba },
+		};
+		static const unsigned char BETA_HEAD[4][3] = {
+			{ 0xd1, 0x06, 0x09 }, { 0xf7, 0x07, 0x0f },
+			{ 0x91, 0x02, 0x05 }, { 0xba, 0x05, 0x0b },
+		};
+		const int tileX = (12 % 16) * 16;
+		const int tileY = (12 / 16) * 16;
+		for (int y = 0; y < 16; y++) {
+			for (int x = 0; x < 16; x++) {
+				unsigned char* px = tex->data + ((tileY + y) * tex->w + (tileX + x)) * 4;
+				if (px[3] == 0)
+					continue;
+				for (int i = 0; i < 4; i++) {
+					if (px[0] == BETA_HEAD[i][0] && px[1] == BETA_HEAD[i][1] && px[2] == BETA_HEAD[i][2]) {
+						px[0] = PE_HEAD[i][0];
+						px[1] = PE_HEAD[i][1];
+						px[2] = PE_HEAD[i][2];
+						break;
+					}
 				}
 			}
 		}
@@ -222,13 +311,13 @@ void Textures::applyFlowerPatch()
 	bind(id);
 	glTexSubImage2D2(GL_TEXTURE_2D, 0, 0, 0, tex->w, tex->h,
 		GL_RGBA, GL_UNSIGNED_BYTE, tex->data);
-	pendingFlowerPatch = false;
+	pendingTerrainPatch = false;
 }
 
 void Textures::tick(bool uploadToGraphicsCard)
 {
-	if (pendingFlowerPatch)
-		applyFlowerPatch();
+	if (pendingTerrainPatch)
+		applyBetaTerrainPatch();
 	for (unsigned int i = 0; i < dynamicTextures.size(); ++i ) {
 		DynamicTexture* tex = dynamicTextures[i];
 		tex->tick();

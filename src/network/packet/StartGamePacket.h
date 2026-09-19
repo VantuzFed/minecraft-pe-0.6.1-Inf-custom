@@ -7,7 +7,9 @@
 class StartGamePacket : public Packet
 {
 public:
-	int32_t levelSeed;
+	// Full 64-bit world seed: beta worlds use the whole Java long range,
+	// truncating it desyncs client-side terrain prediction (stripes).
+	int64_t levelSeed;
 	int levelGeneratorVersion;
 	int gameType;
 
@@ -18,8 +20,8 @@ public:
 	{
 	}
 
-	StartGamePacket(long seed, int levelGeneratorVersion, int gameType, int entityId, double x, double y, double z)
-	:	levelSeed((int32_t)seed),
+	StartGamePacket(int64_t seed, int levelGeneratorVersion, int gameType, int entityId, double x, double y, double z)
+	:	levelSeed(seed),
 		levelGeneratorVersion(levelGeneratorVersion),
 		gameType(gameType),
 		entityId(entityId),

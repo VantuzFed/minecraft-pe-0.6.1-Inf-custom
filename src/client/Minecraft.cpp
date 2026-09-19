@@ -327,7 +327,7 @@ void Minecraft::applyWorldPresentation(Level* level) {
 	platform()->setWindowTitle(beta ? "Minecraft Beta 1.7.3" : "Minecraft PE 0.6.1");
 #ifndef STANDALONE_SERVER
 	if (textures)
-		textures->setBetaFlowers(beta);
+		textures->setBetaTerrain(beta);
 #endif
 }
 
