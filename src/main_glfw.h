@@ -30,6 +30,7 @@ int transformKey(int glfwkey) {
 		case GLFW_KEY_LEFT_SHIFT: return Keyboard::KEY_LSHIFT;
 		case GLFW_KEY_ENTER: return Keyboard::KEY_RETURN;
 		case GLFW_KEY_LEFT_CONTROL: return Keyboard::KEY_LEFT_CTRL;
+		case GLFW_KEY_RIGHT_CONTROL: return Keyboard::KEY_LEFT_CTRL;
 		default: return glfwkey;
 	}
 }

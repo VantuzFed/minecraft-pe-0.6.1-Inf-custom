@@ -73,7 +73,10 @@ LRESULT WINAPI windowProc ( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 		if (wParam == 34) toggleResolutions(hWnd, +1);
 		
 		//if (wParam == 'Q') ((Minecraft*)g_app)->leaveGame();
-		Keyboard::feed((unsigned char) wParam, 1); //(unsigned char) getBits(lParam, 16, 23, 1)
+		if (wParam == VK_CONTROL || wParam == VK_LCONTROL || wParam == VK_RCONTROL)
+			Keyboard::feed(Keyboard::KEY_LEFT_CTRL, 1);
+		else
+			Keyboard::feed((unsigned char) wParam, 1); //(unsigned char) getBits(lParam, 16, 23, 1)
 
 		//char* lParamConv = (char*) &lParam;
 		//int convertResult =  ToUnicode(wParam, lParamConv[1], )
@@ -81,7 +84,10 @@ LRESULT WINAPI windowProc ( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 		return 0;
 	}
 	case WM_KEYUP: {
-		Keyboard::feed((unsigned char) wParam, 0); //(unsigned char) getBits(lParam, 16, 23, 1)
+		if (wParam == VK_CONTROL || wParam == VK_LCONTROL || wParam == VK_RCONTROL)
+			Keyboard::feed(Keyboard::KEY_LEFT_CTRL, 0);
+		else
+			Keyboard::feed((unsigned char) wParam, 0); //(unsigned char) getBits(lParam, 16, 23, 1)
 		return 0;
 	}
 	case WM_CHAR: {

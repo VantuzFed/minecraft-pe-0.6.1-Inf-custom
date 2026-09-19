@@ -80,6 +80,8 @@ public:
 	virtual void showDialog(int dialogId) {}
     virtual void createUserInput() {}
 	virtual void setWindowTitle(const std::string& title) { (void)title; }
+	virtual std::string getClipboardText() { return ""; }
+	virtual void setClipboardText(const std::string& text) { (void)text; }
 	
 	bool is_big_endian(void)  {
 		union {

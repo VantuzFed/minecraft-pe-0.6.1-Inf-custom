@@ -142,6 +142,18 @@ public:
 			glfwSetWindowTitle(window, title.c_str());
 	}
 
+	virtual std::string getClipboardText() override {
+		if (!window)
+			return "";
+		const char* s = glfwGetClipboardString(window);
+		return s ? s : "";
+	}
+
+	virtual void setClipboardText(const std::string& text) override {
+		if (window)
+			glfwSetClipboardString(window, text.c_str());
+	}
+
 	virtual void openURL(const std::string& url) override {
 #ifdef _WIN32
 		ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);

@@ -32,6 +32,35 @@ public:
 			SetWindowTextA(hwnd, title.c_str());
 	}
 
+	virtual std::string getClipboardText() override {
+		std::string out;
+		if (!OpenClipboard(hwnd))
+			return out;
+		HANDLE h = GetClipboardData(CF_TEXT);
+		if (h) {
+			const char* s = (const char*)GlobalLock(h);
+			if (s)
+				out = s;
+			GlobalUnlock(h);
+		}
+		CloseClipboard();
+		return out;
+	}
+
+	virtual void setClipboardText(const std::string& text) override {
+		if (!OpenClipboard(hwnd))
+			return;
+		EmptyClipboard();
+		size_t len = text.size() + 1;
+		HGLOBAL h = GlobalAlloc(GMEM_MOVEABLE, len);
+		if (h) {
+			memcpy(GlobalLock(h), text.c_str(), len);
+			GlobalUnlock(h);
+			SetClipboardData(CF_TEXT, h);
+		}
+		CloseClipboard();
+	}
+
 	HWND hwnd;
 
 	BinaryBlob readAssetFile(const std::string& filename) {
