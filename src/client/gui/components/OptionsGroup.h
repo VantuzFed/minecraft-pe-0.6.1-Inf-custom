@@ -15,6 +15,8 @@ class OptionsGroup: public GuiElementContainer {
 	typedef GuiElementContainer super;
 public:
 	OptionsGroup(std::string labelID);
+	// Adds a custom row (e.g. preset buttons) at the top of the group.
+	void addHeaderRow(GuiElement* element);
 	virtual void setupPositions();
 	virtual void render(Minecraft* minecraft, int xm, int ym);
 	OptionsGroup& addOptionItem(OptionId optId, Minecraft* minecraft);

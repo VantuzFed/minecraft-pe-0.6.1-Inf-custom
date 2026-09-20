@@ -22,6 +22,7 @@ public:
 	void setupPositions();
 	void buttonClicked(Button* button);
 	void applyVisualPreset(bool beta);
+	void refreshOptions();
 	void render(int xm, int ym, float a);
 	void removed();
 	void selectCategory(int index);
@@ -40,15 +41,17 @@ private:
 
 	Button* btnCredits;   // <-- ADD THIS
 
-	Button* btnBetaPreset;
-	Button* btnPePreset;
-
 	std::vector<Touch::TButton*> categoryButtons;
 	std::vector<OptionsGroup*> optionPanes;
 
 	OptionsGroup* currentOptionsGroup;
 
 	int selectedCategory;
+
+	// Set when a preset button fires: the option groups are rebuilt on
+	// the next tick, never from inside event dispatch (the firing button
+	// itself lives in the group being rebuilt).
+	bool m_pendingOptionsRefresh;
 
 	// drag-to-scroll state (mouse + touch, touch emulates left button)
 	bool m_dragActive;

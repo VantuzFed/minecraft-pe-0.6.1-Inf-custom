@@ -157,6 +157,11 @@ void OptionsGroup::render( Minecraft* minecraft, int xm, int ym ) {
 	}
 }
 
+void OptionsGroup::addHeaderRow(GuiElement* element) {
+	children.insert(children.begin(), element);
+	setupPositions();
+}
+
 OptionsGroup& OptionsGroup::addOptionItem(OptionId optId, Minecraft* minecraft ) {
 	auto option = minecraft->options.getOpt(optId);
 

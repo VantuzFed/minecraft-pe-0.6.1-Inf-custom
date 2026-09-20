@@ -13,14 +13,51 @@
 #include "platform/input/Keyboard.h"
 #include "platform/input/Mouse.h"
 
+// Self-contained preset button living inside the Tweaks option group.
+// Applies the preset on click; the group rebuild is deferred to the next
+// tick (see m_pendingOptionsRefresh) because the firing button itself
+// belongs to the group being rebuilt.
+class PresetButton : public Touch::TButton {
+	typedef Touch::TButton super;
+public:
+	PresetButton(int id, const std::string& msg, bool beta)
+	:	super(id, msg),
+		m_beta(beta),
+		m_pressed(false),
+		m_screen(NULL) {
+	}
+
+	void setScreen(OptionsScreen* s) { m_screen = s; }
+
+	virtual void mouseClicked(Minecraft* mc, int x, int y, int buttonNum) {
+		if (buttonNum == MouseAction::ACTION_LEFT && clicked(mc, x, y)) {
+			setPressed();
+			m_pressed = true;
+		}
+	}
+
+	virtual void mouseReleased(Minecraft* mc, int x, int y, int buttonNum) {
+		if (buttonNum == MouseAction::ACTION_LEFT && m_pressed) {
+			m_pressed = false;
+			released(x, y);
+			if (clicked(mc, x, y) && m_screen != NULL)
+				m_screen->applyVisualPreset(m_beta);
+		}
+	}
+
+private:
+	bool m_beta;
+	bool m_pressed;
+	OptionsScreen* m_screen;
+};
+
 OptionsScreen::OptionsScreen()
 	: btnClose(NULL),
 	bHeader(NULL),
 	btnCredits(NULL),
-	btnBetaPreset(NULL),
-	btnPePreset(NULL),
 	currentOptionsGroup(NULL),
 	selectedCategory(0),
+	m_pendingOptionsRefresh(false),
 	m_dragActive(false),
 	m_dragScrolling(false),
 	m_dragStartY(0),
@@ -41,16 +78,6 @@ OptionsScreen::~OptionsScreen() {
 	if (btnCredits != NULL) {
 		delete btnCredits;
 		btnCredits = NULL;
-	}
-
-	if (btnBetaPreset != NULL) {
-		delete btnBetaPreset;
-		btnBetaPreset = NULL;
-	}
-
-	if (btnPePreset != NULL) {
-		delete btnPePreset;
-		btnPePreset = NULL;
 	}
 
 	for (std::vector<Touch::TButton*>::iterator it = categoryButtons.begin(); it != categoryButtons.end(); ++it) {
@@ -91,14 +118,9 @@ void OptionsScreen::init() {
 
 	btnCredits = new Touch::TButton(11, "Credits");
 
-	btnBetaPreset = new Touch::TButton(12, I18n::get("options.visualPreset.beta"));
-	btnPePreset = new Touch::TButton(13, I18n::get("options.visualPreset.pe"));
-
 	buttons.push_back(bHeader);
 	buttons.push_back(btnClose);
 	buttons.push_back(btnCredits);
-	buttons.push_back(btnBetaPreset);
-	buttons.push_back(btnPePreset);
 
 	for (std::vector<Touch::TButton*>::iterator it = categoryButtons.begin(); it != categoryButtons.end(); ++it) {
 		buttons.push_back(*it);
@@ -138,24 +160,6 @@ void OptionsScreen::setupPositions() {
 		btnCredits->x = 0;
 		btnCredits->y = offsetNum * buttonHeight;
 		offsetNum++;
-	}
-
-	// Visual preset buttons live under Credits, visible on Tweaks only.
-	// Both visible and active are toggled: hidden buttons must not
-	// react to clicks (Button::clicked only checks active).
-	bool showPresets = (selectedCategory == 4);
-	if (btnBetaPreset != NULL) {
-		btnBetaPreset->x = 0;
-		btnBetaPreset->y = offsetNum * buttonHeight;
-		btnBetaPreset->setVisible(showPresets);
-		btnBetaPreset->active = showPresets;
-		offsetNum++;
-	}
-	if (btnPePreset != NULL) {
-		btnPePreset->x = 0;
-		btnPePreset->y = offsetNum * buttonHeight;
-		btnPePreset->setVisible(showPresets);
-		btnPePreset->active = showPresets;
 	}
 
 	for (std::vector<OptionsGroup*>::iterator it = optionPanes.begin(); it != optionPanes.end(); ++it) {
@@ -205,14 +209,10 @@ void OptionsScreen::buttonClicked(Button* button) {
 	else if (button == btnCredits) {
 		minecraft->setScreen(new CreditsScreen());
 	}
-	else if ((button == btnBetaPreset || button == btnPePreset) && selectedCategory == 4) {
-		applyVisualPreset(button == btnBetaPreset);
-	}
 }
 
 void OptionsScreen::applyVisualPreset(bool beta) {
-	Minecraft* mc = minecraft;
-	Options& o = mc->options;
+	Options& o = minecraft->options;
 	// One click bundles the scattered beta/PE-look settings.
 	o.set(OPTIONS_FOLIAGE_TINT, true);
 	o.set(OPTIONS_TINTED_SIDE, beta);
@@ -225,11 +225,26 @@ void OptionsScreen::applyVisualPreset(bool beta) {
 	o.set(OPTIONS_RESTORED_ANIMS, beta);
 	o.set(OPTIONS_MENU_STYLE, beta ? 2 : 0);
 	o.save();
-	// Rebuild the screen so sliders/toggles show the new values,
-	// staying on the Tweaks category.
-	OptionsScreen* s = new OptionsScreen();
-	mc->setScreen(s);
-	s->selectCategory(4);
+	// The option rows show the new values only after a rebuild; do it on
+	// the next tick, never from inside event dispatch (the firing button
+	// lives in the group being rebuilt).
+	m_pendingOptionsRefresh = true;
+}
+
+void OptionsScreen::refreshOptions() {
+	m_pendingOptionsRefresh = false;
+	int category = selectedCategory;
+	for (std::vector<OptionsGroup*>::iterator it = optionPanes.begin(); it != optionPanes.end(); ++it) {
+		if (*it != NULL) {
+			delete* it;
+			*it = NULL;
+		}
+	}
+	optionPanes.clear();
+	currentOptionsGroup = NULL;
+	generateOptionScreens();
+	selectCategory(category);
+	setupPositions();
 }
 
 void OptionsScreen::selectCategory(int index) {
@@ -311,6 +326,16 @@ void OptionsScreen::generateOptionScreens() {
 		.addOptionItem(OPTIONS_BEAUTIFUL_SKY, minecraft)
 		.addOptionItem(OPTIONS_VIGNETTE, minecraft);
 
+	// Visual preset buttons at the top of the Tweaks section.
+	{
+		PresetButton* beta = new PresetButton(12, I18n::get("options.visualPreset.beta"), true);
+		beta->setScreen(this);
+		PresetButton* pe = new PresetButton(13, I18n::get("options.visualPreset.pe"), false);
+		pe->setScreen(this);
+		optionPanes[4]->addHeaderRow(pe);
+		optionPanes[4]->addHeaderRow(beta);
+	}
+
 	optionPanes[4]->addOptionItem(OPTIONS_ALLOW_SPRINT, minecraft)
 		.addOptionItem(OPTIONS_BAR_ON_TOP, minecraft)
 		.addOptionItem(OPTIONS_MENU_STYLE, minecraft)
@@ -384,6 +409,9 @@ void OptionsScreen::charPressed(char inputChar) {
 }
 
 void OptionsScreen::tick() {
+
+	if (m_pendingOptionsRefresh)
+		refreshOptions();
 
 	if (currentOptionsGroup != NULL)
 		currentOptionsGroup->tick(minecraft);
