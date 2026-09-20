@@ -20,7 +20,7 @@ public:
         CompoundTag* tag = new CompoundTag();
 
         tag->putBoolean("invulnerable", invulnerable);
-        tag->putBoolean("flying", invulnerable);
+        tag->putBoolean("flying", flying);
         tag->putBoolean("mayfly", mayfly);
         tag->putBoolean("instabuild", instabuild);
 

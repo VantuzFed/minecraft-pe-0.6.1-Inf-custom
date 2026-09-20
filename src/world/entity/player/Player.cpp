@@ -590,6 +590,12 @@ void Player::readAdditionalSaveData(CompoundTag* entityTag) {
 		loadArmor(armor, entityTag->getList("Armor"));
 	}
 
+	abilities.loadSaveData(entityTag);
+	// Flying without flight permission must never survive a reload
+	// (e.g. a creative tag opened in survival).
+	if (!abilities.mayfly)
+		abilities.flying = false;
+
     dimension = entityTag->getInt("Dimension");
 
 	//return;
@@ -629,6 +635,8 @@ void Player::addAdditonalSaveData(CompoundTag* entityTag) {
 
 	ListTag* armorTag = saveArmor(armor);
 	entityTag->put("Armor", armorTag);
+
+	abilities.addSaveData(entityTag);
 
     entityTag->putInt("Dimension", dimension);
 	//return;
