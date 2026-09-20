@@ -78,12 +78,17 @@ bool BetaInventoryScreen::slotPos(int betaIdx, int& sx, int& sy) {
 		sy = 142;
 		return true;
 	}
+	if (betaIdx >= 45 && betaIdx <= 53) { // PE overflow row (main 36-44)
+		sx = 8 + (betaIdx - 45) * 18;
+		sy = 160;
+		return true;
+	}
 	return false;
 }
 
 int BetaInventoryScreen::slotAt(int x, int y) const {
 	int px = panelX(), py = panelY();
-	for (int i = 0; i <= 44; i++) {
+	for (int i = 0; i <= 53; i++) {
 		int sx, sy;
 		if (!slotPos(i, sx, sy))
 			continue;
@@ -159,6 +164,12 @@ ItemInstance* BetaInventoryScreen::getSlotItem(int betaIdx) {
 			return NULL;
 		return it;
 	}
+	if (betaIdx >= 45 && betaIdx <= 53) {
+		ItemInstance* it = in->getItem(betaIdx - 9);
+		if (!it || it->isNull())
+			return NULL;
+		return it;
+	}
 	return NULL;
 }
 
@@ -189,8 +200,12 @@ void BetaInventoryScreen::setSlotItem(int betaIdx, const ItemInstance* item) {
 		else in->setItem(real, const_cast<ItemInstance*>(item));
 		return;
 	}
-	int pe = betaIdx; // main 9-35 maps 1:1
-	if (pe >= 9 && pe <= 35) {
+	int pe = -1;
+	if (betaIdx >= 9 && betaIdx <= 35)
+		pe = betaIdx; // main 9-35 maps 1:1
+	else if (betaIdx >= 45 && betaIdx <= 53)
+		pe = betaIdx - 9; // overflow row -> main 36-44
+	if (pe >= 0) {
 		if (empty) in->clearSlot(pe);
 		else in->setItem(pe, const_cast<ItemInstance*>(item));
 	}
@@ -328,9 +343,9 @@ bool BetaInventoryScreen::takeResultToCursor() {
 // Shift-click the result: whole crafts while they fully fit.
 bool BetaInventoryScreen::takeResultToInventory() {
 	bool moved = false;
-	while (hasCraftResult && spaceFor(craftResult, 9, 45) >= craftResult.count) {
+	while (hasCraftResult && spaceFor(craftResult, 9, 54) >= craftResult.count) {
 		ItemInstance one = craftResult;
-		mergeIntoRange(one, 9, 45, false);
+		mergeIntoRange(one, 9, 54, false);
 		if (!one.isNull())
 			break; // space accounting lied; keep matrix intact
 		consumeMatrix();
@@ -348,9 +363,15 @@ bool BetaInventoryScreen::quickTransfer(int betaIdx) {
 	ItemInstance stack = *src;
 	bool moved = false;
 	if (betaIdx >= 1 && betaIdx <= 8) {
-		moved = mergeIntoRange(stack, 9, 45, false);
+		moved = mergeIntoRange(stack, 9, 54, false);
 	} else if (betaIdx >= 9 && betaIdx <= 35) {
 		moved = mergeIntoRange(stack, 36, 45, false);
+		if (!moved)
+			moved = mergeIntoRange(stack, 45, 54, false);
+	} else if (betaIdx >= 45 && betaIdx <= 53) {
+		moved = mergeIntoRange(stack, 36, 45, false);
+		if (!moved)
+			moved = mergeIntoRange(stack, 9, 36, false);
 	} else {
 		// Armor pieces prefer their armor slot, like the original.
 		if (ItemInstance::isArmorItem(&stack)) {
@@ -364,6 +385,8 @@ bool BetaInventoryScreen::quickTransfer(int betaIdx) {
 		}
 		if (!moved)
 			moved = mergeIntoRange(stack, 9, 36, false);
+		if (!moved)
+			moved = mergeIntoRange(stack, 45, 54, false);
 	}
 	if (moved) {
 		if (stack.isNull()) {
@@ -468,12 +491,23 @@ void BetaInventoryScreen::render(int xm, int ym, float a) {
 		glColor4f2(1, 1, 1, 1);
 		blit(px, py, 0, 0, 176, 166, 256, 256);
 	}
+	// Overflow row extension: gray strip, black bottom edge, slot recesses.
+	fill(px, py + 166, px + 176, py + PANEL_H, 0xffc6c6c6);
+	fill(px, py + PANEL_H - 1, px + 176, py + PANEL_H, 0xff000000);
+	for (int i = 45; i <= 53; i++) {
+		int sx, sy;
+		if (!slotPos(i, sx, sy))
+			continue;
+		int x0 = px + sx, y0 = py + sy;
+		fill(x0, y0, x0 + 18, y0 + 18, 0xff373737);
+		fill(x0 + 1, y0 + 1, x0 + 17, y0 + 17, 0xff8b8b8b);
+	}
 
 	drawString(minecraft->font, "Crafting", px + 86, py + 16, 0xff404040);
 
 	renderPlayerModel((float)(px + 51), (float)(py + 75));
 
-	for (int i = 0; i <= 44; i++) {
+	for (int i = 0; i <= 53; i++) {
 		int sx, sy;
 		if (!slotPos(i, sx, sy))
 			continue;

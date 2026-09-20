@@ -1160,8 +1160,12 @@ void LevelRenderer::renderSky(float alpha) {
 
 	// re ported this again from beta 1.6.6, thanks to the mcpe 0.1 decomp team's code for some bit of help about the void layer - shredder 
 
-	// Sunrise
-	if (mc->options.getBooleanValue(OPTIONS_BEAUTIFUL_SKY)) {
+	// Sunrise, sun, moon and stars. Beta 1.7.3 always draws them, so the
+	// beta visual preset must not lose them; PE keeps them behind the
+	// Beautiful Skies toggle. The glPopMatrix below belongs to this
+	// block's push - keep it inside or the matrix stack underflows.
+	if (mc->options.getBooleanValue(OPTIONS_BEAUTIFUL_SKY)
+		|| mc->options.getBooleanValue(OPTIONS_BETA_SKY)) {
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	Lighting::turnOff();
@@ -1244,14 +1248,13 @@ void LevelRenderer::renderSky(float alpha) {
 		glColor4f(a, a, a, a);
 		drawArrayVT(starBuffer, starVertexCount);
 	}
-	}
 
-	
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 	glDisable(GL_BLEND);
 	glEnable(GL_ALPHA_TEST);
 	glEnable(GL_FOG);
 	glPopMatrix();
+	}
 
 	// ported over void plane (the blue bottom plane seen in java) because pocket edition lacks it @TODO test if it's buggy - shredder
 

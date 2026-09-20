@@ -40,6 +40,7 @@
 #include "../gui/screens/FurnaceScreen.h"
 #include "../gui/screens/BetaFurnaceScreen.h"
 #include "../gui/screens/BetaWorkbenchScreen.h"
+#include "../gui/screens/BetaInventoryScreen.h"
 #include "../gui/screens/ChestScreen.h"
 #include "../gui/screens/crafting/WorkbenchScreen.h"
 #include "../gui/screens/crafting/StonecutterScreen.h"
@@ -771,11 +772,19 @@ void LocalPlayer::startCrafting(int x, int y, int z, int tableSize) {
 #ifndef STANDALONE_SERVER
 	if (minecraft->isCreativeMode())
 		return;
-	// Desktop gets the classic 3x3 Beta workbench; touch keeps its flow.
+	// Desktop gets the classic Beta workbench (3x3) or the inventory's
+	// 2x2 for hand crafting; touch keeps its flow.
+#if defined(PLATFORM_DESKTOP)
+	if (tableSize != Recipe::SIZE_2X2)
+		minecraft->setScreen(new BetaWorkbenchScreen());
+	else
+		minecraft->setScreen(new BetaInventoryScreen());
+#else
 	if (!minecraft->useTouchscreen() && tableSize != Recipe::SIZE_2X2)
 		minecraft->setScreen(new BetaWorkbenchScreen());
 	else
 		minecraft->setScreen( new WorkbenchScreen(tableSize) );
+#endif
 #endif
 }
 
@@ -791,10 +800,14 @@ void LocalPlayer::openFurnace( FurnaceTileEntity* e ) {
 	if (minecraft->isCreativeMode())
 		return;
 	// Desktop gets the classic Beta furnace; touch keeps its flow.
+#if defined(PLATFORM_DESKTOP)
+	minecraft->setScreen(new BetaFurnaceScreen(e));
+#else
 	if (!minecraft->useTouchscreen())
 		minecraft->setScreen(new BetaFurnaceScreen(e));
 	else
 		minecraft->setScreen( new FurnaceScreen(this, e) );
+#endif
 #endif
 }
 

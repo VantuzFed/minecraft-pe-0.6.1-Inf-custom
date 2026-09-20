@@ -7,13 +7,15 @@
 class Inventory;
 
 // Survival inventory in the style of Minecraft Beta 1.7.3: the original
-// gui/inventory.png panel (176x166), ContainerPlayer slot map (result,
-// 2x2 matrix, armor, 3 main rows, hotbar), hover highlight and the
-// rotating player preview.
+// gui/inventory.png panel (176x166) plus an 18px strip, ContainerPlayer
+// slot map (result, 2x2 matrix, armor, 3 main rows, hotbar), hover
+// highlight and the rotating player preview.
 //
-// PE hotbar slots are links (views) into main storage, not storage, so
-// every hotbar mutation resolves (or creates) the underlying link;
-// the orphan link cells are never written directly.
+// PE stores 36 main slots while beta shows 27, so a fourth row below
+// the hotbar exposes main 36-44; without it items parked there were
+// unreachable ("lost"). PE hotbar slots are links (views) into main
+// storage, not storage, so every hotbar mutation resolves (or creates)
+// the underlying link; the orphan link cells are never written directly.
 class BetaInventoryScreen : public Screen {
 	typedef Screen super;
 public:
@@ -33,7 +35,7 @@ public:
 
 private:
 	static const int PANEL_W = 176;
-	static const int PANEL_H = 166;
+	static const int PANEL_H = 184;
 
 	// Beta container slot index -> panel coords. Returns false for bad idx.
 	static bool slotPos(int betaIdx, int& sx, int& sy);
