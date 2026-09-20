@@ -1199,7 +1199,19 @@ void LevelRenderer::renderSky(float alpha) {
 	glPushMatrix();
 
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-	glTranslatef(sc.x, sc.y, sc.z);
+	// Celestial bodies orbit the viewer, not the sky color: the old code
+	// translated by the sky color vector, parking the sun/moon near the
+	// world origin where they are never seen.
+	{
+		Mob* vp = mc->cameraTargetPlayer ? mc->cameraTargetPlayer : (Mob*)mc->player;
+		double vx = 0.0, vy = 0.0, vz = 0.0;
+		if (vp) {
+			vx = vp->xOld + (vp->x - vp->xOld) * alpha;
+			vy = vp->yOld + (vp->y - vp->yOld) * alpha;
+			vz = vp->zOld + (vp->z - vp->zOld) * alpha;
+		}
+		glTranslatef((float)vx, (float)vy, (float)vz);
+	}
 	glRotatef(0.0f, 0.0f, 0.0f, 1.0f);
 	glRotatef(level->getTimeOfDay(alpha) * 360.0f, 1.0f, 0.0f, 0.0f);
 

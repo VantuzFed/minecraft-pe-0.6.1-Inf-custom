@@ -1,9 +1,8 @@
-#include "BetaInventoryScreen.h"
+#include "BetaWorkbenchScreen.h"
 
 #include "../../Minecraft.h"
 #include "../../renderer/Textures.h"
 #include "../../renderer/entity/ItemRenderer.h"
-#include "../../renderer/entity/EntityRenderDispatcher.h"
 #include "../../player/LocalPlayer.h"
 #include "../../../world/entity/player/Player.h"
 #include "../../../world/entity/player/Inventory.h"
@@ -13,17 +12,12 @@
 #include "../../../world/item/crafting/Recipes.h"
 #include "../../../platform/input/Keyboard.h"
 #include "../../../platform/input/Mouse.h"
-#include "../../../platform/time.h"
-#include "../../../util/Mth.h"
-#include "../../../SharedConstants.h"
 #include "../../../locale/I18n.h"
 #include <cstdio>
 
-// CraftingContainer leaves the pointer-based Container API pure;
-// bridge it for recipe matching.
-class BetaCraftGrid : public CraftingContainer {
+class BetaWorkGrid : public CraftingContainer {
 public:
-	BetaCraftGrid() : CraftingContainer(2, 2) {}
+	BetaWorkGrid() : CraftingContainer(3, 3) {}
 	virtual void setItem(int slot, ItemInstance* item) {
 		if (item) {
 			CraftingContainer::setItem(slot, *item);
@@ -38,52 +32,47 @@ public:
 	}
 };
 
-BetaInventoryScreen::BetaInventoryScreen()
+BetaWorkbenchScreen::BetaWorkbenchScreen()
 	: hasCraftResult(false), hasCarried(false),
 	  pressed(false), pressSlot(-1), pressButton(0) {
-	for (int i = 0; i < 4; i++)
+	for (int i = 0; i < 9; i++)
 		craftMatrix[i].setNull();
 	craftResult.setNull();
 	carried.setNull();
 }
 
-void BetaInventoryScreen::init() {
+void BetaWorkbenchScreen::init() {
 	updateCraftResult();
 }
 
-void BetaInventoryScreen::setupPositions() {
+void BetaWorkbenchScreen::setupPositions() {
 }
 
-bool BetaInventoryScreen::slotPos(int betaIdx, int& sx, int& sy) {
-	if (betaIdx == 0) { sx = 144; sy = 36; return true; } // result
-	if (betaIdx >= 1 && betaIdx <= 4) { // 2x2 matrix
+bool BetaWorkbenchScreen::slotPos(int betaIdx, int& sx, int& sy) {
+	if (betaIdx == 0) { sx = 124; sy = 35; return true; } // result
+	if (betaIdx >= 1 && betaIdx <= 9) { // 3x3 matrix
 		int k = betaIdx - 1;
-		sx = 88 + (k % 2) * 18;
-		sy = 26 + (k / 2) * 18;
+		sx = 30 + (k % 3) * 18;
+		sy = 17 + (k / 3) * 18;
 		return true;
 	}
-	if (betaIdx >= 5 && betaIdx <= 8) { // armor, helmet on top
-		sx = 8;
-		sy = 8 + (betaIdx - 5) * 18;
-		return true;
-	}
-	if (betaIdx >= 9 && betaIdx <= 35) { // main, 3 rows like beta
-		int k = betaIdx - 9;
+	if (betaIdx >= 10 && betaIdx <= 36) { // main, 3 rows
+		int k = betaIdx - 10;
 		sx = 8 + (k % 9) * 18;
 		sy = 84 + (k / 9) * 18;
 		return true;
 	}
-	if (betaIdx >= 36 && betaIdx <= 44) { // hotbar
-		sx = 8 + (betaIdx - 36) * 18;
+	if (betaIdx >= 37 && betaIdx <= 45) { // hotbar
+		sx = 8 + (betaIdx - 37) * 18;
 		sy = 142;
 		return true;
 	}
 	return false;
 }
 
-int BetaInventoryScreen::slotAt(int x, int y) const {
+int BetaWorkbenchScreen::slotAt(int x, int y) const {
 	int px = panelX(), py = panelY();
-	for (int i = 0; i <= 44; i++) {
+	for (int i = 0; i <= 45; i++) {
 		int sx, sy;
 		if (!slotPos(i, sx, sy))
 			continue;
@@ -93,35 +82,31 @@ int BetaInventoryScreen::slotAt(int x, int y) const {
 	return -1;
 }
 
-Inventory* BetaInventoryScreen::inv() {
+Inventory* BetaWorkbenchScreen::inv() {
 	Player* player = minecraft ? minecraft->player : NULL;
 	if (!player)
 		return NULL;
 	return player->inventory;
 }
 
-// PE hotbar slots are links (views) into main storage, not storage.
-// Resolve beta hotbar slot to the real main slot, or -1.
-int BetaInventoryScreen::resolveHotbar(int betaIdx) {
+int BetaWorkbenchScreen::resolveHotbar(int betaIdx) {
 	Inventory* in = inv();
-	if (!in || betaIdx < 36 || betaIdx > 44)
+	if (!in || betaIdx < 37 || betaIdx > 45)
 		return -1;
-	int link = betaIdx - 36;
-	int real = in->linkedSlots[link].inventorySlot;
+	int real = in->linkedSlots[betaIdx - 37].inventorySlot;
 	if (real >= 9 && real < in->getContainerSize())
 		return real;
 	return -1;
 }
 
-// Link an empty hotbar position to a free main slot for placement.
-int BetaInventoryScreen::ensureHotbarLink(int betaIdx) {
+int BetaWorkbenchScreen::ensureHotbarLink(int betaIdx) {
 	Inventory* in = inv();
-	if (!in || betaIdx < 36 || betaIdx > 44)
+	if (!in || betaIdx < 37 || betaIdx > 45)
 		return -1;
 	int real = resolveHotbar(betaIdx);
 	if (real >= 0)
 		return real;
-	int link = betaIdx - 36;
+	int link = betaIdx - 37;
 	for (int s = 9; s < in->getContainerSize(); s++) {
 		ItemInstance* it = in->getItem(s);
 		if (!it || it->isNull()) {
@@ -133,28 +118,25 @@ int BetaInventoryScreen::ensureHotbarLink(int betaIdx) {
 	return -1;
 }
 
-ItemInstance* BetaInventoryScreen::getSlotItem(int betaIdx) {
+ItemInstance* BetaWorkbenchScreen::getSlotItem(int betaIdx) {
 	Player* player = minecraft ? minecraft->player : NULL;
 	Inventory* in = inv();
 	if (!player || !in)
 		return NULL;
 	if (betaIdx == 0)
 		return hasCraftResult ? &craftResult : NULL;
-	if (betaIdx >= 1 && betaIdx <= 4) {
+	if (betaIdx >= 1 && betaIdx <= 9) {
 		ItemInstance& it = craftMatrix[betaIdx - 1];
 		return it.isNull() ? NULL : &it;
 	}
-	if (betaIdx >= 5 && betaIdx <= 8)
-		return player->getArmor(betaIdx - 5);
-	if (betaIdx >= 9 && betaIdx <= 35) {
-		ItemInstance* it = in->getItem(betaIdx);
+	if (betaIdx >= 10 && betaIdx <= 36) {
+		ItemInstance* it = in->getItem(betaIdx - 1);
 		if (!it || it->isNull())
 			return NULL;
 		return it;
 	}
-	if (betaIdx >= 36 && betaIdx <= 44) {
-		// Link-following read; never the orphan link storage.
-		ItemInstance* it = in->getItem(betaIdx - 36);
+	if (betaIdx >= 37 && betaIdx <= 45) {
+		ItemInstance* it = in->getItem(betaIdx - 37);
 		if (!it || it->isNull())
 			return NULL;
 		return it;
@@ -162,24 +144,18 @@ ItemInstance* BetaInventoryScreen::getSlotItem(int betaIdx) {
 	return NULL;
 }
 
-void BetaInventoryScreen::setSlotItem(int betaIdx, const ItemInstance* item) {
-	Player* player = minecraft ? minecraft->player : NULL;
+void BetaWorkbenchScreen::setSlotItem(int betaIdx, const ItemInstance* item) {
 	Inventory* in = inv();
-	if (!player || !in)
+	if (!in)
 		return;
 	bool empty = !item || item->isNull();
-	if (betaIdx >= 1 && betaIdx <= 4) {
+	if (betaIdx >= 1 && betaIdx <= 9) {
 		if (empty) craftMatrix[betaIdx - 1].setNull();
 		else craftMatrix[betaIdx - 1] = *item;
 		updateCraftResult();
 		return;
 	}
-	if (betaIdx >= 5 && betaIdx <= 8) {
-		player->setArmor(betaIdx - 5, empty ? NULL : item);
-		return;
-	}
-	if (betaIdx >= 36 && betaIdx <= 44) {
-		// Never write the orphan link storage: resolve or link first.
+	if (betaIdx >= 37 && betaIdx <= 45) {
 		int real = resolveHotbar(betaIdx);
 		if (real < 0 && !empty)
 			real = ensureHotbarLink(betaIdx);
@@ -189,23 +165,25 @@ void BetaInventoryScreen::setSlotItem(int betaIdx, const ItemInstance* item) {
 		else in->setItem(real, const_cast<ItemInstance*>(item));
 		return;
 	}
-	int pe = betaIdx; // main 9-35 maps 1:1
-	if (pe >= 9 && pe <= 35) {
+	int pe = -1;
+	if (betaIdx >= 10 && betaIdx <= 36)
+		pe = betaIdx - 1;
+	if (pe >= 0) {
 		if (empty) in->clearSlot(pe);
 		else in->setItem(pe, const_cast<ItemInstance*>(item));
 	}
 }
 
-void BetaInventoryScreen::updateCraftResult() {
+void BetaWorkbenchScreen::updateCraftResult() {
 	craftResult.setNull();
 	hasCraftResult = false;
 	bool any = false;
-	for (int i = 0; i < 4; i++)
+	for (int i = 0; i < 9; i++)
 		if (!craftMatrix[i].isNull()) { any = true; break; }
 	if (!any)
 		return;
-	BetaCraftGrid cc;
-	for (int i = 0; i < 4; i++)
+	BetaWorkGrid cc;
+	for (int i = 0; i < 9; i++)
 		if (!craftMatrix[i].isNull())
 			cc.CraftingContainer::setItem(i, craftMatrix[i]);
 	Recipes* recipes = Recipes::getInstance();
@@ -229,8 +207,8 @@ void BetaInventoryScreen::updateCraftResult() {
 	}
 }
 
-void BetaInventoryScreen::consumeMatrix() {
-	for (int i = 0; i < 4; i++) {
+void BetaWorkbenchScreen::consumeMatrix() {
+	for (int i = 0; i < 9; i++) {
 		if (craftMatrix[i].isNull())
 			continue;
 		craftMatrix[i].count--;
@@ -250,7 +228,7 @@ static bool sameStack(const ItemInstance* a, const ItemInstance* b) {
 	return true;
 }
 
-bool BetaInventoryScreen::mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse) {
+bool BetaWorkbenchScreen::mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse) {
 	if (stack.isNull())
 		return false;
 	bool moved = false;
@@ -291,8 +269,7 @@ bool BetaInventoryScreen::mergeIntoRange(ItemInstance& stack, int from, int to, 
 	return moved;
 }
 
-// Read-only free space for a stack across a beta range.
-int BetaInventoryScreen::spaceFor(const ItemInstance& stack, int from, int to) {
+int BetaWorkbenchScreen::spaceFor(const ItemInstance& stack, int from, int to) {
 	int space = 0;
 	int max = stack.getMaxStackSize();
 	for (int i = from; i < to; i++) {
@@ -305,9 +282,7 @@ int BetaInventoryScreen::spaceFor(const ItemInstance& stack, int from, int to) {
 	return space;
 }
 
-// Take one craft's output into the cursor. All or nothing, so the
-// matrix consumption always matches what left the slot (no dupes).
-bool BetaInventoryScreen::takeResultToCursor() {
+bool BetaWorkbenchScreen::takeResultToCursor() {
 	if (!hasCraftResult)
 		return false;
 	if (!hasCarried) {
@@ -325,21 +300,20 @@ bool BetaInventoryScreen::takeResultToCursor() {
 	return false;
 }
 
-// Shift-click the result: whole crafts while they fully fit.
-bool BetaInventoryScreen::takeResultToInventory() {
+bool BetaWorkbenchScreen::takeResultToInventory() {
 	bool moved = false;
-	while (hasCraftResult && spaceFor(craftResult, 9, 45) >= craftResult.count) {
+	while (hasCraftResult && spaceFor(craftResult, 10, 46) >= craftResult.count) {
 		ItemInstance one = craftResult;
-		mergeIntoRange(one, 9, 45, false);
+		mergeIntoRange(one, 10, 46, false);
 		if (!one.isNull())
-			break; // space accounting lied; keep matrix intact
+			break;
 		consumeMatrix();
 		moved = true;
 	}
 	return moved;
 }
 
-bool BetaInventoryScreen::quickTransfer(int betaIdx) {
+bool BetaWorkbenchScreen::quickTransfer(int betaIdx) {
 	ItemInstance* src = getSlotItem(betaIdx);
 	if (!src || src->isNull())
 		return false;
@@ -347,23 +321,12 @@ bool BetaInventoryScreen::quickTransfer(int betaIdx) {
 		return takeResultToInventory();
 	ItemInstance stack = *src;
 	bool moved = false;
-	if (betaIdx >= 1 && betaIdx <= 8) {
-		moved = mergeIntoRange(stack, 9, 45, false);
-	} else if (betaIdx >= 9 && betaIdx <= 35) {
-		moved = mergeIntoRange(stack, 36, 45, false);
+	if (betaIdx >= 1 && betaIdx <= 9) {
+		moved = mergeIntoRange(stack, 10, 46, false);
+	} else if (betaIdx >= 10 && betaIdx <= 36) {
+		moved = mergeIntoRange(stack, 37, 46, false);
 	} else {
-		// Armor pieces prefer their armor slot, like the original.
-		if (ItemInstance::isArmorItem(&stack)) {
-			const ArmorItem* ar = (const ArmorItem*)stack.getItem();
-			if (ar && ar->slot >= 0 && ar->slot < 4 && !getSlotItem(5 + ar->slot)) {
-				ItemInstance v = stack;
-				setSlotItem(5 + ar->slot, &v);
-				stack.setNull();
-				moved = true;
-			}
-		}
-		if (!moved)
-			moved = mergeIntoRange(stack, 9, 36, false);
+		moved = mergeIntoRange(stack, 10, 37, false);
 	}
 	if (moved) {
 		if (stack.isNull()) {
@@ -373,19 +336,18 @@ bool BetaInventoryScreen::quickTransfer(int betaIdx) {
 		} else {
 			setSlotItem(betaIdx, &stack);
 		}
-		if (betaIdx >= 1 && betaIdx <= 4)
+		if (betaIdx >= 1 && betaIdx <= 9)
 			updateCraftResult();
 	}
 	return moved;
 }
 
-void BetaInventoryScreen::spillCarried() {
+void BetaWorkbenchScreen::spillCarried() {
 	if (!hasCarried || carried.isNull())
 		return;
 	Player* player = minecraft ? minecraft->player : NULL;
 	Inventory* in = inv();
 	if (player && in) {
-		// add() merges what fits and leaves the rest in count.
 		in->add(&carried);
 		if (carried.isNull() || carried.count <= 0) {
 			carried.setNull();
@@ -398,82 +360,20 @@ void BetaInventoryScreen::spillCarried() {
 	}
 }
 
-void BetaInventoryScreen::renderPlayerModel(float xo, float yo) {
-	glPushMatrix();
-
-	glTranslatef(xo, yo, -200);
-	float ss = 30.0f;
-	glScalef(-ss, ss, ss);
-
-	glRotatef(180, 0, 0, 1);
-
-	Player* player = (Player*)(minecraft ? minecraft->player : NULL);
-	if (!player) {
-		glPopMatrix();
-		return;
-	}
-	float oybr = player->yBodyRot;
-	float oyr = player->yRot;
-	float oxr = player->xRot;
-
-	float t = getTimeS();
-	float xd = 10 * Mth::sin(t);
-	float yd = 10 * Mth::cos(t * 0.05f);
-
-	const float xtan = Mth::atan(xd / 40.0f) * +20;
-	const float ytan = Mth::atan(yd / 40.0f) * -20;
-
-	glRotatef(ytan, 1, 0, 0);
-
-	player->yBodyRot = xtan;
-	player->yRot = xtan + xtan;
-	player->xRot = ytan;
-	glTranslatef(0, player->heightOffset, 0);
-
-	float oldWAP = player->walkAnimPos;
-	float oldWAS = player->walkAnimSpeed;
-	float oldWASO = player->walkAnimSpeedO;
-
-	player->walkAnimSpeedO = player->walkAnimSpeed = 0.25f;
-	player->walkAnimPos = getTimeS() * player->walkAnimSpeed * SharedConstants::TicksPerSecond;
-
-	EntityRenderDispatcher* rd = EntityRenderDispatcher::getInstance();
-	rd->playerRotY = 180;
-	rd->render(player, 0, 0, 0, 0, 1);
-
-	player->walkAnimPos = oldWAP;
-	player->walkAnimSpeed = oldWAS;
-	player->walkAnimSpeedO = oldWASO;
-
-	player->yBodyRot = oybr;
-	player->yRot = oyr;
-	player->xRot = oxr;
-
-	glPopMatrix();
-}
-
-void BetaInventoryScreen::render(int xm, int ym, float a) {
+void BetaWorkbenchScreen::render(int xm, int ym, float a) {
 	renderBackground();
-	// render() mouse comes in raw pixels, clicks in GUI units; use the
-	// same mapping as Screen::mouseEvent (note the -1) so hover and the
-	// carried stack land exactly on the clicked slots.
 	int mx = xm * width / minecraft->width;
 	int my = ym * height / minecraft->height - 1;
 	int px = panelX(), py = panelY();
 
-	// Original panel art, 176x166 at 1:1 from the jar.
-	TextureId bg = minecraft->textures->loadTexture("gui/inventory.png");
+	TextureId bg = minecraft->textures->loadTexture("gui/crafting.png");
 	if (Textures::isTextureIdValid(bg)) {
 		minecraft->textures->bind(bg);
 		glColor4f2(1, 1, 1, 1);
 		blit(px, py, 0, 0, 176, 166, 256, 256);
 	}
 
-	drawString(minecraft->font, "Crafting", px + 86, py + 16, 0xff404040);
-
-	renderPlayerModel((float)(px + 51), (float)(py + 75));
-
-	for (int i = 0; i <= 44; i++) {
+	for (int i = 0; i <= 45; i++) {
 		int sx, sy;
 		if (!slotPos(i, sx, sy))
 			continue;
@@ -489,7 +389,6 @@ void BetaInventoryScreen::render(int xm, int ym, float a) {
 		}
 	}
 
-	// Hovered slot highlight, like the original.
 	int hover = slotAt(mx, my);
 	if (hover >= 0) {
 		int sx, sy;
@@ -509,11 +408,11 @@ void BetaInventoryScreen::render(int xm, int ym, float a) {
 	super::render(xm, ym, a);
 }
 
-void BetaInventoryScreen::tick() {
+void BetaWorkbenchScreen::tick() {
 	super::tick();
 }
 
-void BetaInventoryScreen::mouseClicked(int x, int y, int buttonNum) {
+void BetaWorkbenchScreen::mouseClicked(int x, int y, int buttonNum) {
 	if (buttonNum != MouseAction::ACTION_LEFT && buttonNum != MouseAction::ACTION_RIGHT)
 		return;
 	pressed = true;
@@ -521,20 +420,7 @@ void BetaInventoryScreen::mouseClicked(int x, int y, int buttonNum) {
 	pressButton = buttonNum;
 }
 
-static bool canWearIn(int betaIdx, const ItemInstance* item) {
-	if (betaIdx < 5 || betaIdx > 8)
-		return true;
-	if (!item || item->isNull())
-		return true;
-	if (!ItemInstance::isArmorItem(item))
-		return false;
-	const ArmorItem* armor = (const ArmorItem*)item->getItem();
-	if (!armor)
-		return false;
-	return armor->slot == (betaIdx - 5);
-}
-
-void BetaInventoryScreen::mouseReleased(int x, int y, int buttonNum) {
+void BetaWorkbenchScreen::mouseReleased(int x, int y, int buttonNum) {
 	if (!pressed || buttonNum != pressButton) {
 		pressed = false;
 		return;
@@ -566,8 +452,6 @@ void BetaInventoryScreen::mouseReleased(int x, int y, int buttonNum) {
 				empty.setNull();
 				setSlotItem(slot, &empty);
 			}
-		} else if (!canWearIn(slot, &carried)) {
-			return;
 		} else if (!dst || dst->isNull()) {
 			setSlotItem(slot, &carried);
 			carried.setNull();
@@ -590,7 +474,6 @@ void BetaInventoryScreen::mouseReleased(int x, int y, int buttonNum) {
 			carried = tmp;
 		}
 	} else {
-		// Right click: place one / pick up half. Never touches result.
 		if (slot < 0 || slot == 0)
 			return;
 		if (shift)
@@ -615,8 +498,6 @@ void BetaInventoryScreen::mouseReleased(int x, int y, int buttonNum) {
 				empty.setNull();
 				setSlotItem(slot, &empty);
 			}
-		} else if (!canWearIn(slot, &carried)) {
-			return;
 		} else if (!dst || dst->isNull()) {
 			ItemInstance one = carried;
 			one.count = 1;
@@ -631,19 +512,18 @@ void BetaInventoryScreen::mouseReleased(int x, int y, int buttonNum) {
 	}
 }
 
-void BetaInventoryScreen::keyPressed(int eventKey) {
+void BetaWorkbenchScreen::keyPressed(int eventKey) {
 	super::keyPressed(eventKey);
 	if (eventKey == Keyboard::KEY_E && minecraft && !minecraft->isCreativeMode())
 		minecraft->setScreen(NULL);
 }
 
-void BetaInventoryScreen::removed() {
-	// Grid contents go back to the player inventory (or drop).
+void BetaWorkbenchScreen::removed() {
 	Player* player = minecraft ? minecraft->player : NULL;
 	Inventory* in = inv();
 	if (!player || !in)
 		return;
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < 9; i++) {
 		if (craftMatrix[i].isNull())
 			continue;
 		in->add(&craftMatrix[i]);

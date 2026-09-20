@@ -3,6 +3,7 @@
 #include "client/Options.h"
 #include "platform/input/Keyboard.h"
 #include "screens/IngameBlockSelectionScreen.h"
+#include "screens/BetaInventoryScreen.h"
 #include "screens/ChatScreen.h"
 #include "screens/ConsoleScreen.h"
 #include "../Minecraft.h"
@@ -119,7 +120,10 @@ void Gui::render(float a, bool mouseFree, int xMouse, int yMouse) {
 		glEnable(GL_ALPHA_TEST);
 		glEnable(GL_DEPTH_TEST);
 	}
-	if (!minecraft->options.getBooleanValue(OPTIONS_HIDEGUI)) {
+	// The beta inventory screen draws its own slots (with its own
+	// hotbar row); the PE hotbar underneath would double-render.
+	bool invOpen = dynamic_cast<BetaInventoryScreen*>(minecraft->screen) != NULL;
+	if (!minecraft->options.getBooleanValue(OPTIONS_HIDEGUI) && !invOpen) {
 		renderToolBar(a, ySlot, screenWidth);
 
 	//	font->drawShadow("Minecraft - Pocket Edition ", 2, 2, 0xffffffff);

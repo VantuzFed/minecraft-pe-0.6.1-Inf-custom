@@ -1153,6 +1153,11 @@ void Minecraft::setScreen( Screen* screen )
 	} else {
 		// Closing a screen and returning to the game should unpause.
 		pause = false;
+		// Full grab cycle, not just grab: if the cursor mode desynced
+		// (grabbed platform but no motion events, e.g. Wayland lock
+		// negotiated only once), a fresh release+grab re-syncs it.
+		// This is the same thing as opening/closing a menu by hand.
+		releaseMouse();
 		grabMouse();
 	}
 #endif
@@ -1161,9 +1166,12 @@ void Minecraft::setScreen( Screen* screen )
 void Minecraft::grabMouse()
 {
 #ifndef STANDALONE_SERVER
+	// Always sync the platform grab: the flag alone can desync from the
+	// real cursor mode (missed call, another thread without GL context,
+	// or a Wayland compositor that only honors a fresh grab).
+	mouseHandler.grab();
 	if (mouseGrabbed) return;
 	mouseGrabbed = true;
-	mouseHandler.grab();
 	//setScreen(NULL);
 #endif
 }
@@ -1171,6 +1179,8 @@ void Minecraft::grabMouse()
 void Minecraft::releaseMouse()
 {
 #ifndef STANDALONE_SERVER
+	// Always sync the platform release for the same reason.
+	mouseHandler.release();
 	if (!mouseGrabbed) {
 		return;
 	}
@@ -1178,7 +1188,6 @@ void Minecraft::releaseMouse()
 		player->releaseAllKeys();
 	}
 	mouseGrabbed = false;
-	mouseHandler.release();
 #endif
 }
 

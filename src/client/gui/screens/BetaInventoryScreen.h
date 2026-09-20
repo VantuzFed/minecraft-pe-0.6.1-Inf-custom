@@ -4,18 +4,16 @@
 #include "../Screen.h"
 #include "../../../world/item/ItemInstance.h"
 
-// Survival inventory in the style of Minecraft Beta 1.7.3: classic
-// container panel with a 2x2 crafting grid + result, armor slots and
-// the player inventory. Slot layout (panel-relative, 18px pitch)
-// mirrors ContainerPlayer from the original jar:
+class Inventory;
+
+// Survival inventory in the style of Minecraft Beta 1.7.3: the original
+// gui/inventory.png panel (176x166), ContainerPlayer slot map (result,
+// 2x2 matrix, armor, 3 main rows, hotbar), hover highlight and the
+// rotating player preview.
 //
-//   result 0 at (144,36); craft 1-4 at (88,26)+(18px grid);
-//   armor 5-8 at (8,8..62); main 9-35 in rows y=84..138;
-//   hotbar 36-44 in row y=160.
-//
-// Deviation: PE inventories hold 36 main slots, not 27, so the main
-// block has four rows (panel 176x184 instead of 176x166); otherwise
-// nine slots would be unreachable.
+// PE hotbar slots are links (views) into main storage, not storage, so
+// every hotbar mutation resolves (or creates) the underlying link;
+// the orphan link cells are never written directly.
 class BetaInventoryScreen : public Screen {
 	typedef Screen super;
 public:
@@ -35,16 +33,23 @@ public:
 
 private:
 	static const int PANEL_W = 176;
-	static const int PANEL_H = 184;
+	static const int PANEL_H = 166;
 
 	// Beta container slot index -> panel coords. Returns false for bad idx.
 	static bool slotPos(int betaIdx, int& sx, int& sy);
 	// Beta slot index under the point, or -1.
 	int slotAt(int x, int y) const;
+
+	Inventory* inv();
 	// Live item in a beta slot (NULL when empty). Never keep across calls.
 	ItemInstance* getSlotItem(int betaIdx);
-	// Write an item into a beta slot (copies).
+	// Write an item into a beta slot (copies). Hotbar writes resolve
+	// links; clearing uses link-aware clearSlot.
 	void setSlotItem(int betaIdx, const ItemInstance* item);
+	// Resolve a beta hotbar slot (36-44) to its real PE slot, or -1.
+	int resolveHotbar(int betaIdx);
+	// Resolve, linking to a free main slot first when placing.
+	int ensureHotbarLink(int betaIdx);
 	// Recompute the crafting result from the matrix.
 	void updateCraftResult();
 	// Consume one unit from every non-empty matrix cell.
@@ -54,14 +59,14 @@ private:
 	// Result-slot takes, one atomic craft at a time (no dupes).
 	bool takeResultToCursor();
 	bool takeResultToInventory();
-	// Free cells for a stack across a beta range (read-only).
-	int spaceFor(const ItemInstance& stack, int from, int to);
-	// Rotating player preview, like the original inventory.
-	void renderPlayerModel(float xo, float yo);
 	// Merge helpers over beta slot ranges [from, to).
 	bool mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse);
+	// Read-only free space for a stack across a beta range.
+	int spaceFor(const ItemInstance& stack, int from, int to);
 	// Drop the carried stack back into the inventory, or into the world.
 	void spillCarried();
+	// Rotating player preview, like the original inventory.
+	void renderPlayerModel(float xo, float yo);
 
 	int panelX() const { return (width - PANEL_W) / 2; }
 	int panelY() const { return (height - PANEL_H) / 2; }

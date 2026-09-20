@@ -155,14 +155,13 @@ std::string Dimension::getDimension(){
 	{
 		int dimensionId = Dimension::NORMAL;
 
-		switch(data->getGameType()) {
-		case GameType::Survival: dimensionId = Dimension::NORMAL_DAYCYCLE;
-			break;
-		case GameType::Creative:
-		default:
+		// Beta 1.7.3 predates creative mode: beta worlds always run the
+		// day cycle. PE creative keeps its permanent noon.
+		if (data->getGameType() == GameType::Survival
+			|| data->getGeneratorVersion() == (int)LGV_BETA173)
+			dimensionId = Dimension::NORMAL_DAYCYCLE;
+		else
 			dimensionId = Dimension::NORMAL;
-			break;
-		}
 
 	return Dimension::getNew(dimensionId);
 }
