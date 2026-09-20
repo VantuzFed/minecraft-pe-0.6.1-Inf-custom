@@ -159,7 +159,8 @@ void ClientSideNetworkHandler::handle(const RakNet::RakNetGUID& source, LoginSta
 
 void ClientSideNetworkHandler::handle(const RakNet::RakNetGUID& source, StartGamePacket* packet)
 {
-	LOGI("StartGamePacket\n");
+	LOGI("StartGamePacket recv: seed=%lld genVersion=%d\n",
+		(long long)packet->levelSeed, packet->levelGeneratorVersion);
 
 #ifdef RPI
 	if (packet->gameType != GameType::Creative) {

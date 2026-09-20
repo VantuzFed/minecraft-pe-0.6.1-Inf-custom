@@ -223,8 +223,11 @@ void ServerSideNetworkHandler::handle(const RakNet::RakNetGUID& source, LoginPac
 			? GameType::Creative
 			: GameType::Survival;
 
+        LOGI("StartGamePacket send: seed=%lld genVersion=%d\n",
+            (long long)level->getSeed(),
+            level->getLevelData()->getGeneratorVersion());
         StartGamePacket(
-            level->getSeed(),
+            (int64_t)level->getSeed(),
             level->getLevelData()->getGeneratorVersion(),
             gameType,
             newPlayer->entityId,
