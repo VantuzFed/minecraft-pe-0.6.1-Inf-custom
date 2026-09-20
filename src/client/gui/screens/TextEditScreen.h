@@ -6,6 +6,7 @@
 #include "../Screen.h"
 #include <string>
 #include "../components/ImageButton.h"
+#include "../components/TextBox.h"
 class SignTileEntity;
 class Button;
 class TextEditScreen: public Screen
@@ -30,6 +31,7 @@ protected:
 	int line;
 private:
 	ImageButton btnClose;
+	unsigned char pendingLead = 0; // incomplete UTF-8 lead byte
 };
 
 #endif /*NET_MINECRAFT_CLIENT_GUI_SCREENS__TextEditScreen_H__*/

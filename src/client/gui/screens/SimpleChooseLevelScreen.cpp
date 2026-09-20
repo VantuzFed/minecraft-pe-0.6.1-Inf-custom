@@ -48,6 +48,8 @@ void SimpleChooseLevelScreen::init()
     ChooseLevelScreen::init();
 
     tLevelName.text = "New world";
+    tLevelName.setMaxChars(32);
+    tSeed.setMaxChars(64);
 
     // header + close button
     bHeader = new Touch::THeader(0, "Create World");

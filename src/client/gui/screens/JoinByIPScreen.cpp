@@ -63,6 +63,7 @@ void JoinByIPScreen::tick()
 
 void JoinByIPScreen::init()
 {
+    tIP.setMaxChars(64);
     ImageDef def;
 	def.name = "gui/touchgui.png";
 	def.width = 34;

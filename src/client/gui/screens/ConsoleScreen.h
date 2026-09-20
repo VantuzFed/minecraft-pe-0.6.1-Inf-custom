@@ -2,6 +2,7 @@
 #define NET_MINECRAFT_CLIENT_GUI_SCREENS__ConsoleScreen_H__
 
 #include "../Screen.h"
+#include "../components/TextBox.h"
 #include <string>
 
 class ConsoleScreen: public Screen
@@ -28,6 +29,7 @@ private:
     std::string processCommand(const std::string& cmd);
 
     std::string _input;
+    unsigned char _pendingLead = 0; // incomplete UTF-8 lead byte
     int         _cursorBlink; // tick counter for cursor blink
 };
 

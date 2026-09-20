@@ -17,8 +17,61 @@ TextBox::TextBox(int id, int x, int y, const std::string& msg)
 
 TextBox::TextBox(int id, int x, int y, int w, int h, const std::string& msg)
  : GuiElement(true, true, x, y, w, h),
-   id(id), hint(msg), focused(false), blink(false), blinkTicks(0)
+   id(id), hint(msg), focused(false), blink(false), blinkTicks(0),
+   maxChars(256), pendingLead(0)
 {
+}
+
+int TextBox::charCount(const std::string& s) {
+	int n = 0;
+	for (size_t i = 0; i < s.size(); i++) {
+		unsigned char c = (unsigned char)s[i];
+		// Lead bytes (ASCII and UTF-8 sequence starts) count, trail
+		// bytes (0x80..0xBF) don't.
+		if (c < 0x80 || c >= 0xC0)
+			n++;
+	}
+	return n;
+}
+
+// Only what the game font can render: printable ASCII plus the
+// Cyrillic subset mapped into cells 0x80..0xC1. Everything else is
+// forbidden so fields never collect garbage.
+static bool isCyrillicSeq(unsigned char lead, unsigned char trail) {
+	if (lead == 0xD0)
+		return (trail >= 0x90 && trail <= 0xBF) || trail == 0x81;
+	if (lead == 0xD1)
+		return (trail >= 0x80 && trail <= 0xBF) || trail == 0x91;
+	return false;
+}
+
+void TextBox::appendInputByte(std::string& text, unsigned char& pending, int maxChars, unsigned char u) {
+	if (pending) {
+		unsigned char lead = pending;
+		pending = 0;
+		if (u >= 0x80 && u <= 0xBF && isCyrillicSeq(lead, u)
+			&& TextBox::charCount(text) < maxChars) {
+			text.push_back((char)lead);
+			text.push_back((char)u);
+		}
+		return;
+	}
+	if (u == 0xD0 || u == 0xD1) {
+		pending = u;
+		return;
+	}
+	if (u >= 32 && u < 127 && TextBox::charCount(text) < maxChars)
+		text.push_back((char)u);
+}
+
+void TextBox::popInputChar(std::string& text) {
+	// Trail bytes first, then the lead/ASCII byte. A dangling lead
+	// (shouldn't persist, but be safe) is dropped as well.
+	while (!text.empty() && (unsigned char)text.back() >= 0x80
+		&& (unsigned char)text.back() <= 0xBF)
+		text.pop_back();
+	if (!text.empty())
+		text.pop_back();
 }
 
 void TextBox::setFocus(Minecraft* minecraft) {
@@ -27,6 +80,7 @@ void TextBox::setFocus(Minecraft* minecraft) {
         focused = true;
         blinkTicks = 0;
         blink = false;
+        pendingLead = 0;
     }
 }
 
@@ -34,6 +88,7 @@ bool TextBox::loseFocus(Minecraft* minecraft) {
     if (focused) {
         minecraft->platform()->hideKeyboard();
         focused = false;
+        pendingLead = 0;
         return true;
     }
     return false;
@@ -53,33 +108,33 @@ void TextBox::charPressed(Minecraft* minecraft, char c)  {
     if (!focused)
         return;
     // Don't type control characters from Ctrl+key combos into the field.
-    if (Keyboard::isKeyDown(Keyboard::KEY_LEFT_CTRL))
+    if (Keyboard::isKeyDown(Keyboard::KEY_LEFT_CTRL)) {
+        pendingLead = 0;
         return;
-    if (c >= 32 && c < 127 && (int)text.size() < 256) {
-        text.push_back(c);
     }
+    appendInputByte(text, pendingLead, maxChars, (unsigned char)c);
 }
 
 void TextBox::keyPressed(Minecraft* minecraft, int key) {
     if (!focused)
         return;
     if (key == Keyboard::KEY_BACKSPACE && !text.empty()) {
-        text.pop_back();
+        popInputChar(text);
+        pendingLead = 0;
         return;
     }
     // Clipboard: Ctrl+C copy, Ctrl+X cut, Ctrl+V paste.
     if (Keyboard::isKeyDown(Keyboard::KEY_LEFT_CTRL)) {
+        pendingLead = 0;
         if (key == Keyboard::KEY_C || key == Keyboard::KEY_X) {
             minecraft->platform()->setClipboardText(text);
             if (key == Keyboard::KEY_X)
                 text.clear();
         } else if (key == Keyboard::KEY_V) {
             std::string clip = minecraft->platform()->getClipboardText();
-            for (size_t i = 0; i < clip.size() && (int)text.size() < 256; i++) {
-                char c = clip[i];
-                if (c >= 32 && c < 127)
-                    text.push_back(c);
-            }
+            for (size_t i = 0; i < clip.size(); i++)
+                appendInputByte(text, pendingLead, maxChars, (unsigned char)clip[i]);
+            pendingLead = 0;
         }
     }
 }

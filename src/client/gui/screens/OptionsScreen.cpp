@@ -284,6 +284,7 @@ void OptionsScreen::generateOptionScreens() {
 
 	// General Pane
 	optionPanes[0]->addOptionItem(OPTIONS_USERNAME, minecraft)
+		.addOptionItem(OPTIONS_LANGUAGE, minecraft)
 		.addOptionItem(OPTIONS_SENSITIVITY, minecraft);
 
 	// Game Pane

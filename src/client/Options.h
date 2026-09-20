@@ -101,6 +101,8 @@ enum OptionId {
 	OPTIONS_LOG_LEVEL,
 	OPTIONS_COMPLETE_LIGHTING,
 	OPTIONS_MENU_STYLE,
+	// UI language: 0 = English, 1 = Russian. Only these two ship.
+	OPTIONS_LANGUAGE,
 	// Should be last!
 	OPTIONS_COUNT
 };

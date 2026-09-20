@@ -3,7 +3,10 @@
 #include "Minecraft.h"
 #include "../platform/log.h"
 #include "../world/Difficulty.h"
+#include "../locale/I18n.h"
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 #include <memory>
 
@@ -112,6 +115,18 @@ OptionBool firstLaunch("firstLaunch", true);
 
 OptionString lastIp("lastip");
 
+// Only English and Russian ship; default to Russian on ru systems.
+static int detectSystemLanguage() {
+	const char* env = getenv("LANG");
+	if (!env || !env[0])
+		env = getenv("LANGUAGE");
+	if (env && (strncmp(env, "ru", 2) == 0 || strncmp(env, "RU", 2) == 0))
+		return 1;
+	return 0;
+}
+
+OptionInt languageOpt("language", detectSystemLanguage(), 0, 1);
+
 void Options::initTable() {
     m_options[OPTIONS_DIFFICULTY] = &difficulty;
     m_options[OPTIONS_HIDEGUI] = &hidegui;
@@ -180,6 +195,8 @@ void Options::initTable() {
     m_options[OPTIONS_SERVER_VISIBLE] = &serverVisible;
 
 	m_options[OPTIONS_MENU_STYLE] = &menuStyle;
+
+	m_options[OPTIONS_LANGUAGE] = &languageOpt;
 
     m_options[OPTIONS_KEY_FORWARD] = &keyForward;
     m_options[OPTIONS_KEY_LEFT] = &keyLeft;
@@ -341,6 +358,10 @@ void Options::load() {
 		// }*/
 	}
 	g_mcpeLogLevel = getIntValue(OPTIONS_LOG_LEVEL);
+	// Apply saved language (parse() doesn't notify).
+	if (minecraft)
+		I18n::loadLanguage(minecraft->platform(),
+			getIntValue(OPTIONS_LANGUAGE) ? "ru_RU" : "en_US");
 }
 
 void Options::save() {
@@ -368,5 +389,7 @@ void Options::notifyOptionUpdate(OptionId key, float value) {
 void Options::notifyOptionUpdate(OptionId key, int value) {
 	if (key == OPTIONS_LOG_LEVEL)
 		g_mcpeLogLevel = value;
+	if (key == OPTIONS_LANGUAGE && minecraft)
+		I18n::loadLanguage(minecraft->platform(), value ? "ru_RU" : "en_US");
 	minecraft->optionUpdated(key, value);
 }

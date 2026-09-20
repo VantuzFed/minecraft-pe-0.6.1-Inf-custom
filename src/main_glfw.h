@@ -56,7 +56,14 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 }
 
 void character_callback(GLFWwindow* window, unsigned int codepoint) {
-	Keyboard::feedText(codepoint);
+	// Text channel carries raw UTF-8 bytes; TextBox assembles them.
+	// Only what the game font renders: ASCII plus Cyrillic U+0400-U+045F.
+	if (codepoint < 128) {
+		Keyboard::feedText((char)codepoint);
+	} else if (codepoint >= 0x400 && codepoint <= 0x45F) {
+		Keyboard::feedText((char)(0xC0 | (codepoint >> 6)));
+		Keyboard::feedText((char)(0x80 | (codepoint & 0x3F)));
+	}
 }
 
 static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {

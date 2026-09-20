@@ -231,6 +231,9 @@ Java_com_mojang_minecraftpe_MainActivity_nativeTextChar(JNIEnv* env, jclass cls,
         Keyboard::feed(Keyboard::KEY_BACKSPACE, false);
     } else if (unicodeChar > 0 && unicodeChar < 128) {
         Keyboard::feedText((char)unicodeChar);
+    } else if (unicodeChar >= 0x400 && unicodeChar <= 0x45F) {
+        Keyboard::feedText((char)(0xC0 | (unicodeChar >> 6)));
+        Keyboard::feedText((char)(0x80 | (unicodeChar & 0x3F)));
     }
 }
 JNIEXPORT void JNICALL

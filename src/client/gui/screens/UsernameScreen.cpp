@@ -20,6 +20,7 @@ UsernameScreen::~UsernameScreen()
 void UsernameScreen::init()
 {
     _input = "";
+    tUsername.setMaxChars(16);
     _btnDone.active = false; // disabled until name typed
     buttons.push_back(&_btnDone);
     tabButtons.push_back(&_btnDone);

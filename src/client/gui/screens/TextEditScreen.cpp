@@ -118,7 +118,8 @@ void TextEditScreen::keyPressed( int eventKey ) {
 	LOGW("Key pressed! [%d]", eventKey);
 	if(eventKey == Keyboard::KEY_BACKSPACE) {
 		if(sign->messages[line].length() > 0) {
-			sign->messages[line].erase(sign->messages[line].size() - 1, 1);
+			TextBox::popInputChar(sign->messages[line]);
+			pendingLead = 0;
 		} else {
             line--;
             if(line < 0) {
@@ -127,17 +128,15 @@ void TextEditScreen::keyPressed( int eventKey ) {
         }
 	} else if(eventKey == Keyboard::KEY_RETURN)  {
 		line = (line + 1) % 4;
+		pendingLead = 0;
 	} else {
 		super::keyPressed(eventKey);
 	}
 }
 
 void TextEditScreen::charPressed( char inputChar ) {
-	std::string fullstring = sign->messages[line] + inputChar;
-	if(fullstring.length() < 16) {
-		sign->messages[line] = fullstring;
-		//LOGW("Line text updated: %s\n", fullstring.c_str());
-	}
+	// Sign lines: 15 user characters, ASCII plus renderable Cyrillic.
+	TextBox::appendInputByte(sign->messages[line], pendingLead, 15, (unsigned char)inputChar);
 }
 
 void TextEditScreen::buttonClicked( Button* button ) {

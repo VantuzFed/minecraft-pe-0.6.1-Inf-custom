@@ -96,6 +96,15 @@ void OptionsItem::render( Minecraft* minecraft, int xm, int ym ) {
 		}
 		text += ": " + scaleText;
 	}
+	if (m_optionId == OPTIONS_LANGUAGE) {
+		int value = minecraft->options.getIntValue(OPTIONS_LANGUAGE);
+		std::string scaleText;
+		switch (value) {
+		case 1: scaleText = I18n::get("options.language.russian"); break;
+		default: scaleText = I18n::get("options.language.english"); break;
+		}
+		text += ": " + scaleText;
+	}
 	if (m_optionId == OPTIONS_VIEW_DISTANCE) {
 		int value = minecraft->options.getIntValue(OPTIONS_VIEW_DISTANCE);
 		std::string scaleText;

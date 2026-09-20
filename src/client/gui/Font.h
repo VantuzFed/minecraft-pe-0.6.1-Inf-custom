@@ -32,6 +32,13 @@ public:
 	int height(const std::string& str);
 
 	static std::string sanitize(const std::string& str);
+
+	// Decode one character at str[i] into a font cell 0..255.
+	// Returns -1 for unsupported scripts (bytes are still consumed so
+	// they never render as garbage). Advances i past consumed bytes.
+	// Latin bytes pass through, D0/D1 lead bytes map Cyrillic into the
+	// patched cells 0x80..0xC1, everything else is forbidden.
+	static int utf8Cell(const std::string& str, unsigned int& i);
 private:
 	void buildChar(unsigned char i, float x = 0, float y = 0);
 	void drawSlow(const std::string& str, float x, float y, int color, bool darken = false);

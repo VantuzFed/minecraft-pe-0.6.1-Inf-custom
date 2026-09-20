@@ -96,7 +96,7 @@ void NinecraftApp::init()
 #ifndef STANDALONE_SERVER
 	initGLStates();
 	Tesselator::instance.init();
-	I18n::loadLanguage(platform(), "en_US");
+	I18n::loadLanguage(platform(), options.getIntValue(OPTIONS_LANGUAGE) ? "ru_RU" : "en_US");
 #endif
 
 	if (!externalStoragePath.empty()) {

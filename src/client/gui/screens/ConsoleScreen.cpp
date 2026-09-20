@@ -42,7 +42,8 @@ void ConsoleScreen::keyPressed(int eventKey)
         execute();
     } else if (eventKey == Keyboard::KEY_BACKSPACE) {
         if (!_input.empty())
-            _input.erase(_input.size() - 1, 1);
+            TextBox::popInputChar(_input);
+        _pendingLead = 0;
     } else {
         super::keyPressed(eventKey);
     }
@@ -50,8 +51,9 @@ void ConsoleScreen::keyPressed(int eventKey)
 
 void ConsoleScreen::charPressed(char inputChar)
 {
-    if (inputChar >= 32 && inputChar < 127)
-        _input += inputChar;
+    // Chat/commands: ASCII plus renderable Cyrillic, capped at the
+    // protocol chat length (in characters).
+    TextBox::appendInputByte(_input, _pendingLead, 100, (unsigned char)inputChar);
 }
 
 // ---------------------------------------------------------------------------

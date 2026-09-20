@@ -92,8 +92,14 @@ LRESULT WINAPI windowProc ( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam )
 	}
 	case WM_CHAR: {
 		//LOGW("WM_CHAR: %d\n", wParam);
-		if(wParam >= 32)
-			Keyboard::feedText(wParam);
+		// wParam is UTF-16; feed raw UTF-8 bytes, ASCII plus Cyrillic only.
+		if (wParam < 128) {
+			if(wParam >= 32)
+				Keyboard::feedText((char)wParam);
+		} else if (wParam >= 0x400 && wParam <= 0x45F && wParam < 0xD800) {
+			Keyboard::feedText((char)(0xC0 | (wParam >> 6)));
+			Keyboard::feedText((char)(0x80 | (wParam & 0x3F)));
+		}
 		return 0;
 	}
 	case WM_LBUTTONDOWN: {
