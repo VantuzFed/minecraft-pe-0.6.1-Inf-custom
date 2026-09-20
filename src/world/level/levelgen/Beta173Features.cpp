@@ -267,7 +267,20 @@ static void bigLayout(BigTreeState& t) {
 	t.nodes.clear();
 	t.nodes.reserve((size_t)branchCount * (size_t)t.height);
 	int top = t.oy + t.height - t.n;
-	for (int lvl = top, rel = lvl - t.oy; rel >= 0; --lvl, --rel) {
+	// o[0]: the trunk-top node. It always exists, so b() always stacks
+	// leaves at the crown and d() always draws the upper trunk segment,
+	// even when every branch attempt below is blocked.
+	{
+		BigTreeState::Node crown;
+		crown.x = t.ox; crown.y = top; crown.z = t.oz;
+		crown.baseY = t.oy + t.trunkTop;
+		t.nodes.push_back(crown);
+	}
+	// Attempt levels run top-1 down to y-1 (rel = lvl-y+1): the top level
+	// is covered by o[0], never by attempts. The y-1 attempt is real in
+	// the original (taper 0, underground endpoint) and keeps the internal
+	// RNG stream aligned.
+	for (int lvl = top - 1, rel = t.height - t.n; rel >= 0; --lvl, --rel) {
 		float taper = bigLayerSize(t.height, rel);
 		if (taper < 0.0f) continue;
 		for (int i = 0; i < branchCount; i++) {
