@@ -174,8 +174,15 @@ void SimpleChooseLevelScreen::render( int xm, int ym, float a )
     if (modeDesc) {
         drawCenteredString(minecraft->font, modeDesc, width / 2, bGamemode->y + bGamemode->height + 4, 0xffcccccc);
     }
-    if (bWorldType && worldType == LGV_BETA173) {
-        drawCenteredString(minecraft->font, "Classic Beta 1.7.3 terrain", width / 2, bWorldType->y + bWorldType->height + 4, 0xffcccccc);
+    // World-type description on its own line below the mode description
+    // (same Y as the mode line would overlap it: all three buttons
+    // sit in one row).
+    if (bWorldType) {
+        const char* worldDesc = (worldType == LGV_BETA173)
+            ? "Classic Beta 1.7.3 terrain"
+            : "Pocket Edition 0.6.1 terrain";
+        drawCenteredString(minecraft->font, worldDesc, width / 2,
+            bWorldType->y + bWorldType->height + 4 + Font::DefaultLineHeight + 2, 0xffcccccc);
     }
 
     drawString(minecraft->font, "World name:", tLevelName.x, tLevelName.y - Font::DefaultLineHeight - 2, 0xffcccccc);

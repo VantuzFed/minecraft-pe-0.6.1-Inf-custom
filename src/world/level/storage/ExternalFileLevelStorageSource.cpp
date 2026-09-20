@@ -115,6 +115,11 @@ void ExternalFileLevelStorageSource::deleteLevel( const std::string& levelId )
 		remove((path + "/chunks.dat").c_str());
 		remove((path + "/player.dat").c_str());
 		remove((path + "/level.dat").c_str());
+		// DeleteDirectory is not recursive, so region files survive the
+		// wipe above and leak chunks of a previous world into the next
+		// one (stale wrong-generator terrain in the MP temp world).
+		// region/ holds only flat r.X.Z.dat files, so one call clears it.
+		DeleteDirectory(path + "/region");
 	}
 }
 
