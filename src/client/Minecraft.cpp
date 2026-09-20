@@ -35,6 +35,7 @@
 #include "gui/Screen.h"
 #include "gui/Font.h"
 #ifndef STANDALONE_SERVER
+#include "gui/screens/BetaInventoryScreen.h"
 #include "gui/screens/DisconnectionScreen.h"
 #endif
 #include "gui/screens/RenameMPLevelScreen.h"
@@ -775,7 +776,12 @@ void Minecraft::tickInput() {
 			}
 
 			if (key == Keyboard::KEY_E) {
-				screenChooser.setScreen(SCREEN_BLOCKSELECTION);
+				// Survival gets the classic Beta-style inventory,
+				// creative keeps the block selection screen.
+				if (!isCreativeMode() && !useTouchscreen())
+					setScreen(new BetaInventoryScreen());
+				else
+					screenChooser.setScreen(SCREEN_BLOCKSELECTION);
 			}
 
 			if (!screen && key == Keyboard::KEY_T && level) {
