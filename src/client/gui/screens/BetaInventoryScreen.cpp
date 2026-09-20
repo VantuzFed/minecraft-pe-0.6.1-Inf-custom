@@ -1,7 +1,10 @@
 #include "BetaInventoryScreen.h"
 
 #include "../../Minecraft.h"
+#include "../../renderer/Textures.h"
 #include "../../renderer/entity/ItemRenderer.h"
+#include "../../renderer/entity/EntityRenderDispatcher.h"
+#include "../../player/LocalPlayer.h"
 #include "../../../world/entity/player/Player.h"
 #include "../../../world/entity/player/Inventory.h"
 #include "../../../world/inventory/CraftingContainer.h"
@@ -10,8 +13,10 @@
 #include "../../../world/item/crafting/Recipes.h"
 #include "../../../platform/input/Keyboard.h"
 #include "../../../platform/input/Mouse.h"
+#include "../../../platform/time.h"
+#include "../../../util/Mth.h"
+#include "../../../SharedConstants.h"
 #include "../../../locale/I18n.h"
-#include "../../player/LocalPlayer.h"
 #include <cstdio>
 
 // CraftingContainer leaves the pointer-based Container API pure;
@@ -70,12 +75,12 @@ bool BetaInventoryScreen::slotPos(int betaIdx, int& sx, int& sy) {
 	}
 	if (betaIdx >= 36 && betaIdx <= 44) { // hotbar
 		sx = 8 + (betaIdx - 36) * 18;
-		sy = 160;
+		sy = 142;
 		return true;
 	}
-	if (betaIdx >= 45 && betaIdx <= 53) { // 4th main row (PE extra slots)
+	if (betaIdx >= 45 && betaIdx <= 53) { // extra PE row below hotbar
 		sx = 8 + (betaIdx - 45) * 18;
-		sy = 138;
+		sy = 160;
 		return true;
 	}
 	return false;
@@ -130,11 +135,6 @@ void BetaInventoryScreen::setSlotItem(int betaIdx, const ItemInstance* item) {
 	ItemInstance v;
 	if (item && !item->isNull())
 		v = *item;
-	if (betaIdx == 0) {
-		if (item && !item->isNull()) { craftResult = *item; hasCraftResult = true; }
-		else { craftResult.setNull(); hasCraftResult = false; }
-		return;
-	}
 	if (betaIdx >= 1 && betaIdx <= 4) {
 		craftMatrix[betaIdx - 1] = v;
 		updateCraftResult();
@@ -207,35 +207,28 @@ bool BetaInventoryScreen::mergeIntoRange(ItemInstance& stack, int from, int to, 
 	if (stack.isNull())
 		return false;
 	bool moved = false;
-	// First pass: top up existing stacks.
 	if (stack.isStackable()) {
-		for (int pass = 0; pass < 2; pass++) {
+		for (int pass = 0; pass < 2 && !stack.isNull(); pass++) {
 			for (int i = from; i < to; i++) {
 				int idx = reverse ? (to - 1 - (i - from)) : i;
 				ItemInstance* dst = getSlotItem(idx);
-				if (pass == 0 && (!dst || !sameStack(&stack, dst)))
-					continue;
-				if (pass == 1 && dst && !dst->isNull())
-					continue;
-				int max = stack.getMaxStackSize();
 				if (pass == 0) {
-					int space = max - dst->count;
+					if (!dst || !sameStack(&stack, dst))
+						continue;
+					int space = stack.getMaxStackSize() - dst->count;
 					if (space <= 0)
 						continue;
 					int take = stack.count < space ? stack.count : space;
 					dst->count += take;
 					stack.count -= take;
 					moved = true;
-					if (stack.count <= 0) { stack.setNull(); return true; }
-				} else {
+				} else if (!dst || dst->isNull()) {
 					ItemInstance v = stack;
 					setSlotItem(idx, &v);
 					stack.setNull();
 					return true;
 				}
 			}
-			if (stack.isNull())
-				return moved;
 		}
 	} else {
 		for (int i = from; i < to; i++) {
@@ -251,25 +244,72 @@ bool BetaInventoryScreen::mergeIntoRange(ItemInstance& stack, int from, int to, 
 	return moved;
 }
 
+// Read-only free space for a stack across a beta range.
+int BetaInventoryScreen::spaceFor(const ItemInstance& stack, int from, int to) {
+	int space = 0;
+	int max = stack.getMaxStackSize();
+	for (int i = from; i < to; i++) {
+		ItemInstance* dst = getSlotItem(i);
+		if (!dst || dst->isNull())
+			space += max;
+		else if (sameStack(&stack, dst))
+			space += max - dst->count;
+	}
+	return space;
+}
+
+// Take one craft's output into the cursor. All or nothing, so the
+// matrix consumption always matches what left the slot (no dupes).
+bool BetaInventoryScreen::takeResultToCursor() {
+	if (!hasCraftResult)
+		return false;
+	if (!hasCarried) {
+		carried = craftResult;
+		hasCarried = true;
+		consumeMatrix();
+		return true;
+	}
+	if (sameStack(&carried, &craftResult)
+		&& carried.count + craftResult.count <= carried.getMaxStackSize()) {
+		carried.count += craftResult.count;
+		consumeMatrix();
+		return true;
+	}
+	return false;
+}
+
+// Shift-click the result: whole crafts while they fully fit.
+bool BetaInventoryScreen::takeResultToInventory() {
+	bool moved = false;
+	while (hasCraftResult && spaceFor(craftResult, 9, 54) >= craftResult.count) {
+		ItemInstance one = craftResult;
+		mergeIntoRange(one, 9, 54, false);
+		if (!one.isNull())
+			break; // space accounting lied; keep matrix intact
+		consumeMatrix();
+		moved = true;
+	}
+	return moved;
+}
+
 bool BetaInventoryScreen::quickTransfer(int betaIdx) {
 	ItemInstance* src = getSlotItem(betaIdx);
 	if (!src || src->isNull())
 		return false;
+	if (betaIdx == 0)
+		return takeResultToInventory();
 	ItemInstance stack = *src;
 	bool moved = false;
-	if (betaIdx == 0) {
-		// Crafting result goes to inventory/hotbar.
-		moved = mergeIntoRange(stack, 9, 54, false);
-		if (moved)
-			consumeMatrix();
-		return moved;
-	}
 	if (betaIdx >= 1 && betaIdx <= 8) {
 		moved = mergeIntoRange(stack, 9, 54, false);
 	} else if (betaIdx >= 9 && betaIdx <= 35) {
 		moved = mergeIntoRange(stack, 36, 45, false);
 		if (!moved)
 			moved = mergeIntoRange(stack, 45, 54, false);
+	} else if (betaIdx >= 45 && betaIdx <= 53) {
+		moved = mergeIntoRange(stack, 36, 45, false);
+		if (!moved)
+			moved = mergeIntoRange(stack, 9, 36, false);
 	} else {
 		// Armor pieces prefer their armor slot, like the original.
 		if (ItemInstance::isArmorItem(&stack)) {
@@ -283,6 +323,8 @@ bool BetaInventoryScreen::quickTransfer(int betaIdx) {
 		}
 		if (!moved)
 			moved = mergeIntoRange(stack, 9, 36, false);
+		if (!moved)
+			moved = mergeIntoRange(stack, 45, 54, false);
 	}
 	if (moved) {
 		if (stack.isNull()) {
@@ -316,28 +358,92 @@ void BetaInventoryScreen::spillCarried() {
 	}
 }
 
+void BetaInventoryScreen::renderPlayerModel(float xo, float yo) {
+	glPushMatrix();
+
+	glTranslatef(xo, yo, -200);
+	float ss = 30.0f;
+	glScalef(-ss, ss, ss);
+
+	glRotatef(180, 0, 0, 1);
+
+	Player* player = (Player*)minecraft->player;
+	if (!player) {
+		glPopMatrix();
+		return;
+	}
+	float oybr = player->yBodyRot;
+	float oyr = player->yRot;
+	float oxr = player->xRot;
+
+	float t = getTimeS();
+	float xd = 10 * Mth::sin(t);
+	float yd = 10 * Mth::cos(t * 0.05f);
+
+	const float xtan = Mth::atan(xd / 40.0f) * +20;
+	const float ytan = Mth::atan(yd / 40.0f) * -20;
+
+	glRotatef(ytan, 1, 0, 0);
+
+	player->yBodyRot = xtan;
+	player->yRot = xtan + xtan;
+	player->xRot = ytan;
+	glTranslatef(0, player->heightOffset, 0);
+
+	float oldWAP = player->walkAnimPos;
+	float oldWAS = player->walkAnimSpeed;
+	float oldWASO = player->walkAnimSpeedO;
+
+	player->walkAnimSpeedO = player->walkAnimSpeed = 0.25f;
+	player->walkAnimPos = getTimeS() * player->walkAnimSpeed * SharedConstants::TicksPerSecond;
+
+	EntityRenderDispatcher* rd = EntityRenderDispatcher::getInstance();
+	rd->playerRotY = 180;
+	rd->render(player, 0, 0, 0, 0, 1);
+
+	player->walkAnimPos = oldWAP;
+	player->walkAnimSpeed = oldWAS;
+	player->walkAnimSpeedO = oldWASO;
+
+	player->yBodyRot = oybr;
+	player->yRot = oyr;
+	player->xRot = oxr;
+
+	glPopMatrix();
+}
+
 void BetaInventoryScreen::render(int xm, int ym, float a) {
 	renderBackground();
 	int px = panelX(), py = panelY();
 
-	// Classic container panel: gray body, light top/left, dark bottom/right.
-	fill(px - 2, py - 2, px + PANEL_W + 2, py + PANEL_H + 2, 0xff000000);
-	fill(px, py, px + PANEL_W, py + PANEL_H, 0xffc6c6c6);
-	fill(px + 1, py + 1, px + PANEL_W - 1, py + 2, 0xffffffff);
-	fill(px + 1, py + 1, px + 2, py + PANEL_H - 1, 0xffffffff);
-	fill(px + 1, py + PANEL_H - 2, px + PANEL_W - 1, py + PANEL_H - 1, 0xff555555);
-	fill(px + PANEL_W - 2, py + 1, px + PANEL_W - 1, py + PANEL_H - 1, 0xff555555);
+	// Original panel art; the extra PE row below is drawn procedurally.
+	TextureId bg = minecraft->textures->loadTexture("gui/inventory.png");
+	if (Textures::isTextureIdValid(bg)) {
+		minecraft->textures->bind(bg);
+		glColor4f2(1, 1, 1, 1);
+		blit(px, py, 0, 0, 176, 166, 256, 256);
+	}
+	// Extra-row extension: gray strip, black bottom edge, slot recesses.
+	fill(px, py + 166, px + 176, py + PANEL_H, 0xffc6c6c6);
+	fill(px, py + PANEL_H - 1, px + 176, py + PANEL_H, 0xff000000);
+	for (int i = 45; i <= 53; i++) {
+		int sx, sy;
+		if (!slotPos(i, sx, sy))
+			continue;
+		int x0 = px + sx, y0 = py + sy;
+		fill(x0, y0, x0 + 18, y0 + 18, 0xff373737);
+		fill(x0 + 1, y0 + 1, x0 + 17, y0 + 17, 0xff8b8b8b);
+	}
 
 	drawString(minecraft->font, "Crafting", px + 86, py + 16, 0xff404040);
+
+	renderPlayerModel((float)(px + 51), (float)(py + 75));
 
 	for (int i = 0; i <= 53; i++) {
 		int sx, sy;
 		if (!slotPos(i, sx, sy))
 			continue;
 		int x0 = px + sx, y0 = py + sy;
-		// Slot recess.
-		fill(x0, y0, x0 + 18, y0 + 18, 0xff373737);
-		fill(x0 + 1, y0 + 1, x0 + 17, y0 + 17, 0xff8b8b8b);
 		ItemInstance* it = getSlotItem(i);
 		if (it && !it->isNull()) {
 			ItemRenderer::renderGuiItem(minecraft->font, minecraft->textures, it, (float)(x0 + 1), (float)(y0 + 1), true);
@@ -347,6 +453,14 @@ void BetaInventoryScreen::render(int xm, int ym, float a) {
 				minecraft->font->drawShadow(buf, (float)(x0 + 17 - minecraft->font->width(buf)), (float)(y0 + 9), 0xffffffff);
 			}
 		}
+	}
+
+	// Hovered slot highlight, like the original.
+	int hover = slotAt(xm, ym);
+	if (hover >= 0) {
+		int sx, sy;
+		if (slotPos(hover, sx, sy))
+			fill(px + sx + 1, py + sy + 1, px + sx + 17, py + sy + 17, 0x80ffffff);
 	}
 
 	if (hasCarried && !carried.isNull()) {
@@ -406,22 +520,7 @@ void BetaInventoryScreen::mouseReleased(int x, int y, int buttonNum) {
 			return;
 		}
 		if (slot == 0) {
-			// Crafting result: take only with an accepting cursor.
-			if (!hasCraftResult)
-				return;
-			if (!hasCarried) {
-				carried = craftResult;
-				hasCarried = true;
-				consumeMatrix();
-			} else if (sameStack(&carried, &craftResult)) {
-				int space = carried.getMaxStackSize() - carried.count;
-				int take = craftResult.count < space ? craftResult.count : space;
-				if (take > 0) {
-					carried.count += take;
-					for (int t = 0; t < take; t++)
-						consumeMatrix();
-				}
-			}
+			takeResultToCursor();
 			return;
 		}
 		ItemInstance* dst = getSlotItem(slot);
@@ -457,7 +556,7 @@ void BetaInventoryScreen::mouseReleased(int x, int y, int buttonNum) {
 			carried = tmp;
 		}
 	} else {
-		// Right click: place one / pick up half.
+		// Right click: place one / pick up half. Never touches result.
 		if (slot < 0 || slot == 0)
 			return;
 		if (shift)

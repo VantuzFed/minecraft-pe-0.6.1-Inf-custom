@@ -51,6 +51,13 @@ private:
 	void consumeMatrix();
 	// Shift-click quick transfer. Returns true if anything moved.
 	bool quickTransfer(int betaIdx);
+	// Result-slot takes, one atomic craft at a time (no dupes).
+	bool takeResultToCursor();
+	bool takeResultToInventory();
+	// Free cells for a stack across a beta range (read-only).
+	int spaceFor(const ItemInstance& stack, int from, int to);
+	// Rotating player preview, like the original inventory.
+	void renderPlayerModel(float xo, float yo);
 	// Merge helpers over beta slot ranges [from, to).
 	bool mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse);
 	// Drop the carried stack back into the inventory, or into the world.
