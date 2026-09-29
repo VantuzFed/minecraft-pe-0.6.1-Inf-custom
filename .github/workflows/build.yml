@@ -143,6 +143,7 @@ jobs:
           cp index.html MinecraftPE.js MinecraftPE.wasm MinecraftPE.data dist/
           [ -f MinecraftPE.worker.js ] && cp MinecraftPE.worker.js dist/ || true
           [ -f coi-serviceworker.js ] && cp coi-serviceworker.js dist/ || true
+          [ -f ${{ github.workspace }}/CNAME ] && cp ${{ github.workspace }}/CNAME dist/ || true
           touch dist/.nojekyll
 
       - name: Upload Artifact
@@ -158,6 +159,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ${{ github.workspace }}/build/dist
           publish_branch: gh-pages
+          cname: pe.vantuzfed.ru
 
   publish:
     name: Publish
