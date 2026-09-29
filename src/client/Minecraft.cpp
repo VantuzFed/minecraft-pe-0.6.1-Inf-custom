@@ -8,6 +8,10 @@
 #include <string>
 #include <cstdlib>
 
+#ifdef __APPLE__
+#include <TargetConditionals.h>
+#endif
+
 
 #if defined(APPLE_DEMO_PROMOTION)
 #define NO_NETWORK
@@ -1315,14 +1319,14 @@ void Minecraft::setSize(int w, int h) {
 		} else {
 			// auto compute from resolution
 			if (width >= 1000) {
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
 				Gui::GuiScale = (width > 2000)? 8.0f : 4.0f;
 #else
 				Gui::GuiScale = 4.0f;
 #endif
 			}
 			else if (width >= 800) {
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
 				Gui::GuiScale = 4.0f;
 #else
 				Gui::GuiScale = 3.0f;

@@ -168,6 +168,9 @@ int main(void) {
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+#ifdef __APPLE__
+	glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_FALSE);
+#endif
 #else
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 1);
@@ -188,6 +191,7 @@ int main(void) {
 	glfwSetMouseButtonCallback(platform->window, mouse_button_callback);
 	glfwSetScrollCallback(platform->window, scroll_callback);
 	glfwSetWindowSizeCallback(platform->window, window_size_callback);
+	glfwSetFramebufferSizeCallback(platform->window, window_size_callback);
 
 	glfwMakeContextCurrent(platform->window);
 	#ifndef __EMSCRIPTEN__
@@ -202,7 +206,10 @@ int main(void) {
 	((MAIN_CLASS*)g_app)->externalStoragePath = ".";
 	((MAIN_CLASS*)g_app)->externalCacheStoragePath = ".";
 	g_app->init(appContext);
-	g_app->setSize(appContext.platform->getScreenWidth(), appContext.platform->getScreenHeight());
+	int fbW = appContext.platform->getScreenWidth();
+	int fbH = appContext.platform->getScreenHeight();
+	glfwGetFramebufferSize(platform->window, &fbW, &fbH);
+	g_app->setSize(fbW, fbH);
 
 #ifdef __EMSCRIPTEN__
 	emscripten_set_main_loop(loop, 0, 1);
