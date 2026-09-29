@@ -39,6 +39,8 @@ public:
 		(void)x; (void)z; (void)temp; (void)humid;
 		return false;
 	}
+	// Alpha 1.1.2 has no biomes: fixed bright-green art, no tint.
+	virtual bool isAlphaWorld() { return false; }
 };
 
 #endif /*NET_MINECRAFT_WORLD_LEVEL__LevelSource_H__*/

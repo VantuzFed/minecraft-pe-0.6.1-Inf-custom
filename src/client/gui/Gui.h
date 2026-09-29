@@ -20,6 +20,9 @@ struct GuiMessage
 {
 	std::string message;
 	int ticks;
+	// Non-empty when clicking this line should copy text somewhere
+	// (e.g. the /seed output copies the seed to the clipboard).
+	std::string clickCopy;
 };
 
 typedef std::vector<GuiMessage> GuiMessageList;
@@ -66,6 +69,10 @@ public:
 	void renderProgressIndicator( const bool isTouchInterface, const int screenWidth, const int screenHeight, float a );
 
     void addMessage(const std::string& string);
+	// Chat line that copies copyText to the clipboard when clicked.
+	void addClickableMessage(const std::string& string, const std::string& copyText);
+	// Click (GUI units) on a clickable chat line: copies and returns true.
+	bool chatClickCopy(int gx, int gy);
 	void clearMessages();
 	void postError(int errCode);
 

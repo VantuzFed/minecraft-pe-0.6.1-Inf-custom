@@ -1167,15 +1167,29 @@ void LevelRenderer::renderSky(float alpha) {
 	if (mc->options.getBooleanValue(OPTIONS_BEAUTIFUL_SKY)
 		|| mc->options.getBooleanValue(OPTIONS_BETA_SKY)) {
 	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	// Beta draws the sunrise fan additive (SRC_ALPHA, ONE), like the
+	// rest of the celestial pass - verified against RenderGlobal.
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 	Lighting::turnOff();
+	// The whole celestial shell (sunrise fan, sun, moon, stars) is
+	// locked to the camera like modern Minecraft: fixed apparent size,
+	// no parallax. Around the world origin it would slide and swell
+	// as the player roams (fan R=120, bodies/stars R=100).
+	Mob* celestialVp = mc->cameraTargetPlayer ? mc->cameraTargetPlayer : (Mob*)mc->player;
+	float celestialVx = 0.0f, celestialVy = 0.0f, celestialVz = 0.0f;
+	if (celestialVp) {
+		celestialVx = (float)(celestialVp->xOld + (celestialVp->x - celestialVp->xOld) * alpha);
+		celestialVy = (float)(celestialVp->yOld + (celestialVp->y - celestialVp->yOld) * alpha);
+		celestialVz = (float)(celestialVp->zOld + (celestialVp->z - celestialVp->zOld) * alpha);
+	}
 	float* c = level->dimension->getSunriseColor(level->getTimeOfDay(alpha), alpha);
 	if (c != nullptr)
 	{
 		glDisable(GL_TEXTURE_2D);
-//		glShadeModel(GL_SMOOTH); //
+		glShadeModel(GL_SMOOTH);
 
 		glPushMatrix();
+		glTranslatef(celestialVx, celestialVy, celestialVz);
 		glRotatef(90.0f, 1.0f, 0.0f, 0.0f);
 		glRotatef(level->getTimeOfDay(alpha) > 0.5f ? 180 : 0, 0.0f, 0.0f, 1.0f);
 		t.begin(GL_TRIANGLE_FAN);
@@ -1194,28 +1208,29 @@ void LevelRenderer::renderSky(float alpha) {
 
 		t.draw();
 		glPopMatrix();
-//		glShadeModel(GL_FLAT); //
+		// Beta leaves FLAT here, but our chunk pipeline never
+		// re-establishes shading per frame: leaving FLAT paints every
+		// triangulated quad one solid color (diagonal triangle artifact
+		// on terrain after the first dawn/dusk). Restore SMOOTH.
+		glShadeModel(GL_SMOOTH);
 	}
 
 	// gets the time of day and rotates the sun and moon png based on the time
 	glEnable(GL_TEXTURE_2D);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+	// Celestial bodies ignore world fog: at short view distances the fog
+	// far plane sits closer than the shell and eats the moon otherwise.
+	glDisable(GL_FOG);
 	glPushMatrix();
 
-	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-	// Celestial bodies orbit the viewer, not the sky color: the old code
-	// translated by the sky color vector, parking the sun/moon near the
-	// world origin where they are never seen.
-	{
-		Mob* vp = mc->cameraTargetPlayer ? mc->cameraTargetPlayer : (Mob*)mc->player;
-		double vx = 0.0, vy = 0.0, vz = 0.0;
-		if (vp) {
-			vx = vp->xOld + (vp->x - vp->xOld) * alpha;
-			vy = vp->yOld + (vp->y - vp->yOld) * alpha;
-			vz = vp->zOld + (vp->z - vp->zOld) * alpha;
-		}
-		glTranslatef((float)vx, (float)vy, (float)vz);
-	}
+	// Sun/moon body brightness follows beta (1-celestialAngle), but the
+	// shell itself stays camera-locked (see above) instead of orbiting
+	// the world origin like beta's RenderGlobal did.
+	float celestialFade = 1.0f - level->getTimeOfDay(alpha);
+	if (celestialFade < 0.0f) celestialFade = 0.0f;
+	if (celestialFade > 1.0f) celestialFade = 1.0f;
+	glColor4f(1.0f, 1.0f, 1.0f, celestialFade);
+	glTranslatef(celestialVx, celestialVy, celestialVz);
 	glRotatef(0.0f, 0.0f, 0.0f, 1.0f);
 	glRotatef(level->getTimeOfDay(alpha) * 360.0f, 1.0f, 0.0f, 0.0f);
 
@@ -1242,6 +1257,7 @@ void LevelRenderer::renderSky(float alpha) {
 
 	glDisable(GL_TEXTURE_2D);
 
+	// Beta feeds raw star brightness (no extra celestial fade).
 	float a = level->getStarBrightness(alpha);
 	if (a > 0.0f)
 	{
@@ -1289,7 +1305,8 @@ void LevelRenderer::renderClouds( double alpha ) {
 	textures->loadAndBindTexture("environment/clouds.png");
 
 	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	// Beta blends clouds additive (SRC_ALPHA, ONE) - RenderGlobal.
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
 	Vec3 cc = level->getCloudColor(alpha);
 	float cr = (float) cc.x;
@@ -1309,6 +1326,9 @@ void LevelRenderer::renderClouds( double alpha ) {
 	double yy = /*level.dimension.getCloudHeight()*/ 128 - yOffs + 0.33;//mc->player->y + 1;
 	float uo = (float) (xo * scale);
 	float vo = (float) (zo * scale);
+	// Beta bakes the slab around the world origin (verts carry no viewer
+	// offset); only the UV scroll is viewer-relative. Verified against
+	// RenderGlobal: origin slab, world-locked pattern.
 	t.begin();
 
 	t.color(cr, cg, cb, 0.8f);

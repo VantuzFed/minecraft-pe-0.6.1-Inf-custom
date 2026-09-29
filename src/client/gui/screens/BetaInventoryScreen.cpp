@@ -1,6 +1,7 @@
 #include "BetaInventoryScreen.h"
 
 #include "../../Minecraft.h"
+#include "../../renderer/Lighting.h"
 #include "../../renderer/Textures.h"
 #include "../../renderer/entity/ItemRenderer.h"
 #include "../../renderer/entity/EntityRenderDispatcher.h"
@@ -40,7 +41,7 @@ public:
 
 BetaInventoryScreen::BetaInventoryScreen()
 	: hasCraftResult(false), hasCarried(false),
-	  pressed(false), pressSlot(-1), pressButton(0) {
+	  pressed(false), pressSlot(-1), pressButton(0), pressPickedUp(false) {
 	for (int i = 0; i < 4; i++)
 		craftMatrix[i].setNull();
 	craftResult.setNull();
@@ -86,9 +87,37 @@ bool BetaInventoryScreen::slotPos(int betaIdx, int& sx, int& sy) {
 	return false;
 }
 
+bool BetaInventoryScreen::showOverflow() const {
+	Player* player = minecraft ? minecraft->player : NULL;
+	Inventory* in = player ? player->inventory : NULL;
+	if (!in)
+		return false;
+	for (int s = 36; s <= 44; s++) {
+		ItemInstance* it = in->getItem(s);
+		// Linked storage renders in the hotbar row, not in the strip.
+		if (it && !it->isNull() && !isLinkedMain(s))
+			return true;
+	}
+	return false;
+}
+
+bool BetaInventoryScreen::isLinkedMain(int peSlot) const {
+	Inventory* in = inv();
+	if (!in || peSlot < 9 || peSlot >= in->getContainerSize())
+		return false;
+	for (int l = 0; l < in->numLinkedSlots; l++) {
+		if (in->linkedSlots[l].inventorySlot == peSlot)
+			return true;
+	}
+	return false;
+}
+
 int BetaInventoryScreen::slotAt(int x, int y) const {
 	int px = panelX(), py = panelY();
+	bool overflow = showOverflow();
 	for (int i = 0; i <= 53; i++) {
+		if (i >= 45 && !overflow)
+			continue;
 		int sx, sy;
 		if (!slotPos(i, sx, sy))
 			continue;
@@ -98,7 +127,7 @@ int BetaInventoryScreen::slotAt(int x, int y) const {
 	return -1;
 }
 
-Inventory* BetaInventoryScreen::inv() {
+Inventory* BetaInventoryScreen::inv() const {
 	Player* player = minecraft ? minecraft->player : NULL;
 	if (!player)
 		return NULL;
@@ -130,11 +159,29 @@ int BetaInventoryScreen::ensureHotbarLink(int betaIdx) {
 	for (int s = 9; s < in->getContainerSize(); s++) {
 		ItemInstance* it = in->getItem(s);
 		if (!it || it->isNull()) {
+			// One main = one link, always: a stale (dangling) link may
+			// still point at this just-emptied main from an earlier
+			// placement. Without the steal-cleanup two hotbar cells
+			// would render the same stack ("dupes in every cell").
+			for (int l = 0; l < in->numLinkedSlots; l++) {
+				if (l != link && in->linkedSlots[l].inventorySlot == s)
+					in->linkedSlots[l].inventorySlot = -1;
+			}
 			if (in->linkSlot(link, s, false))
 				return s;
 			return -1;
 		}
 	}
+	return -1;
+}
+
+int BetaInventoryScreen::betaToPe(int betaIdx) {
+	if (betaIdx >= 9 && betaIdx <= 35)
+		return betaIdx;
+	if (betaIdx >= 36 && betaIdx <= 44)
+		return resolveHotbar(betaIdx);
+	if (betaIdx >= 45 && betaIdx <= 53)
+		return betaIdx - 9;
 	return -1;
 }
 
@@ -152,6 +199,9 @@ ItemInstance* BetaInventoryScreen::getSlotItem(int betaIdx) {
 	if (betaIdx >= 5 && betaIdx <= 8)
 		return player->getArmor(betaIdx - 5);
 	if (betaIdx >= 9 && betaIdx <= 35) {
+		// Linked storage renders in the hotbar row, not here.
+		if (isLinkedMain(betaIdx))
+			return NULL;
 		ItemInstance* it = in->getItem(betaIdx);
 		if (!it || it->isNull())
 			return NULL;
@@ -165,6 +215,8 @@ ItemInstance* BetaInventoryScreen::getSlotItem(int betaIdx) {
 		return it;
 	}
 	if (betaIdx >= 45 && betaIdx <= 53) {
+		if (isLinkedMain(betaIdx - 9))
+			return NULL;
 		ItemInstance* it = in->getItem(betaIdx - 9);
 		if (!it || it->isNull())
 			return NULL;
@@ -196,8 +248,18 @@ void BetaInventoryScreen::setSlotItem(int betaIdx, const ItemInstance* item) {
 			real = ensureHotbarLink(betaIdx);
 		if (real < 0)
 			return;
-		if (empty) in->clearSlot(real);
-		else in->setItem(real, const_cast<ItemInstance*>(item));
+		if (empty) {
+			in->clearSlot(real);
+			// Drop the link too: a dangling link to the just-emptied
+			// main would alias the next placement into another cell.
+			in->linkedSlots[betaIdx - 36].inventorySlot = -1;
+		} else in->setItem(real, const_cast<ItemInstance*>(item));
+		// One main = one link: whenever this cell owns storage, no
+		// other hotbar cell may view it (kills live mirrors too).
+		for (int l = 0; l < in->numLinkedSlots; l++) {
+			if (l != betaIdx - 36 && in->linkedSlots[l].inventorySlot == real)
+				in->linkedSlots[l].inventorySlot = -1;
+		}
 		return;
 	}
 	int pe = -1;
@@ -265,7 +327,7 @@ static bool sameStack(const ItemInstance* a, const ItemInstance* b) {
 	return true;
 }
 
-bool BetaInventoryScreen::mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse) {
+bool BetaInventoryScreen::mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse, int skipPe) {
 	if (stack.isNull())
 		return false;
 	bool moved = false;
@@ -273,6 +335,8 @@ bool BetaInventoryScreen::mergeIntoRange(ItemInstance& stack, int from, int to, 
 		for (int pass = 0; pass < 2 && !stack.isNull(); pass++) {
 			for (int i = from; i < to; i++) {
 				int idx = reverse ? (to - 1 - (i - from)) : i;
+				if (skipPe >= 0 && betaToPe(idx) == skipPe)
+					continue;
 				ItemInstance* dst = getSlotItem(idx);
 				if (pass == 0) {
 					if (!dst || !sameStack(&stack, dst))
@@ -285,8 +349,18 @@ bool BetaInventoryScreen::mergeIntoRange(ItemInstance& stack, int from, int to, 
 					stack.count -= take;
 					moved = true;
 				} else if (!dst || dst->isNull()) {
+					// Never park stacks in storage that is hidden
+					// behind a hotbar link (hotbar cells themselves
+					// are fine: 36-44 resolve through their links).
+					if ((idx < 36 || idx > 44) && isLinkedMain(betaToPe(idx)))
+						continue;
 					ItemInstance v = stack;
 					setSlotItem(idx, &v);
+					// setSlotItem can silently drop (no free main to
+					// link a hotbar cell): only consume when it landed.
+					ItemInstance* check = getSlotItem(idx);
+					if (!check || check->isNull())
+						continue;
 					stack.setNull();
 					return true;
 				}
@@ -295,9 +369,16 @@ bool BetaInventoryScreen::mergeIntoRange(ItemInstance& stack, int from, int to, 
 	} else {
 		for (int i = from; i < to; i++) {
 			int idx = reverse ? (to - 1 - (i - from)) : i;
+			if (skipPe >= 0 && betaToPe(idx) == skipPe)
+				continue;
+			if ((idx < 36 || idx > 44) && isLinkedMain(betaToPe(idx)))
+				continue;
 			if (!getSlotItem(idx)) {
 				ItemInstance v = stack;
 				setSlotItem(idx, &v);
+				ItemInstance* check = getSlotItem(idx);
+				if (!check || check->isNull())
+					continue;
 				stack.setNull();
 				return true;
 			}
@@ -361,17 +442,18 @@ bool BetaInventoryScreen::quickTransfer(int betaIdx) {
 	if (betaIdx == 0)
 		return takeResultToInventory();
 	ItemInstance stack = *src;
+	int srcPe = betaToPe(betaIdx);
 	bool moved = false;
 	if (betaIdx >= 1 && betaIdx <= 8) {
-		moved = mergeIntoRange(stack, 9, 54, false);
+		moved = mergeIntoRange(stack, 9, 54, false, srcPe);
 	} else if (betaIdx >= 9 && betaIdx <= 35) {
-		moved = mergeIntoRange(stack, 36, 45, false);
+		moved = mergeIntoRange(stack, 36, 45, false, srcPe);
 		if (!moved)
-			moved = mergeIntoRange(stack, 45, 54, false);
+			moved = mergeIntoRange(stack, 45, 54, false, srcPe);
 	} else if (betaIdx >= 45 && betaIdx <= 53) {
-		moved = mergeIntoRange(stack, 36, 45, false);
+		moved = mergeIntoRange(stack, 36, 45, false, srcPe);
 		if (!moved)
-			moved = mergeIntoRange(stack, 9, 36, false);
+			moved = mergeIntoRange(stack, 9, 36, false, srcPe);
 	} else {
 		// Armor pieces prefer their armor slot, like the original.
 		if (ItemInstance::isArmorItem(&stack)) {
@@ -384,9 +466,9 @@ bool BetaInventoryScreen::quickTransfer(int betaIdx) {
 			}
 		}
 		if (!moved)
-			moved = mergeIntoRange(stack, 9, 36, false);
+			moved = mergeIntoRange(stack, 9, 36, false, srcPe);
 		if (!moved)
-			moved = mergeIntoRange(stack, 45, 54, false);
+			moved = mergeIntoRange(stack, 45, 54, false, srcPe);
 	}
 	if (moved) {
 		if (stack.isNull()) {
@@ -422,7 +504,33 @@ void BetaInventoryScreen::spillCarried() {
 }
 
 void BetaInventoryScreen::renderPlayerModel(float xo, float yo) {
+	Player* player = (Player*)(minecraft ? minecraft->player : NULL);
+	if (!player)
+		return;
+
 	glPushMatrix();
+
+	// GUI leaves lighting/texture/blend/depth in 2D-party state; the
+	// entity renderer needs opaque textured polys with depth, otherwise
+	// the model comes out black or not at all. Everything is restored
+	// afterwards: leaking e.g. depth-test-off into the next world frame
+	// makes the terrain render see-through (x-ray) while open.
+	GLboolean depthWas = glIsEnabled(GL_DEPTH_TEST);
+	GLboolean lightWas = glIsEnabled(GL_LIGHTING);
+	GLboolean blendWas = glIsEnabled(GL_BLEND);
+	GLboolean cullWas = glIsEnabled(GL_CULL_FACE);
+	glColor4f2(1, 1, 1, 1);
+	glEnable2(GL_TEXTURE_2D);
+	glDisable2(GL_BLEND);
+	glEnable2(GL_DEPTH_TEST);
+	// The model is mirrored (negative X scale) so its winding is
+	// flipped: with culling on every face is rejected and nothing
+	// draws. Beta's player preview needs culling off here.
+	glDisable2(GL_CULL_FACE);
+	glDepthMask(true);
+	// Standard GUI lighting (same fixed rig as the block selection
+	// screen): without it the model renders black-on-black here.
+	Lighting::turnOn(minecraft);
 
 	glTranslatef(xo, yo, -200);
 	float ss = 30.0f;
@@ -430,11 +538,6 @@ void BetaInventoryScreen::renderPlayerModel(float xo, float yo) {
 
 	glRotatef(180, 0, 0, 1);
 
-	Player* player = (Player*)(minecraft ? minecraft->player : NULL);
-	if (!player) {
-		glPopMatrix();
-		return;
-	}
 	float oybr = player->yBodyRot;
 	float oyr = player->yRot;
 	float oxr = player->xRot;
@@ -472,35 +575,54 @@ void BetaInventoryScreen::renderPlayerModel(float xo, float yo) {
 	player->yRot = oyr;
 	player->xRot = oxr;
 
+	// Restore whatever the GUI/world had: slots and labels need blend
+	// and texture, the world behind needs its depth test and lighting.
+	if (depthWas) glEnable2(GL_DEPTH_TEST); else glDisable2(GL_DEPTH_TEST);
+	if (lightWas) Lighting::turnOn(minecraft); else Lighting::turnOff();
+	if (blendWas) glEnable2(GL_BLEND); else glDisable2(GL_BLEND);
+	if (cullWas) glEnable2(GL_CULL_FACE); else glDisable2(GL_CULL_FACE);
+	glBlendFunc2(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable2(GL_TEXTURE_2D);
+	glColor4f2(1, 1, 1, 1);
+
 	glPopMatrix();
 }
 
 void BetaInventoryScreen::render(int xm, int ym, float a) {
 	renderBackground();
-	// render() mouse comes in raw pixels, clicks in GUI units; use the
-	// same mapping as Screen::mouseEvent (note the -1) so hover and the
-	// carried stack land exactly on the clicked slots.
-	int mx = xm * width / minecraft->width;
-	int my = ym * height / minecraft->height - 1;
+	// render() already gets GUI units (GameRenderer scales raw pixels by
+	// InvGuiScale); Screen::mouseEvent maps raw click events into the
+	// same space (with a -1 on y), so use the coords directly - mapping
+	// them again squishes hover and the carried stack into a corner.
+	int mx = xm;
+	int my = ym - 1;
 	int px = panelX(), py = panelY();
 
-	// Original panel art, 176x166 at 1:1 from the jar.
+	// Original panel art, 176x166 at 1:1 from the jar. blit() always
+	// divides UVs by 256, so sw/sh must default (0 -> w/h): passing
+	// 256,256 squeezes the whole texture into the panel and every slot
+	// recess lands off-grid.
 	TextureId bg = minecraft->textures->loadTexture("gui/inventory.png");
 	if (Textures::isTextureIdValid(bg)) {
 		minecraft->textures->bind(bg);
 		glColor4f2(1, 1, 1, 1);
-		blit(px, py, 0, 0, 176, 166, 256, 256);
+		blit(px, py, 0, 0, 176, 166);
 	}
-	// Overflow row extension: gray strip, black bottom edge, slot recesses.
-	fill(px, py + 166, px + 176, py + PANEL_H, 0xffc6c6c6);
-	fill(px, py + PANEL_H - 1, px + 176, py + PANEL_H, 0xff000000);
-	for (int i = 45; i <= 53; i++) {
-		int sx, sy;
-		if (!slotPos(i, sx, sy))
-			continue;
-		int x0 = px + sx, y0 = py + sy;
-		fill(x0, y0, x0 + 18, y0 + 18, 0xff373737);
-		fill(x0 + 1, y0 + 1, x0 + 17, y0 + 17, 0xff8b8b8b);
+	// Overflow row extension (PE mains 36-44): gray strip, black bottom
+	// edge, slot recesses. Only while occupied, otherwise plain beta.
+	bool overflow = showOverflow();
+	int ph = panelH();
+	if (overflow) {
+		fill(px, py + 166, px + 176, py + ph, 0xffc6c6c6);
+		fill(px, py + ph - 1, px + 176, py + ph, 0xff000000);
+		for (int i = 45; i <= 53; i++) {
+			int sx, sy;
+			if (!slotPos(i, sx, sy))
+				continue;
+			int x0 = px + sx, y0 = py + sy;
+			fill(x0, y0, x0 + 18, y0 + 18, 0xff373737);
+			fill(x0 + 1, y0 + 1, x0 + 17, y0 + 17, 0xff8b8b8b);
+		}
 	}
 
 	drawString(minecraft->font, "Crafting", px + 86, py + 16, 0xff404040);
@@ -508,6 +630,8 @@ void BetaInventoryScreen::render(int xm, int ym, float a) {
 	renderPlayerModel((float)(px + 51), (float)(py + 75));
 
 	for (int i = 0; i <= 53; i++) {
+		if (i >= 45 && !overflow)
+			continue;
 		int sx, sy;
 		if (!slotPos(i, sx, sy))
 			continue;
@@ -547,12 +671,137 @@ void BetaInventoryScreen::tick() {
 	super::tick();
 }
 
+static bool canWearIn(int betaIdx, const ItemInstance* item);
+
+// Place the whole carried stack into a slot (merge or swap). The result
+// slot is output-only and never accepts anything.
+void BetaInventoryScreen::placeInto(int slot) {
+	if (!hasCarried || carried.isNull() || slot == 0)
+		return;
+	if (!canWearIn(slot, &carried))
+		return;
+	ItemInstance* dst = getSlotItem(slot);
+	if (!dst || dst->isNull()) {
+		setSlotItem(slot, &carried);
+		// An unlinked hotbar cell with a full inventory silently drops:
+		// keep holding instead of deleting the stack.
+		ItemInstance* check = getSlotItem(slot);
+		if (!check || check->isNull())
+			return;
+		carried.setNull();
+		hasCarried = false;
+	} else if (sameStack(&carried, dst)) {
+		int space = dst->getMaxStackSize() - dst->count;
+		int take = carried.count < space ? carried.count : space;
+		if (take > 0) {
+			dst->count += take;
+			carried.count -= take;
+			if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
+		} else {
+			ItemInstance tmp = *dst;
+			setSlotItem(slot, &carried);
+			carried = tmp;
+		}
+	} else {
+		ItemInstance tmp = *dst;
+		setSlotItem(slot, &carried);
+		carried = tmp;
+	}
+}
+
+// Place a single unit from the carried stack into a slot.
+void BetaInventoryScreen::placeOneInto(int slot) {
+	if (!hasCarried || carried.isNull() || slot == 0)
+		return;
+	if (!canWearIn(slot, &carried))
+		return;
+	ItemInstance* dst = getSlotItem(slot);
+	if (!dst || dst->isNull()) {
+		ItemInstance one = carried;
+		one.count = 1;
+		setSlotItem(slot, &one);
+		ItemInstance* check = getSlotItem(slot);
+		if (!check || check->isNull())
+			return;
+		carried.count--;
+		if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
+	} else if (sameStack(&carried, dst) && dst->count < dst->getMaxStackSize()) {
+		dst->count++;
+		carried.count--;
+		if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
+	}
+}
+
+// Beta acts on press, not on release: click-click picks up and places,
+// and press-drag-release moves in one gesture. Acting on release instead
+// shuffles stacks whenever the two land on different cells.
 void BetaInventoryScreen::mouseClicked(int x, int y, int buttonNum) {
 	if (buttonNum != MouseAction::ACTION_LEFT && buttonNum != MouseAction::ACTION_RIGHT)
 		return;
 	pressed = true;
 	pressSlot = slotAt(x, y);
 	pressButton = buttonNum;
+	pressPickedUp = false;
+	bool shift = Keyboard::isKeyDown(Keyboard::KEY_LSHIFT);
+
+	if (pressButton == MouseAction::ACTION_LEFT) {
+		if (pressSlot < 0) {
+			spillCarried();
+			return;
+		}
+		if (shift) {
+			if (hasCarried) spillCarried();
+			quickTransfer(pressSlot);
+			return;
+		}
+		if (pressSlot == 0) {
+			takeResultToCursor();
+			return;
+		}
+		if (!hasCarried) {
+			ItemInstance* dst = getSlotItem(pressSlot);
+			if (dst && !dst->isNull()) {
+				carried = *dst;
+				hasCarried = true;
+				ItemInstance empty;
+				empty.setNull();
+				setSlotItem(pressSlot, &empty);
+				pressPickedUp = true;
+			}
+			return;
+		}
+		placeInto(pressSlot);
+	} else {
+		// Right click: place one / pick up half. Never touches result.
+		if (pressSlot < 0 || pressSlot == 0 || shift)
+			return;
+		if (!hasCarried) {
+			ItemInstance* dst = getSlotItem(pressSlot);
+			if (dst && !dst->isNull()) {
+				if (dst->count > 1) {
+					int half = (dst->count + 1) / 2;
+					carried = *dst;
+					carried.count = half;
+					hasCarried = true;
+					dst->count -= half;
+					if (dst->count <= 0) {
+						ItemInstance empty;
+						empty.setNull();
+						setSlotItem(pressSlot, &empty);
+					}
+				} else {
+					carried = *dst;
+					hasCarried = true;
+					ItemInstance empty;
+					empty.setNull();
+					setSlotItem(pressSlot, &empty);
+				}
+				pressPickedUp = true;
+			}
+			return;
+		}
+		placeOneInto(pressSlot);
+	}
 }
 
 static bool canWearIn(int betaIdx, const ItemInstance* item) {
@@ -574,95 +823,20 @@ void BetaInventoryScreen::mouseReleased(int x, int y, int buttonNum) {
 		return;
 	}
 	pressed = false;
+	// Only a press that picked something up can drop it elsewhere.
+	// Releasing on the press slot keeps holding (click-click), on the
+	// result slot does nothing (output-only), outside drops the stack.
+	if (!pressPickedUp || !hasCarried || carried.isNull())
+		return;
+	pressPickedUp = false;
 	int slot = slotAt(x, y);
-	bool shift = Keyboard::isKeyDown(Keyboard::KEY_LSHIFT);
-
-	if (pressButton == MouseAction::ACTION_LEFT) {
-		if (slot < 0) {
-			spillCarried();
-			return;
-		}
-		if (shift) {
-			if (hasCarried) spillCarried();
-			quickTransfer(slot);
-			return;
-		}
-		if (slot == 0) {
-			takeResultToCursor();
-			return;
-		}
-		ItemInstance* dst = getSlotItem(slot);
-		if (!hasCarried) {
-			if (dst && !dst->isNull()) {
-				carried = *dst;
-				hasCarried = true;
-				ItemInstance empty;
-				empty.setNull();
-				setSlotItem(slot, &empty);
-			}
-		} else if (!canWearIn(slot, &carried)) {
-			return;
-		} else if (!dst || dst->isNull()) {
-			setSlotItem(slot, &carried);
-			carried.setNull();
-			hasCarried = false;
-		} else if (sameStack(&carried, dst)) {
-			int space = dst->getMaxStackSize() - dst->count;
-			int take = carried.count < space ? carried.count : space;
-			if (take > 0) {
-				dst->count += take;
-				carried.count -= take;
-				if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
-			} else {
-				ItemInstance tmp = *dst;
-				setSlotItem(slot, &carried);
-				carried = tmp;
-			}
-		} else {
-			ItemInstance tmp = *dst;
-			setSlotItem(slot, &carried);
-			carried = tmp;
-		}
-	} else {
-		// Right click: place one / pick up half. Never touches result.
-		if (slot < 0 || slot == 0)
-			return;
-		if (shift)
-			return;
-		ItemInstance* dst = getSlotItem(slot);
-		if (!hasCarried) {
-			if (dst && !dst->isNull() && dst->count > 1) {
-				int half = (dst->count + 1) / 2;
-				carried = *dst;
-				carried.count = half;
-				hasCarried = true;
-				dst->count -= half;
-				if (dst->count <= 0) {
-					ItemInstance empty;
-					empty.setNull();
-					setSlotItem(slot, &empty);
-				}
-			} else if (dst && !dst->isNull()) {
-				carried = *dst;
-				hasCarried = true;
-				ItemInstance empty;
-				empty.setNull();
-				setSlotItem(slot, &empty);
-			}
-		} else if (!canWearIn(slot, &carried)) {
-			return;
-		} else if (!dst || dst->isNull()) {
-			ItemInstance one = carried;
-			one.count = 1;
-			setSlotItem(slot, &one);
-			carried.count--;
-			if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
-		} else if (sameStack(&carried, dst) && dst->count < dst->getMaxStackSize()) {
-			dst->count++;
-			carried.count--;
-			if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
-		}
+	if (slot < 0) {
+		spillCarried();
+		return;
 	}
+	if (slot == pressSlot || slot == 0)
+		return;
+	placeInto(slot);
 }
 
 void BetaInventoryScreen::keyPressed(int eventKey) {

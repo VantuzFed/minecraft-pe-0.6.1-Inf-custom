@@ -323,12 +323,14 @@ void Minecraft::setLevel(Level* level, const std::string& message /* ="" */, Loc
 }
 
 void Minecraft::applyWorldPresentation(Level* level) {
-	bool beta = level
-		&& level->getLevelData()->getGeneratorVersion() == (int)LGV_BETA173;
-	platform()->setWindowTitle(beta ? "Minecraft Beta 1.7.3" : "Minecraft PE 0.6.1");
+	int genVersion = level ? level->getLevelData()->getGeneratorVersion() : (int)LGV_ORIGINAL;
+	bool beta = genVersion == (int)LGV_BETA173;
+	bool alpha = genVersion == (int)LGV_ALPHA112;
+	platform()->setWindowTitle(alpha ? "Minecraft Alpha 1.1.2"
+		: (beta ? "Minecraft Beta 1.7.3" : "Minecraft PE 0.6.1"));
 #ifndef STANDALONE_SERVER
 	if (textures)
-		textures->setBetaTerrain(beta);
+		textures->setTerrainMode(alpha ? 2 : (beta ? 1 : 0));
 #endif
 }
 
@@ -719,7 +721,11 @@ void Minecraft::tickInput() {
 				Inventory* v = player->inventory;
 
 				int numSlots = gui.getNumSlots();
+#if defined(PLATFORM_DESKTOP)
+				// Desktop has no "..." button: all link slots scroll.
+#else
 				if (!useTouchscreen()) numSlots--;
+#endif
 
 				int slot = (v->selected - e.dy + numSlots) % numSlots;
 				v->selectSlot(slot);

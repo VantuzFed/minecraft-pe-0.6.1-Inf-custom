@@ -6,6 +6,7 @@
 #include "RenameMPLevelScreen.h"
 #include "ConsoleScreen.h"
 #include "IngameBlockSelectionScreen.h"
+#include "Beta18CreativeScreen.h"
 #include "JoinByIPScreen.h"
 #include "touch/TouchStartMenuScreen.h"
 #include "touch/TouchSelectWorldScreen.h"
@@ -43,7 +44,8 @@ Screen* ScreenChooser::createScreen( ScreenId id )
 		case SCREEN_JOINGAME:	     screen = new JoinGameScreen();   break;
 		case SCREEN_PAUSE:	         screen = new PauseScreen(false); break;
 		case SCREEN_PAUSEPREV:	     screen = new PauseScreen(true);	 break;
-		case SCREEN_BLOCKSELECTION:	 screen = new IngameBlockSelectionScreen();	break;
+		// Desktop creative uses the Beta 1.8 item-selection screen.
+		case SCREEN_BLOCKSELECTION:	 screen = new Beta18CreativeScreen();	break;
 		case SCREEN_JOINBYIP:        screen = new JoinByIPScreen(); break;
 		case SCREEN_CONSOLE:		 screen = new ConsoleScreen(); break;
 		case SCREEN_NONE:

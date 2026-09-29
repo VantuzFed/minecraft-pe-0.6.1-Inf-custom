@@ -1,6 +1,7 @@
 #include "Textures.h"
 
 #include "BetaTerrainPatch.h"
+#include "AlphaTerrainPatch.h"
 #include "TextureData.h"
 #include "ptexture/DynamicTexture.h"
 #include "../Options.h"
@@ -18,7 +19,7 @@ Textures::Textures( Options* options_, AppPlatform* platform_ )
 	options(options_),
 	platform(platform_),
 	lastBoundTexture(Textures::InvalidId),
-	betaTerrain(false),
+	terrainMode(0),
 	pendingTerrainPatch(false)
 {
 }
@@ -44,8 +45,8 @@ void Textures::clear()
 	idMap.clear();
 	loadedImages.clear();
 
-	// The reloaded atlas comes from the PE asset; re-apply beta sprites.
-	pendingTerrainPatch = betaTerrain;
+	// The reloaded atlas comes from the PE asset; re-apply world sprites.
+	pendingTerrainPatch = terrainMode != 0;
 
 	lastBoundTexture = Textures::InvalidId;
 }
@@ -169,11 +170,11 @@ TextureData* Textures::getEditableTextureData( TextureId id )
 	return &it->second;
 }
 
-void Textures::setBetaTerrain(bool beta)
+void Textures::setTerrainMode(int mode)
 {
-	if (beta == betaTerrain && !pendingTerrainPatch)
+	if (mode == terrainMode && !pendingTerrainPatch)
 		return;
-	betaTerrain = beta;
+	terrainMode = mode;
 	pendingTerrainPatch = true;
 }
 
@@ -226,9 +227,71 @@ void Textures::applyBetaTerrainPatch()
 		saveTile(tex, 52, origTile52);
 		saveTile(tex, 53, origTile53);
 		saveTile(tex, 3, origTile3);
+		saveTile(tex, 0, origTile0);
+		saveTile(tex, 69, origTile69);
+		saveTile(tex, 70, origTile70);
+		saveTile(tex, 71, origTile71);
+		saveTile(tex, 73, origTile73);
 	}
 
-	if (betaTerrain) {
+	if (terrainMode == 2) {
+		// Alpha 1.1.2 art straight from its atlas: green grass top,
+		// grass-side overlay, green leaves.
+		restoreTile(tex, 0, std::vector<unsigned char>(
+			ALPHA_TILE_0, ALPHA_TILE_0 + 16 * 16 * 4));
+		restoreTile(tex, 52, std::vector<unsigned char>(
+			ALPHA_TILE_52, ALPHA_TILE_52 + 16 * 16 * 4));
+		restoreTile(tex, 53, std::vector<unsigned char>(
+			ALPHA_TILE_53, ALPHA_TILE_53 + 16 * 16 * 4));
+		// Cactus top/side/bottom + reeds: ours are dark wisps, alpha's
+		// are solid green (black spikes otherwise).
+		restoreTile(tex, 69, std::vector<unsigned char>(
+			ALPHA_TILE_69, ALPHA_TILE_69 + 16 * 16 * 4));
+		restoreTile(tex, 70, std::vector<unsigned char>(
+			ALPHA_TILE_70, ALPHA_TILE_70 + 16 * 16 * 4));
+		restoreTile(tex, 71, std::vector<unsigned char>(
+			ALPHA_TILE_71, ALPHA_TILE_71 + 16 * 16 * 4));
+		restoreTile(tex, 73, std::vector<unsigned char>(
+			ALPHA_TILE_73, ALPHA_TILE_73 + 16 * 16 * 4));
+		// Grass side: full Alpha 1.1.2 tile (green overlay + original dirt).
+		restoreTile(tex, 3, std::vector<unsigned char>(
+			ALPHA_TILE_3, ALPHA_TILE_3 + 16 * 16 * 4));
+
+		// Rose head: PE cyan -> red (same red as beta).
+		static const unsigned char PE_HEAD[4][3] = {
+			{ 0x3c, 0xa2, 0xcb }, { 0x3d, 0xb9, 0xe7 },
+			{ 0x37, 0x7f, 0x9b }, { 0x3b, 0x98, 0xba },
+		};
+		static const unsigned char BETA_HEAD[4][3] = {
+			{ 0xd1, 0x06, 0x09 }, { 0xf7, 0x07, 0x0f },
+			{ 0x91, 0x02, 0x05 }, { 0xba, 0x05, 0x0b },
+		};
+		{
+			const int tileX = (12 % 16) * 16;
+			const int tileY = (12 / 16) * 16;
+			for (int y = 0; y < 16; y++) {
+				for (int x = 0; x < 16; x++) {
+					unsigned char* px = tex->data + ((tileY + y) * tex->w + (tileX + x)) * 4;
+					if (px[3] == 0)
+						continue;
+					for (int i = 0; i < 4; i++) {
+						if (px[0] == PE_HEAD[i][0] && px[1] == PE_HEAD[i][1] && px[2] == PE_HEAD[i][2]) {
+							px[0] = BETA_HEAD[i][0];
+							px[1] = BETA_HEAD[i][1];
+							px[2] = BETA_HEAD[i][2];
+							break;
+						}
+					}
+				}
+			}
+		}
+	} else if (terrainMode == 1) {
+		// Grass top + cactus/reeds back to PE (alpha mode paints them).
+		restoreTile(tex, 0, origTile0);
+		restoreTile(tex, 69, origTile69);
+		restoreTile(tex, 70, origTile70);
+		restoreTile(tex, 71, origTile71);
+		restoreTile(tex, 73, origTile73);
 		// Leaves: wholesale beta sprites (shape differs too).
 		restoreTile(tex, 52, std::vector<unsigned char>(
 			BETA_TILE_52, BETA_TILE_52 + 16 * 16 * 4));
@@ -280,6 +343,11 @@ void Textures::applyBetaTerrainPatch()
 		restoreTile(tex, 52, origTile52);
 		restoreTile(tex, 53, origTile53);
 		restoreTile(tex, 3, origTile3);
+		restoreTile(tex, 0, origTile0);
+		restoreTile(tex, 69, origTile69);
+		restoreTile(tex, 70, origTile70);
+		restoreTile(tex, 71, origTile71);
+		restoreTile(tex, 73, origTile73);
 		// Rose back: beta red -> PE cyan.
 		static const unsigned char PE_HEAD[4][3] = {
 			{ 0x3c, 0xa2, 0xcb }, { 0x3d, 0xb9, 0xe7 },

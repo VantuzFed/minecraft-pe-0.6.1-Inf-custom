@@ -42,10 +42,11 @@ public:
 	TextureId loadTexture(const std::string& resourceName, bool inTextureFolder = true);
 	TextureId loadAndBindTexture(const std::string& resourceName);
 
-	// Beta worlds use Beta 1.7.3 terrain sprites: red rose, grayscale
-	// leaves and the beta grass-side overlay (PE keeps its own).
-	// Applied lazily in tick() so it always runs with GL context current.
-	void setBetaTerrain(bool beta);
+	// Per-world terrain sprites, applied lazily in tick() so it always
+	// runs with GL context current. Mode 0 = PE, 1 = Beta 1.7.3
+	// (red rose, grayscale leaves, beta grass-side), 2 = Alpha 1.1.2
+	// (green grass top/side overlay/leaves straight from its atlas).
+	void setTerrainMode(int mode);
 
     TextureId assignTexture(const std::string& resourceName, const TextureData& img);
 	const TextureData* getTemporaryTextureData(TextureId id);
@@ -81,12 +82,17 @@ private:
 	int lastBoundTexture;
 	std::vector<DynamicTexture*> dynamicTextures;
 
-	bool betaTerrain;
+	int terrainMode;
 	bool pendingTerrainPatch;
 	// PE originals of the patched tiles, saved on first patch.
 	std::vector<unsigned char> origTile52;
 	std::vector<unsigned char> origTile53;
 	std::vector<unsigned char> origTile3;
+	std::vector<unsigned char> origTile0;
+	std::vector<unsigned char> origTile69;
+	std::vector<unsigned char> origTile70;
+	std::vector<unsigned char> origTile71;
+	std::vector<unsigned char> origTile73;
 	void applyBetaTerrainPatch();
 	TextureData* getEditableTextureData(TextureId id);
 };

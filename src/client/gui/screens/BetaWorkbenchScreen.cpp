@@ -34,7 +34,7 @@ public:
 
 BetaWorkbenchScreen::BetaWorkbenchScreen()
 	: hasCraftResult(false), hasCarried(false),
-	  pressed(false), pressSlot(-1), pressButton(0) {
+	  pressed(false), pressSlot(-1), pressButton(0), pressPickedUp(false) {
 	for (int i = 0; i < 9; i++)
 		craftMatrix[i].setNull();
 	craftResult.setNull();
@@ -110,12 +110,36 @@ int BetaWorkbenchScreen::ensureHotbarLink(int betaIdx) {
 	for (int s = 9; s < in->getContainerSize(); s++) {
 		ItemInstance* it = in->getItem(s);
 		if (!it || it->isNull()) {
+			// One main = one link (see BetaInventoryScreen).
+			for (int l = 0; l < in->numLinkedSlots; l++) {
+				if (l != link && in->linkedSlots[l].inventorySlot == s)
+					in->linkedSlots[l].inventorySlot = -1;
+			}
 			if (in->linkSlot(link, s, false))
 				return s;
 			return -1;
 		}
 	}
 	return -1;
+}
+
+int BetaWorkbenchScreen::betaToPe(int betaIdx) {
+	if (betaIdx >= 10 && betaIdx <= 36)
+		return betaIdx - 1;
+	if (betaIdx >= 37 && betaIdx <= 45)
+		return resolveHotbar(betaIdx);
+	return -1;
+}
+
+bool BetaWorkbenchScreen::isLinkedMain(int peSlot) {
+	Inventory* in = inv();
+	if (!in || peSlot < 9 || peSlot >= in->getContainerSize())
+		return false;
+	for (int l = 0; l < in->numLinkedSlots; l++) {
+		if (in->linkedSlots[l].inventorySlot == peSlot)
+			return true;
+	}
+	return false;
 }
 
 ItemInstance* BetaWorkbenchScreen::getSlotItem(int betaIdx) {
@@ -130,6 +154,10 @@ ItemInstance* BetaWorkbenchScreen::getSlotItem(int betaIdx) {
 		return it.isNull() ? NULL : &it;
 	}
 	if (betaIdx >= 10 && betaIdx <= 36) {
+		// Linked storage renders in the hotbar row, not here: every
+		// stack is visible exactly once (no link-mirror "dupes").
+		if (isLinkedMain(betaIdx - 1))
+			return NULL;
 		ItemInstance* it = in->getItem(betaIdx - 1);
 		if (!it || it->isNull())
 			return NULL;
@@ -161,8 +189,15 @@ void BetaWorkbenchScreen::setSlotItem(int betaIdx, const ItemInstance* item) {
 			real = ensureHotbarLink(betaIdx);
 		if (real < 0)
 			return;
-		if (empty) in->clearSlot(real);
-		else in->setItem(real, const_cast<ItemInstance*>(item));
+		if (empty) {
+			in->clearSlot(real);
+			in->linkedSlots[betaIdx - 37].inventorySlot = -1;
+		} else in->setItem(real, const_cast<ItemInstance*>(item));
+		// One main = one link (see BetaInventoryScreen).
+		for (int l = 0; l < in->numLinkedSlots; l++) {
+			if (l != betaIdx - 37 && in->linkedSlots[l].inventorySlot == real)
+				in->linkedSlots[l].inventorySlot = -1;
+		}
 		return;
 	}
 	int pe = -1;
@@ -228,7 +263,7 @@ static bool sameStack(const ItemInstance* a, const ItemInstance* b) {
 	return true;
 }
 
-bool BetaWorkbenchScreen::mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse) {
+bool BetaWorkbenchScreen::mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse, int skipPe) {
 	if (stack.isNull())
 		return false;
 	bool moved = false;
@@ -236,6 +271,8 @@ bool BetaWorkbenchScreen::mergeIntoRange(ItemInstance& stack, int from, int to, 
 		for (int pass = 0; pass < 2 && !stack.isNull(); pass++) {
 			for (int i = from; i < to; i++) {
 				int idx = reverse ? (to - 1 - (i - from)) : i;
+				if (skipPe >= 0 && betaToPe(idx) == skipPe)
+					continue;
 				ItemInstance* dst = getSlotItem(idx);
 				if (pass == 0) {
 					if (!dst || !sameStack(&stack, dst))
@@ -248,8 +285,15 @@ bool BetaWorkbenchScreen::mergeIntoRange(ItemInstance& stack, int from, int to, 
 					stack.count -= take;
 					moved = true;
 				} else if (!dst || dst->isNull()) {
+					// Workbench hotbar is 37-45; other linked storage
+					// is hidden, never park stacks there.
+					if ((idx < 37 || idx > 45) && isLinkedMain(betaToPe(idx)))
+						continue;
 					ItemInstance v = stack;
 					setSlotItem(idx, &v);
+					ItemInstance* check = getSlotItem(idx);
+					if (!check || check->isNull())
+						continue;
 					stack.setNull();
 					return true;
 				}
@@ -258,9 +302,16 @@ bool BetaWorkbenchScreen::mergeIntoRange(ItemInstance& stack, int from, int to, 
 	} else {
 		for (int i = from; i < to; i++) {
 			int idx = reverse ? (to - 1 - (i - from)) : i;
+			if (skipPe >= 0 && betaToPe(idx) == skipPe)
+				continue;
+			if ((idx < 37 || idx > 45) && isLinkedMain(betaToPe(idx)))
+				continue;
 			if (!getSlotItem(idx)) {
 				ItemInstance v = stack;
 				setSlotItem(idx, &v);
+				ItemInstance* check = getSlotItem(idx);
+				if (!check || check->isNull())
+					continue;
 				stack.setNull();
 				return true;
 			}
@@ -320,13 +371,14 @@ bool BetaWorkbenchScreen::quickTransfer(int betaIdx) {
 	if (betaIdx == 0)
 		return takeResultToInventory();
 	ItemInstance stack = *src;
+	int srcPe = betaToPe(betaIdx);
 	bool moved = false;
 	if (betaIdx >= 1 && betaIdx <= 9) {
-		moved = mergeIntoRange(stack, 10, 46, false);
+		moved = mergeIntoRange(stack, 10, 46, false, srcPe);
 	} else if (betaIdx >= 10 && betaIdx <= 36) {
-		moved = mergeIntoRange(stack, 37, 46, false);
+		moved = mergeIntoRange(stack, 37, 46, false, srcPe);
 	} else {
-		moved = mergeIntoRange(stack, 10, 37, false);
+		moved = mergeIntoRange(stack, 10, 37, false, srcPe);
 	}
 	if (moved) {
 		if (stack.isNull()) {
@@ -362,15 +414,16 @@ void BetaWorkbenchScreen::spillCarried() {
 
 void BetaWorkbenchScreen::render(int xm, int ym, float a) {
 	renderBackground();
-	int mx = xm * width / minecraft->width;
-	int my = ym * height / minecraft->height - 1;
+	// render() coords are already GUI units (see BetaInventoryScreen).
+	int mx = xm;
+	int my = ym - 1;
 	int px = panelX(), py = panelY();
 
 	TextureId bg = minecraft->textures->loadTexture("gui/crafting.png");
 	if (Textures::isTextureIdValid(bg)) {
 		minecraft->textures->bind(bg);
 		glColor4f2(1, 1, 1, 1);
-		blit(px, py, 0, 0, 176, 166, 256, 256);
+		blit(px, py, 0, 0, 176, 166);
 	}
 
 	for (int i = 0; i <= 45; i++) {
@@ -412,12 +465,118 @@ void BetaWorkbenchScreen::tick() {
 	super::tick();
 }
 
+void BetaWorkbenchScreen::placeInto(int slot) {
+	if (!hasCarried || carried.isNull() || slot == 0)
+		return;
+	ItemInstance* dst = getSlotItem(slot);
+	if (!dst || dst->isNull()) {
+		setSlotItem(slot, &carried);
+		carried.setNull();
+		hasCarried = false;
+	} else if (sameStack(&carried, dst)) {
+		int space = dst->getMaxStackSize() - dst->count;
+		int take = carried.count < space ? carried.count : space;
+		if (take > 0) {
+			dst->count += take;
+			carried.count -= take;
+			if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
+		} else {
+			ItemInstance tmp = *dst;
+			setSlotItem(slot, &carried);
+			carried = tmp;
+		}
+	} else {
+		ItemInstance tmp = *dst;
+		setSlotItem(slot, &carried);
+		carried = tmp;
+	}
+}
+
+void BetaWorkbenchScreen::placeOneInto(int slot) {
+	if (!hasCarried || carried.isNull() || slot == 0)
+		return;
+	ItemInstance* dst = getSlotItem(slot);
+	if (!dst || dst->isNull()) {
+		ItemInstance one = carried;
+		one.count = 1;
+		setSlotItem(slot, &one);
+		carried.count--;
+		if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
+	} else if (sameStack(&carried, dst) && dst->count < dst->getMaxStackSize()) {
+		dst->count++;
+		carried.count--;
+		if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
+	}
+}
+
+// Same press-based model as BetaInventoryScreen: beta acts on press,
+// release on another slot finishes a drag.
 void BetaWorkbenchScreen::mouseClicked(int x, int y, int buttonNum) {
 	if (buttonNum != MouseAction::ACTION_LEFT && buttonNum != MouseAction::ACTION_RIGHT)
 		return;
 	pressed = true;
 	pressSlot = slotAt(x, y);
 	pressButton = buttonNum;
+	pressPickedUp = false;
+	bool shift = Keyboard::isKeyDown(Keyboard::KEY_LSHIFT);
+
+	if (pressButton == MouseAction::ACTION_LEFT) {
+		if (pressSlot < 0) {
+			spillCarried();
+			return;
+		}
+		if (shift) {
+			if (hasCarried) spillCarried();
+			quickTransfer(pressSlot);
+			return;
+		}
+		if (pressSlot == 0) {
+			takeResultToCursor();
+			return;
+		}
+		if (!hasCarried) {
+			ItemInstance* dst = getSlotItem(pressSlot);
+			if (dst && !dst->isNull()) {
+				carried = *dst;
+				hasCarried = true;
+				ItemInstance empty;
+				empty.setNull();
+				setSlotItem(pressSlot, &empty);
+				pressPickedUp = true;
+			}
+			return;
+		}
+		placeInto(pressSlot);
+	} else {
+		if (pressSlot < 0 || pressSlot == 0 || shift)
+			return;
+		if (!hasCarried) {
+			ItemInstance* dst = getSlotItem(pressSlot);
+			if (dst && !dst->isNull()) {
+				if (dst->count > 1) {
+					int half = (dst->count + 1) / 2;
+					carried = *dst;
+					carried.count = half;
+					hasCarried = true;
+					dst->count -= half;
+					if (dst->count <= 0) {
+						ItemInstance empty;
+						empty.setNull();
+						setSlotItem(pressSlot, &empty);
+					}
+				} else {
+					carried = *dst;
+					hasCarried = true;
+					ItemInstance empty;
+					empty.setNull();
+					setSlotItem(pressSlot, &empty);
+				}
+				pressPickedUp = true;
+			}
+			return;
+		}
+		placeOneInto(pressSlot);
+	}
 }
 
 void BetaWorkbenchScreen::mouseReleased(int x, int y, int buttonNum) {
@@ -426,90 +585,17 @@ void BetaWorkbenchScreen::mouseReleased(int x, int y, int buttonNum) {
 		return;
 	}
 	pressed = false;
+	if (!pressPickedUp || !hasCarried || carried.isNull())
+		return;
+	pressPickedUp = false;
 	int slot = slotAt(x, y);
-	bool shift = Keyboard::isKeyDown(Keyboard::KEY_LSHIFT);
-
-	if (pressButton == MouseAction::ACTION_LEFT) {
-		if (slot < 0) {
-			spillCarried();
-			return;
-		}
-		if (shift) {
-			if (hasCarried) spillCarried();
-			quickTransfer(slot);
-			return;
-		}
-		if (slot == 0) {
-			takeResultToCursor();
-			return;
-		}
-		ItemInstance* dst = getSlotItem(slot);
-		if (!hasCarried) {
-			if (dst && !dst->isNull()) {
-				carried = *dst;
-				hasCarried = true;
-				ItemInstance empty;
-				empty.setNull();
-				setSlotItem(slot, &empty);
-			}
-		} else if (!dst || dst->isNull()) {
-			setSlotItem(slot, &carried);
-			carried.setNull();
-			hasCarried = false;
-		} else if (sameStack(&carried, dst)) {
-			int space = dst->getMaxStackSize() - dst->count;
-			int take = carried.count < space ? carried.count : space;
-			if (take > 0) {
-				dst->count += take;
-				carried.count -= take;
-				if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
-			} else {
-				ItemInstance tmp = *dst;
-				setSlotItem(slot, &carried);
-				carried = tmp;
-			}
-		} else {
-			ItemInstance tmp = *dst;
-			setSlotItem(slot, &carried);
-			carried = tmp;
-		}
-	} else {
-		if (slot < 0 || slot == 0)
-			return;
-		if (shift)
-			return;
-		ItemInstance* dst = getSlotItem(slot);
-		if (!hasCarried) {
-			if (dst && !dst->isNull() && dst->count > 1) {
-				int half = (dst->count + 1) / 2;
-				carried = *dst;
-				carried.count = half;
-				hasCarried = true;
-				dst->count -= half;
-				if (dst->count <= 0) {
-					ItemInstance empty;
-					empty.setNull();
-					setSlotItem(slot, &empty);
-				}
-			} else if (dst && !dst->isNull()) {
-				carried = *dst;
-				hasCarried = true;
-				ItemInstance empty;
-				empty.setNull();
-				setSlotItem(slot, &empty);
-			}
-		} else if (!dst || dst->isNull()) {
-			ItemInstance one = carried;
-			one.count = 1;
-			setSlotItem(slot, &one);
-			carried.count--;
-			if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
-		} else if (sameStack(&carried, dst) && dst->count < dst->getMaxStackSize()) {
-			dst->count++;
-			carried.count--;
-			if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
-		}
+	if (slot < 0) {
+		spillCarried();
+		return;
 	}
+	if (slot == pressSlot || slot == 0)
+		return;
+	placeInto(slot);
 }
 
 void BetaWorkbenchScreen::keyPressed(int eventKey) {

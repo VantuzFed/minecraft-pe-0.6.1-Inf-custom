@@ -29,6 +29,11 @@ public:
         if (slot >= getContainerSize()) {
             return NULL;
         }
+        // Java semantics: empty cells read as NULL. The recipe matchers
+        // count non-NULL cells, so a half-empty grid never matches
+        // otherwise (sticks, torches, ... all fail).
+        if (items[slot].isNull())
+            return NULL;
         return &items[slot];
     }
 

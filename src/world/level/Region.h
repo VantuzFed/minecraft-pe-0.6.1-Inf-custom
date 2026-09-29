@@ -29,6 +29,9 @@ public:
 	const Material* getMaterial(int x, int y, int z);
 	Biome* getBiome(int x, int z);
 	BiomeSource* getBiomeSource() override;
+	bool getBetaTempHumid(int x, int z, float& temp, float& humid) override;
+	bool isAlphaWorld() override;
+
 private:
 	LevelChunk* getChunkFor(int x, int z);
 

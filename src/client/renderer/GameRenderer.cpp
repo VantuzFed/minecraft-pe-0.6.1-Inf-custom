@@ -300,8 +300,19 @@ void GameRenderer::renderLevel(double a) {
 			setupFog(-1);
 			TIMER_POP_PUSH("sky");
 			// @TODO - EXTREME JANK BELOW, it works but i have to do heavy cleanup here, also to test if the glfogf commands even affect fog in anyway.
-			if(mc->options.getBooleanValue(OPTIONS_BETA_SKY) && (mc->options.getIntValue(OPTIONS_VIEW_DISTANCE) < 2)){
+			if(mc->options.getBooleanValue(OPTIONS_BETA_SKY)){
+			// Java-style sky on its own far plane: the level projection
+			// ends at renderDistance, which clips the R=100 celestial
+			// shell on short view distances (sun/moon/stars vanish).
+			glMatrixMode(GL_PROJECTION);
+			glPushMatrix2();
+			glLoadIdentity2();
+			gluPerspective(_setupCameraFov = getFov(a, true), mc->width / (double) mc->height, 0.05, renderDistance * 512.0);
+			glMatrixMode(GL_MODELVIEW);
 			levelRenderer->renderSky(a); // how java renders the sky instead of how pe doing prepareandrenderclouds.
+			glMatrixMode(GL_PROJECTION);
+			glPopMatrix2();
+			glMatrixMode(GL_MODELVIEW);
 			} else if (!mc->options.getBooleanValue(OPTIONS_BETA_SKY)){
 			glFogf(GL_FOG_START, renderDistance  * 0.2);
 			glFogf(GL_FOG_END, renderDistance *0.75);
@@ -402,7 +413,17 @@ void GameRenderer::renderLevel(double a) {
 		if(mc->options.getBooleanValue(OPTIONS_BETA_SKY)){
 		       setupFog(0);
 		       glEnable2(GL_FOG);
+		       // Same far-plane treatment as the sky: cloud verts reach
+		       // past renderDistance and get clipped without it.
+		       glMatrixMode(GL_PROJECTION);
+		       glPushMatrix2();
+		       glLoadIdentity2();
+		       gluPerspective(_setupCameraFov = getFov(a, true), mc->width / (double) mc->height, 0.05, renderDistance * 512.0);
+		       glMatrixMode(GL_MODELVIEW);
 		        levelRenderer->renderClouds(a);
+		       glMatrixMode(GL_PROJECTION);
+		       glPopMatrix2();
+		       glMatrixMode(GL_MODELVIEW);
 		        glDisable2(GL_FOG);
 		}
 		// SHREDDER END

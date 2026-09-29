@@ -40,14 +40,18 @@ private:
 	void setSlotItem(int betaIdx, const ItemInstance* item);
 	int resolveHotbar(int betaIdx);
 	int ensureHotbarLink(int betaIdx);
+	int betaToPe(int betaIdx);
+	bool isLinkedMain(int peSlot);
 	void updateCraftResult();
 	void consumeMatrix();
 	bool quickTransfer(int betaIdx);
 	bool takeResultToCursor();
 	bool takeResultToInventory();
-	bool mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse);
+	bool mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse, int skipPe = -1);
 	int spaceFor(const ItemInstance& stack, int from, int to);
 	void spillCarried();
+	void placeInto(int slot);
+	void placeOneInto(int slot);
 
 	int panelX() const { return (width - PANEL_W) / 2; }
 	int panelY() const { return (height - PANEL_H) / 2; }
@@ -61,6 +65,7 @@ private:
 	bool pressed;
 	int pressSlot;
 	int pressButton;
+	bool pressPickedUp;
 };
 
 #endif

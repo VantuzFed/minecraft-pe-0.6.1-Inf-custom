@@ -380,9 +380,10 @@ void LevelData::setGameType( int type )
 
 bool LevelData::getSpawnMobs() const
 {
-	// Beta 1.7.3 predates creative mode entirely, so beta worlds always
-	// spawn mobs regardless of game mode. PE worlds keep the flag.
-	return spawnMobs || generatorVersion == (int)LGV_BETA173;
+	// Beta 1.7.3 and Alpha 1.1.2 predate creative mode entirely, so those
+	// worlds always spawn mobs regardless of game mode. PE worlds keep the flag.
+	return spawnMobs || generatorVersion == (int)LGV_BETA173
+		|| generatorVersion == (int)LGV_ALPHA112;
 }
 
 void LevelData::setSpawnMobs( bool doSpawn )

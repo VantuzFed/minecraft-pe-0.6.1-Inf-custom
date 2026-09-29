@@ -41,6 +41,10 @@ int TallGrass::getColor( int auxData ) {
 }
 
 int TallGrass::getColor( LevelSource* level, int x, int y, int z ) {
+	if (!level) return 0xffffff;
+	if (level->isAlphaWorld()) {
+		return 0xffffff;
+	}
 	int d = level->getData(x, y, z);
 	if (d == DEAD_SHRUB); //return 0xffffff; // i removed this to make it accurate to beta 1.6.6 instead of early java release versions
 	// Beta worlds tint grass from the beta biome, like Beta 1.7.3.

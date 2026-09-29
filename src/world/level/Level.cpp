@@ -832,6 +832,10 @@ bool Level::isBetaWorld() const {
 	return levelData.getGeneratorVersion() == (int)LGV_BETA173;
 }
 
+bool Level::isAlphaWorld() {
+	return levelData.getGeneratorVersion() == (int)LGV_ALPHA112;
+}
+
 bool Level::getBetaTempHumid(int x, int z, float& temp, float& humid) {
 	if (!betaBiomeSource) return false;
 	betaBiomeSource->getBiomeBlock(betaBiomeScratch, x, z, 1, 1);

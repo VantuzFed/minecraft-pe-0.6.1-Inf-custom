@@ -278,6 +278,20 @@ void FillingContainer::load( ListTag* inventoryList )
 			}
 		}
 	}
+	// Duplicate link targets are corrupt data (two hotbar cells viewing
+	// one stack renders as phantom "dupes" everywhere): keep the first
+	// occurrence, drop the rest. Legit saves never alias like this.
+	for (int a = 0; a < numLinkedSlots; a++) {
+		int t = linkedSlots[a].inventorySlot;
+		if (t < numLinkedSlots || t >= (int)items.size())
+			continue;
+		for (int b = a + 1; b < numLinkedSlots; b++) {
+			if (linkedSlots[b].inventorySlot == t) {
+				LOGE("Dropping duplicate hotbar link %d -> %d (kept %d)\n", b, t, a);
+				linkedSlots[b].inventorySlot = -1;
+			}
+		}
+	}
 	compressLinkedSlotList(0);
 }
 

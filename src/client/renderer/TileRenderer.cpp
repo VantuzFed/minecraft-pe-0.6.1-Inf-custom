@@ -108,7 +108,7 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 		if (tt->zz0 > 0) br = centerBrightness;
 		t.color(r2 * br, g2 * br, b2 * br);
 		renderNorth(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 2));
-		if ((tt->getTexture(level, x, y, z, 2) == 3) && sideTinting) { // checking if the texture from terrain.png is the normal grass side texture
+		if ((tt->getTexture(level, x, y, z, 2) == 3) && sideTinting && (!level || !level->isAlphaWorld())) { // checking if the texture from terrain.png is the normal grass side texture
 			t.color(c2 * br * biomeR, c2 * br * biomeG, c2 * br * biomeB);
 			renderNorth(tt, xf, yf, zf, 38); // rendering an extra face over the side of the cube that is a grayscale grass fringe tinted by t.color using biome colors, kinda inefficient
 		}
@@ -120,7 +120,7 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 		if (tt->zz1 < 1) br = centerBrightness;
 		t.color(r2 * br, g2 * br, b2 * br);
 		renderSouth(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 3));
-		if ((tt->getTexture(level, x, y, z, 3) == 3) && sideTinting){ // checking if the texture from terrain.png is the normal grass side texture
+		if ((tt->getTexture(level, x, y, z, 3) == 3) && sideTinting && (!level || !level->isAlphaWorld())){ // checking if the texture from terrain.png is the normal grass side texture
 			t.color(c2 * br * biomeR, c2 * br * biomeG, c2 * br * biomeB);
 			renderSouth(tt, xf, yf, zf, 38); // rendering an extra face over the side of the cube that is a grayscale grass fringe tinted by t.color using biome colors, kinda inefficient
 		}
@@ -132,7 +132,7 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 		if (tt->xx0 > 0) br = centerBrightness;
 		t.color(r3 * br, g3 * br, b3 * br);
 		renderWest(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 4));
-		if ((tt->getTexture(level, x, y, z, 4) == 3) && sideTinting) { // checking if the texture from terrain.png is the normal grass side texture
+		if ((tt->getTexture(level, x, y, z, 4) == 3) && sideTinting && (!level || !level->isAlphaWorld())) { // checking if the texture from terrain.png is the normal grass side texture
 			t.color(c2 * br * biomeR, c2 * br * biomeG, c2 * br * biomeB);
 			renderWest(tt, xf, yf, zf, 38); // rendering an extra face over the side of the cube that is a grayscale grass fringe tinted by t.color using biome colors, kinda inefficient
 		}
@@ -144,7 +144,7 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 		if (tt->xx1 < 1) br = centerBrightness;
 		t.color(r3 * br, g3 * br, b3 * br);
 		renderEast(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 5));
-		if ((tt->getTexture(level, x, y, z, 5) == 3) && sideTinting) { // checking if the texture from terrain.png is the normal grass side texture
+		if ((tt->getTexture(level, x, y, z, 5) == 3) && sideTinting && (!level || !level->isAlphaWorld())) { // checking if the texture from terrain.png is the normal grass side texture
 			t.color(c2 * br * biomeR, c2 * br * biomeG, c2 * br * biomeB);
 			renderEast(tt, xf, yf, zf, 38); // rendering an extra face over the side of the cube that is a grayscale grass fringe tinted by t.color using biome colors, kinda inefficient
 		}
@@ -1220,7 +1220,7 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 		c4g *= ll4;
 		c4b *= ll4;
 		renderNorth(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 2));
-		if (tt->getTexture(level, pX, pY, pZ, 2) == 3 && sideTinting) 
+		if (tt->getTexture(level, pX, pY, pZ, 2) == 3 && sideTinting && (!level || !level->isAlphaWorld())) 
 		{
 			c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
 			c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
@@ -1282,7 +1282,7 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 		c4g *= ll4;
 		c4b *= ll4;
 		renderSouth(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 3));
-		if (tt->getTexture(level, pX, pY, pZ, 3) == 3 && sideTinting) 
+		if (tt->getTexture(level, pX, pY, pZ, 3) == 3 && sideTinting && (!level || !level->isAlphaWorld())) 
 		{
 			c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
 			c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
@@ -1343,7 +1343,7 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 		c4g *= ll4;
 		c4b *= ll4;
 		renderWest(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 4));
-		if (tt->getTexture(level, pX, pY, pZ, 4) == 3 && sideTinting) 
+		if (tt->getTexture(level, pX, pY, pZ, 4) == 3 && sideTinting && (!level || !level->isAlphaWorld())) 
 		{
 			c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
 			c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
@@ -1405,7 +1405,7 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 		c4b *= ll4;
 
 		renderEast(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 5));
-		if (tt->getTexture(level, pX, pY, pZ, 5) == 3 && sideTinting) 
+		if (tt->getTexture(level, pX, pY, pZ, 5) == 3 && sideTinting && (!level || !level->isAlphaWorld())) 
 		{
 			c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
 			c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;

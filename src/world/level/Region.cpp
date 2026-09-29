@@ -153,3 +153,12 @@ Biome* Region::getBiome( int x, int z ) {
 BiomeSource* Region::getBiomeSource() {
     return level->getBiomeSource();
 }
+
+bool Region::getBetaTempHumid(int x, int z, float& temp, float& humid) {
+	return level ? level->getBetaTempHumid(x, z, temp, humid) : false;
+}
+
+bool Region::isAlphaWorld() {
+	return level ? level->isAlphaWorld() : false;
+}
+

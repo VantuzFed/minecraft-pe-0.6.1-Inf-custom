@@ -54,7 +54,13 @@ Gui::Gui(Minecraft* minecraft)
 	_currentDropSlot(-1),
 	MAX_MESSAGE_WIDTH(240),
 	itemNameOverlayTime(2),
+	// On desktop the touch flow (and its "..." hotbar button) is never
+	// used, whatever the option says: all 9 link slots are real items.
+#if defined(PLATFORM_DESKTOP)
+	_openInventorySlot(false)
+#else
 	_openInventorySlot(minecraft->useTouchscreen())
+#endif
 {
 	glGenBuffers2(1, &_inventoryRc.vboId);
 	glGenBuffers2(1, &rcFeedbackInner.vboId);
@@ -327,6 +333,7 @@ void Gui::addMessage(const std::string& _string) {
 	GuiMessage message;
 	message.message = string;
 	message.ticks = 0;
+	message.clickCopy = "";
 	guiMessages.insert(guiMessages.begin(), message);
 
 	// Keep a larger history so users can scroll through the full chat
@@ -339,6 +346,60 @@ void Gui::addMessage(const std::string& _string) {
 	if (chatScrollOffset > 0) {
 		chatScrollOffset++;
 	}
+}
+
+void Gui::addClickableMessage(const std::string& string, const std::string& copyText) {
+	if (!minecraft->font)
+		return;
+	GuiMessage message;
+	message.message = string;
+	message.ticks = 0;
+	message.clickCopy = copyText;
+	guiMessages.insert(guiMessages.begin(), message);
+
+	const unsigned int MaxHistoryLines = 200;
+	while (guiMessages.size() > MaxHistoryLines) {
+		guiMessages.pop_back();
+	}
+	if (chatScrollOffset > 0) {
+		chatScrollOffset++;
+	}
+}
+
+bool Gui::chatClickCopy(int gx, int gy) {
+	if (!minecraft)
+		return false;
+	// Same geometry as renderChatMessages: newest line at the bottom.
+	int screenHeight = (int)(minecraft->height * InvGuiScale);
+	bool isChatting = (minecraft->screen && (dynamic_cast<ChatScreen*>(minecraft->screen) || dynamic_cast<ConsoleScreen*>(minecraft->screen)));
+	unsigned int max = 10;
+	if (isChatting) {
+		max = (screenHeight - 48) / 9;
+		if (max < 1) max = 1;
+	}
+	int start = isChatting ? chatScrollOffset : 0;
+	if (start < 0) start = 0;
+	int baseY = screenHeight - 48;
+	int hitIdx = -1;
+	for (unsigned int i = 0; i < max; i++) {
+		unsigned int msgIdx = (unsigned int)start + i;
+		if (msgIdx >= guiMessages.size())
+			break;
+		GuiMessage& message = guiMessages.at(msgIdx);
+		if (message.ticks >= 20 * 10 && !isChatting)
+			continue;
+		float y = (float)(baseY - (int)i * 9);
+		if (gx >= 2 && gx <= 2 + MAX_MESSAGE_WIDTH && gy >= (int)(y - 1) && gy <= (int)(y + 8)) {
+			if (!message.clickCopy.empty())
+				hitIdx = (int)msgIdx;
+			break;
+		}
+	}
+	if (hitIdx < 0)
+		return false;
+	minecraft->platform()->setClipboardText(guiMessages.at((unsigned int)hitIdx).clickCopy);
+	addMessage("Copied to clipboard");
+	return true;
 }
 
 void Gui::clearMessages() {
@@ -510,6 +571,12 @@ void Gui::onConfigChanged( const Config& c ) {
 		_numSlots = num;
 #if defined(__APPLE__)
 		_numSlots = Mth::Min(7, _numSlots);
+#endif
+#if defined(PLATFORM_DESKTOP)
+		// No "..." button on desktop: the 9th link slot stays an item.
+		_openInventorySlot = false;
+#else
+		_openInventorySlot = c.minecraft->useTouchscreen();
 #endif
 	} else {
 		_numSlots = Inventory::MAX_SELECTION_SIZE; // Xperia Play
@@ -773,9 +840,11 @@ void Gui::renderDebugInfo() {
 	else if (yMod < 225)                 { facing = "North"; axis = "-Z"; }
 	else                                 { facing = "East";  axis = "+X"; }
 
-	// Biome
+	// Biome (Alpha 1.1.2 has no biomes at all).
 	const char* biomeName = "unknown";
-	if (lvl) {
+	if (lvl && lvl->isAlphaWorld()) {
+		biomeName = "none";
+	} else if (lvl) {
 		Biome* biome = lvl->getBiome(bx, bz);
 		if (biome) biomeName = biome->name.c_str();
 	}

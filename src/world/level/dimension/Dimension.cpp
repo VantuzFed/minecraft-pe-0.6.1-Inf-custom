@@ -4,6 +4,7 @@
 //#include "../levelgen/SimpleLevelSource.h"
 #include "../levelgen/RandomLevelSource.h"
 #include "../levelgen/Beta173LevelSource.h"
+#include "../levelgen/Alpha112LevelSource.h"
 #include "../Level.h"
 #include "../biome/BiomeSource.h"
 #include "../chunk/ChunkSource.h"
@@ -59,6 +60,11 @@ ChunkSource* Dimension::createRandomLevelSource() {
 	int version = level->getLevelData()->getGeneratorVersion();
 	if (version == (int)LGV_BETA173)
 		return new Beta173LevelSource(
+			level,
+			level->getSeed(),
+			!level->isClientSide && level->getLevelData()->getSpawnMobs());
+	if (version == (int)LGV_ALPHA112)
+		return new Alpha112LevelSource(
 			level,
 			level->getSeed(),
 			!level->isClientSide && level->getLevelData()->getSpawnMobs());
@@ -155,10 +161,11 @@ std::string Dimension::getDimension(){
 	{
 		int dimensionId = Dimension::NORMAL;
 
-		// Beta 1.7.3 predates creative mode: beta worlds always run the
-		// day cycle. PE creative keeps its permanent noon.
+		// Beta 1.7.3 and Alpha 1.1.2 predate creative mode: those worlds
+		// always run the day cycle. PE creative keeps its permanent noon.
 		if (data->getGameType() == GameType::Survival
-			|| data->getGeneratorVersion() == (int)LGV_BETA173)
+			|| data->getGeneratorVersion() == (int)LGV_BETA173
+			|| data->getGeneratorVersion() == (int)LGV_ALPHA112)
 			dimensionId = Dimension::NORMAL_DAYCYCLE;
 		else
 			dimensionId = Dimension::NORMAL;

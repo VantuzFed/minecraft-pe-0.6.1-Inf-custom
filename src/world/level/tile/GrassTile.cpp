@@ -30,6 +30,11 @@ int GrassTile::getTexture( int face, int data ) {
 
 int GrassTile::getColor( LevelSource* level, int x, int y, int z ) {
 
+	if (!level) return 0xffffff;
+	if (level->isAlphaWorld()) {
+		return 0xffffff;
+	}
+
 	if(!GrassColor::useTint){
 		return 0x339933;
 	}
@@ -39,6 +44,7 @@ int GrassTile::getColor( LevelSource* level, int x, int y, int z ) {
 	if (level->getBetaTempHumid(x, z, betaTemp, betaHumid)) {
 		return GrassColor::get(betaTemp, betaHumid);
 	}
+
 
 	level->getBiomeSource()->getBiomeBlock(x, z, 1, 1);
 	float temp = level->getBiomeSource()->temperatures[0];

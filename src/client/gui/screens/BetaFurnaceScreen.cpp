@@ -18,7 +18,7 @@
 BetaFurnaceScreen::BetaFurnaceScreen(FurnaceTileEntity* furnace)
 	: furnace(furnace), fx(furnace ? furnace->x : 0),
 	  fy(furnace ? furnace->y : 0), fz(furnace ? furnace->z : 0),
-	  hasCarried(false), pressed(false), pressSlot(-1), pressButton(0) {
+	  hasCarried(false), pressed(false), pressSlot(-1), pressButton(0), pressPickedUp(false) {
 	carried.setNull();
 }
 
@@ -92,12 +92,36 @@ int BetaFurnaceScreen::ensureHotbarLink(int betaIdx) {
 	for (int s = 9; s < in->getContainerSize(); s++) {
 		ItemInstance* it = in->getItem(s);
 		if (!it || it->isNull()) {
+			// One main = one link (see BetaInventoryScreen).
+			for (int l = 0; l < in->numLinkedSlots; l++) {
+				if (l != link && in->linkedSlots[l].inventorySlot == s)
+					in->linkedSlots[l].inventorySlot = -1;
+			}
 			if (in->linkSlot(link, s, false))
 				return s;
 			return -1;
 		}
 	}
 	return -1;
+}
+
+int BetaFurnaceScreen::betaToPe(int betaIdx) {
+	if (betaIdx >= 3 && betaIdx <= 29)
+		return betaIdx + 6;
+	if (betaIdx >= 30 && betaIdx <= 38)
+		return resolveHotbar(betaIdx);
+	return -1;
+}
+
+bool BetaFurnaceScreen::isLinkedMain(int peSlot) {
+	Inventory* in = inv();
+	if (!in || peSlot < 9 || peSlot >= in->getContainerSize())
+		return false;
+	for (int l = 0; l < in->numLinkedSlots; l++) {
+		if (in->linkedSlots[l].inventorySlot == peSlot)
+			return true;
+	}
+	return false;
 }
 
 ItemInstance* BetaFurnaceScreen::getSlotItem(int betaIdx) {
@@ -114,6 +138,9 @@ ItemInstance* BetaFurnaceScreen::getSlotItem(int betaIdx) {
 	if (!player || !in)
 		return NULL;
 	if (betaIdx >= 3 && betaIdx <= 29) {
+		// Linked storage renders in the hotbar row, not here.
+		if (isLinkedMain(betaIdx + 6))
+			return NULL;
 		ItemInstance* it = in->getItem(betaIdx + 6);
 		if (!it || it->isNull())
 			return NULL;
@@ -151,8 +178,15 @@ void BetaFurnaceScreen::setSlotItem(int betaIdx, const ItemInstance* item) {
 			real = ensureHotbarLink(betaIdx);
 		if (real < 0)
 			return;
-		if (empty) in->clearSlot(real);
-		else in->setItem(real, const_cast<ItemInstance*>(item));
+		if (empty) {
+			in->clearSlot(real);
+			in->linkedSlots[betaIdx - 30].inventorySlot = -1;
+		} else in->setItem(real, const_cast<ItemInstance*>(item));
+		// One main = one link (see BetaInventoryScreen).
+		for (int l = 0; l < in->numLinkedSlots; l++) {
+			if (l != betaIdx - 30 && in->linkedSlots[l].inventorySlot == real)
+				in->linkedSlots[l].inventorySlot = -1;
+		}
 		return;
 	}
 	int pe = -1;
@@ -187,7 +221,7 @@ static bool canBurn(const ItemInstance* item) {
 	return FurnaceTileEntity::getBurnDuration(*item) > 0;
 }
 
-bool BetaFurnaceScreen::mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse) {
+bool BetaFurnaceScreen::mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse, int skipPe) {
 	if (stack.isNull())
 		return false;
 	bool moved = false;
@@ -195,6 +229,8 @@ bool BetaFurnaceScreen::mergeIntoRange(ItemInstance& stack, int from, int to, bo
 		for (int pass = 0; pass < 2 && !stack.isNull(); pass++) {
 			for (int i = from; i < to; i++) {
 				int idx = reverse ? (to - 1 - (i - from)) : i;
+				if (skipPe >= 0 && betaToPe(idx) == skipPe)
+					continue;
 				ItemInstance* dst = getSlotItem(idx);
 				if (pass == 0) {
 					if (!dst || !sameStack(&stack, dst))
@@ -207,8 +243,15 @@ bool BetaFurnaceScreen::mergeIntoRange(ItemInstance& stack, int from, int to, bo
 					stack.count -= take;
 					moved = true;
 				} else if (!dst || dst->isNull()) {
+					// Furnace hotbar is 30-38; other linked storage
+					// is hidden, never park stacks there.
+					if ((idx < 30 || idx > 38) && isLinkedMain(betaToPe(idx)))
+						continue;
 					ItemInstance v = stack;
 					setSlotItem(idx, &v);
+					ItemInstance* check = getSlotItem(idx);
+					if (!check || check->isNull())
+						continue;
 					stack.setNull();
 					return true;
 				}
@@ -217,9 +260,16 @@ bool BetaFurnaceScreen::mergeIntoRange(ItemInstance& stack, int from, int to, bo
 	} else {
 		for (int i = from; i < to; i++) {
 			int idx = reverse ? (to - 1 - (i - from)) : i;
+			if (skipPe >= 0 && betaToPe(idx) == skipPe)
+				continue;
+			if ((idx < 30 || idx > 38) && isLinkedMain(betaToPe(idx)))
+				continue;
 			if (!getSlotItem(idx)) {
 				ItemInstance v = stack;
 				setSlotItem(idx, &v);
+				ItemInstance* check = getSlotItem(idx);
+				if (!check || check->isNull())
+					continue;
 				stack.setNull();
 				return true;
 			}
@@ -233,11 +283,12 @@ bool BetaFurnaceScreen::quickTransfer(int betaIdx) {
 	if (!src || src->isNull())
 		return false;
 	ItemInstance stack = *src;
+	int srcPe = betaToPe(betaIdx);
 	bool moved = false;
 	if (betaIdx == 2) {
-		moved = mergeIntoRange(stack, 3, 39, false);
+		moved = mergeIntoRange(stack, 3, 39, false, srcPe);
 	} else if (betaIdx == 0 || betaIdx == 1) {
-		moved = mergeIntoRange(stack, 3, 39, false);
+		moved = mergeIntoRange(stack, 3, 39, false, srcPe);
 	} else if (betaIdx >= 3 && betaIdx <= 29) {
 		// Smeltables prefer the ingredient slot, fuel prefers fuel.
 		if (canSmelt(&stack) && !getSlotItem(0)) {
@@ -251,7 +302,7 @@ bool BetaFurnaceScreen::quickTransfer(int betaIdx) {
 			stack.setNull();
 			moved = true;
 		} else {
-			moved = mergeIntoRange(stack, 30, 39, false);
+			moved = mergeIntoRange(stack, 30, 39, false, srcPe);
 		}
 	} else {
 	 if (canSmelt(&stack) && !getSlotItem(0)) {
@@ -265,7 +316,7 @@ bool BetaFurnaceScreen::quickTransfer(int betaIdx) {
 			stack.setNull();
 			moved = true;
 		} else {
-			moved = mergeIntoRange(stack, 3, 30, false);
+			moved = mergeIntoRange(stack, 3, 30, false, srcPe);
 		}
 	}
 	if (moved) {
@@ -300,15 +351,16 @@ void BetaFurnaceScreen::spillCarried() {
 
 void BetaFurnaceScreen::render(int xm, int ym, float a) {
 	renderBackground();
-	int mx = xm * width / minecraft->width;
-	int my = ym * height / minecraft->height - 1;
+	// render() coords are already GUI units (see BetaInventoryScreen).
+	int mx = xm;
+	int my = ym - 1;
 	int px = panelX(), py = panelY();
 
 	TextureId bg = minecraft->textures->loadTexture("gui/furnace.png");
 	if (Textures::isTextureIdValid(bg)) {
 		minecraft->textures->bind(bg);
 		glColor4f2(1, 1, 1, 1);
-		blit(px, py, 0, 0, 176, 166, 256, 256);
+		blit(px, py, 0, 0, 176, 166);
 	}
 
 	drawString(minecraft->font, I18n::get("container.furnace"), px + 56, py + 6, 0xff404040);
@@ -318,10 +370,10 @@ void BetaFurnaceScreen::render(int xm, int ym, float a) {
 	if (furnace && !furnaceGone()) {
 		int lit = furnace->getLitProgress(14);
 		if (lit > 0)
-			blit(px + 56, py + 36 + 14 - lit, 176, 14 - lit, 14, lit, 256, 256);
+			blit(px + 56, py + 36 + 14 - lit, 176, 14 - lit, 14, lit);
 		int burn = furnace->getBurnProgress(24);
 		if (burn > 0)
-			blit(px + 79, py + 34, 176, 14, burn, 17, 256, 256);
+			blit(px + 79, py + 34, 176, 14, burn, 17);
 	}
 
 	for (int i = 0; i <= 38; i++) {
@@ -367,12 +419,119 @@ void BetaFurnaceScreen::tick() {
 	super::tick();
 }
 
+static bool acceptsFurnaceSlot(int betaIdx, const ItemInstance* item);
+
+void BetaFurnaceScreen::placeInto(int slot) {
+	if (!hasCarried || carried.isNull())
+		return;
+	if (slot <= 2 && !acceptsFurnaceSlot(slot, &carried))
+		return;
+	ItemInstance* dst = getSlotItem(slot);
+	if (!dst || dst->isNull()) {
+		setSlotItem(slot, &carried);
+		carried.setNull();
+		hasCarried = false;
+	} else if (sameStack(&carried, dst)) {
+		int space = dst->getMaxStackSize() - dst->count;
+		int take = carried.count < space ? carried.count : space;
+		if (take > 0) {
+			dst->count += take;
+			carried.count -= take;
+			if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
+		} else if (slot > 2) {
+			ItemInstance tmp = *dst;
+			setSlotItem(slot, &carried);
+			carried = tmp;
+		}
+	} else if (slot > 2) {
+		ItemInstance tmp = *dst;
+		setSlotItem(slot, &carried);
+		carried = tmp;
+	}
+}
+
+void BetaFurnaceScreen::placeOneInto(int slot) {
+	if (!hasCarried || carried.isNull() || slot == 2)
+		return;
+	if (slot <= 1 && !acceptsFurnaceSlot(slot, &carried))
+		return;
+	ItemInstance* dst = getSlotItem(slot);
+	if (!dst || dst->isNull()) {
+		ItemInstance one = carried;
+		one.count = 1;
+		setSlotItem(slot, &one);
+		carried.count--;
+		if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
+	} else if (sameStack(&carried, dst) && dst->count < dst->getMaxStackSize()) {
+		dst->count++;
+		carried.count--;
+		if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
+	}
+}
+
+// Same press-based model as BetaInventoryScreen.
 void BetaFurnaceScreen::mouseClicked(int x, int y, int buttonNum) {
 	if (buttonNum != MouseAction::ACTION_LEFT && buttonNum != MouseAction::ACTION_RIGHT)
 		return;
 	pressed = true;
 	pressSlot = slotAt(x, y);
 	pressButton = buttonNum;
+	pressPickedUp = false;
+	bool shift = Keyboard::isKeyDown(Keyboard::KEY_LSHIFT);
+
+	if (pressButton == MouseAction::ACTION_LEFT) {
+		if (pressSlot < 0) {
+			spillCarried();
+			return;
+		}
+		if (shift) {
+			if (hasCarried) spillCarried();
+			quickTransfer(pressSlot);
+			return;
+		}
+		if (!hasCarried) {
+			ItemInstance* dst = getSlotItem(pressSlot);
+			if (dst && !dst->isNull()) {
+				carried = *dst;
+				hasCarried = true;
+				ItemInstance empty;
+				empty.setNull();
+				setSlotItem(pressSlot, &empty);
+				pressPickedUp = true;
+			}
+			return;
+		}
+		placeInto(pressSlot);
+	} else {
+		if (pressSlot < 0 || pressSlot == 2 || shift)
+			return;
+		if (!hasCarried) {
+			ItemInstance* dst = getSlotItem(pressSlot);
+			if (dst && !dst->isNull()) {
+				if (dst->count > 1) {
+					int half = (dst->count + 1) / 2;
+					carried = *dst;
+					carried.count = half;
+					hasCarried = true;
+					dst->count -= half;
+					if (dst->count <= 0) {
+						ItemInstance empty;
+						empty.setNull();
+						setSlotItem(pressSlot, &empty);
+					}
+				} else {
+					carried = *dst;
+					hasCarried = true;
+					ItemInstance empty;
+					empty.setNull();
+					setSlotItem(pressSlot, &empty);
+				}
+				pressPickedUp = true;
+			}
+			return;
+		}
+		placeOneInto(pressSlot);
+	}
 }
 
 static bool acceptsFurnaceSlot(int betaIdx, const ItemInstance* item) {
@@ -393,94 +552,17 @@ void BetaFurnaceScreen::mouseReleased(int x, int y, int buttonNum) {
 		return;
 	}
 	pressed = false;
+	if (!pressPickedUp || !hasCarried || carried.isNull())
+		return;
+	pressPickedUp = false;
 	int slot = slotAt(x, y);
-	bool shift = Keyboard::isKeyDown(Keyboard::KEY_LSHIFT);
-
-	if (pressButton == MouseAction::ACTION_LEFT) {
-		if (slot < 0) {
-			spillCarried();
-			return;
-		}
-		if (shift) {
-			if (hasCarried) spillCarried();
-			quickTransfer(slot);
-			return;
-		}
-		ItemInstance* dst = getSlotItem(slot);
-		if (!hasCarried) {
-			if (dst && !dst->isNull()) {
-				carried = *dst;
-				hasCarried = true;
-				ItemInstance empty;
-				empty.setNull();
-				setSlotItem(slot, &empty);
-			}
-		} else if (slot <= 2 && !acceptsFurnaceSlot(slot, &carried)) {
-			return;
-		} else if (!dst || dst->isNull()) {
-			setSlotItem(slot, &carried);
-			carried.setNull();
-			hasCarried = false;
-		} else if (sameStack(&carried, dst)) {
-			int space = dst->getMaxStackSize() - dst->count;
-			int take = carried.count < space ? carried.count : space;
-			if (take > 0) {
-				dst->count += take;
-				carried.count -= take;
-				if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
-			} else {
-				if (slot > 2) {
-					ItemInstance tmp = *dst;
-					setSlotItem(slot, &carried);
-					carried = tmp;
-				}
-			}
-		} else {
-			if (slot > 2) {
-				ItemInstance tmp = *dst;
-				setSlotItem(slot, &carried);
-				carried = tmp;
-			}
-		}
-	} else {
-		if (slot < 0 || slot == 2)
-			return;
-		if (shift)
-			return;
-		ItemInstance* dst = getSlotItem(slot);
-		if (!hasCarried) {
-			if (dst && !dst->isNull() && dst->count > 1) {
-				int half = (dst->count + 1) / 2;
-				carried = *dst;
-				carried.count = half;
-				hasCarried = true;
-				dst->count -= half;
-				if (dst->count <= 0) {
-					ItemInstance empty;
-					empty.setNull();
-					setSlotItem(slot, &empty);
-				}
-			} else if (dst && !dst->isNull()) {
-				carried = *dst;
-				hasCarried = true;
-				ItemInstance empty;
-				empty.setNull();
-				setSlotItem(slot, &empty);
-			}
-		} else if (slot <= 1 && !acceptsFurnaceSlot(slot, &carried)) {
-			return;
-		} else if (!dst || dst->isNull()) {
-			ItemInstance one = carried;
-			one.count = 1;
-			setSlotItem(slot, &one);
-			carried.count--;
-			if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
-		} else if (sameStack(&carried, dst) && dst->count < dst->getMaxStackSize()) {
-			dst->count++;
-			carried.count--;
-			if (carried.count <= 0) { carried.setNull(); hasCarried = false; }
-		}
+	if (slot < 0) {
+		spillCarried();
+		return;
 	}
+	if (slot == pressSlot || slot == 2)
+		return;
+	placeInto(slot);
 }
 
 void BetaFurnaceScreen::keyPressed(int eventKey) {

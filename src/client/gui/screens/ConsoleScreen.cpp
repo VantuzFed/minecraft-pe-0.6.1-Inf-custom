@@ -3,6 +3,7 @@
 #include "../../Minecraft.h"
 #include "../../player/LocalPlayer.h"
 #include "../../../platform/input/Keyboard.h"
+#include "../../../platform/input/Mouse.h"
 #include "../../../world/level/Level.h"
 #include "../../../network/RakNetInstance.h"
 #include "../../../network/ServerSideNetworkHandler.h"
@@ -47,6 +48,15 @@ void ConsoleScreen::keyPressed(int eventKey)
     } else {
         super::keyPressed(eventKey);
     }
+}
+
+void ConsoleScreen::mouseClicked(int x, int y, int buttonNum)
+{
+    // Clicking a clickable chat line (e.g. the /seed output) copies it.
+    // Console has no buttons, so a consumed click ends here.
+    if (buttonNum == MouseAction::ACTION_LEFT && minecraft->gui.chatClickCopy(x, y))
+        return;
+    super::mouseClicked(x, y, buttonNum);
 }
 
 void ConsoleScreen::charPressed(char inputChar)
@@ -221,6 +231,18 @@ std::string ConsoleScreen::processCommand(const std::string& raw)
         out << "Teleported player to "
             << x << " " << y << " " << z;
         return out.str();
+    }
+
+    // -----------------------------------------------------------------------
+    // /seed — print the world seed; clicking the line copies it.
+    // -----------------------------------------------------------------------
+    if (args[0] == "seed") {
+        std::ostringstream out;
+        out << level->getSeed();
+        std::string seedText = out.str();
+        minecraft->platform()->setClipboardText(seedText);
+        minecraft->gui.addClickableMessage("Seed: " + seedText + " (copied to clipboard)", seedText);
+        return "";
     }
 
     return std::string("Unknown command: /") + args[0];

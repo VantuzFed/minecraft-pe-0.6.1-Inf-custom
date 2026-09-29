@@ -182,7 +182,9 @@ void SimpleChooseLevelScreen::render( int xm, int ym, float a )
     if (bWorldType) {
         const char* worldDesc = (worldType == LGV_BETA173)
             ? "Classic Beta 1.7.3 terrain"
-            : "Pocket Edition 0.6.1 terrain";
+            : ((worldType == LGV_ALPHA112)
+                ? "Classic Alpha 1.1.2 terrain"
+                : "Pocket Edition 0.6.1 terrain");
         drawCenteredString(minecraft->font, worldDesc, width / 2,
             bWorldType->y + bWorldType->height + 4 + Font::DefaultLineHeight + 2, 0xffcccccc);
     }
@@ -248,8 +250,14 @@ void SimpleChooseLevelScreen::buttonClicked( Button* button )
     }
 
     if (button == bWorldType) {
-        worldType = (worldType == LGV_ORIGINAL) ? LGV_BETA173 : LGV_ORIGINAL;
-        bWorldType->msg = (worldType == LGV_BETA173) ? "World: Beta 1.7.3" : "World: PE 0.6.1";
+        if (worldType == LGV_ORIGINAL)
+            worldType = LGV_BETA173;
+        else if (worldType == LGV_BETA173)
+            worldType = LGV_ALPHA112;
+        else
+            worldType = LGV_ORIGINAL;
+        bWorldType->msg = (worldType == LGV_BETA173) ? "World: Beta 1.7.3"
+            : ((worldType == LGV_ALPHA112) ? "World: Alpha 1.1.2" : "World: PE 0.6.1");
         return;
     }
 

@@ -35,14 +35,21 @@ public:
 
 private:
 	static const int PANEL_W = 176;
-	static const int PANEL_H = 184;
+	static const int PANEL_BASE_H = 166;
+	static const int OVERFLOW_H = 18;
+
+	// The 4th row (PE mains 36-44, which beta never had) is only drawn
+	// while something is actually stored there; the rest of the time
+	// the panel is the plain 176x166 beta one.
+	bool showOverflow() const;
+	int panelH() const { return PANEL_BASE_H + (showOverflow() ? OVERFLOW_H : 0); }
 
 	// Beta container slot index -> panel coords. Returns false for bad idx.
 	static bool slotPos(int betaIdx, int& sx, int& sy);
 	// Beta slot index under the point, or -1.
 	int slotAt(int x, int y) const;
 
-	Inventory* inv();
+	Inventory* inv() const;
 	// Live item in a beta slot (NULL when empty). Never keep across calls.
 	ItemInstance* getSlotItem(int betaIdx);
 	// Write an item into a beta slot (copies). Hotbar writes resolve
@@ -52,6 +59,14 @@ private:
 	int resolveHotbar(int betaIdx);
 	// Resolve, linking to a free main slot first when placing.
 	int ensureHotbarLink(int betaIdx);
+	// Beta slot -> underlying PE main slot (links resolved), or -1 for
+	// crafting/result/armor. Hotbar and overflow row can alias the same
+	// storage; shift-click must skip the source's own cell.
+	int betaToPe(int betaIdx);
+	// True when a PE main slot is shown through a hotbar link. Such
+	// storage is hidden from the main/overflow rows so every stack is
+	// rendered exactly once (otherwise link mirrors look like dupes).
+	bool isLinkedMain(int peSlot) const;
 	// Recompute the crafting result from the matrix.
 	void updateCraftResult();
 	// Consume one unit from every non-empty matrix cell.
@@ -61,17 +76,22 @@ private:
 	// Result-slot takes, one atomic craft at a time (no dupes).
 	bool takeResultToCursor();
 	bool takeResultToInventory();
-	// Merge helpers over beta slot ranges [from, to).
-	bool mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse);
+	// Merge helpers over beta slot ranges [from, to). skipPe excludes
+	// one underlying PE slot (the shift-click source's own cell).
+	bool mergeIntoRange(ItemInstance& stack, int from, int to, bool reverse, int skipPe = -1);
 	// Read-only free space for a stack across a beta range.
 	int spaceFor(const ItemInstance& stack, int from, int to);
 	// Drop the carried stack back into the inventory, or into the world.
 	void spillCarried();
+	// Place the whole carried stack into a slot (merge or swap).
+	void placeInto(int slot);
+	// Place a single unit from the carried stack into a slot.
+	void placeOneInto(int slot);
 	// Rotating player preview, like the original inventory.
 	void renderPlayerModel(float xo, float yo);
 
 	int panelX() const { return (width - PANEL_W) / 2; }
-	int panelY() const { return (height - PANEL_H) / 2; }
+	int panelY() const { return (height - panelH()) / 2; }
 
 	ItemInstance craftMatrix[4];
 	ItemInstance craftResult;
@@ -82,6 +102,10 @@ private:
 	bool pressed;
 	int pressSlot;
 	int pressButton;
+	// True when the press picked something up: releasing on another
+	// slot drops it there (drag and drop). Click-click keeps working
+	// because releasing on the press slot does nothing.
+	bool pressPickedUp;
 };
 
 #endif

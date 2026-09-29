@@ -48,6 +48,10 @@ public:
     }
 
     int getColor(LevelSource* level, int x, int y, int z) {
+        if (!level) return 0xffffff;
+        if (level->isAlphaWorld()) {
+            return 0xffffff;
+        }
 
         int data = (level->getData(x, y, z) & LEAF_TYPE_MASK);
         if (data == EVERGREEN_LEAF) {
@@ -61,6 +65,7 @@ public:
 		if (level->getBetaTempHumid(x, z, betaTemp, betaHumid)) {
 			return FoliageColor::get(betaTemp, betaHumid);
 		}
+
 		if (!FoliageColor::useTint){
 			return FoliageColor::getDefaultColor();
 		}

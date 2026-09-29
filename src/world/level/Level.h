@@ -132,6 +132,7 @@ public:
 	BiomeSource* getBiomeSource();
 	Biome* getBiome(int x, int z);
 	bool isBetaWorld() const;
+	virtual bool isAlphaWorld();
 	bool getBetaTempHumid(int x, int z, float& temp, float& humid);
 
 	int getRawBrightness(int x, int y, int z);
