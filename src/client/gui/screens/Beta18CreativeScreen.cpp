@@ -64,55 +64,10 @@ Inventory* Beta18CreativeScreen::inv() {
 	return player->inventory;
 }
 
-int Beta18CreativeScreen::resolveHotbar(int betaIdx) {
-	Inventory* in = inv();
-	if (!in || betaIdx < 72 || betaIdx > 80)
-		return -1;
-	int link = betaIdx - 72;
-	int real = in->linkedSlots[link].inventorySlot;
-	if (real >= 9 && real < in->getContainerSize())
-		return real;
-	return -1;
-}
-
-int Beta18CreativeScreen::ensureHotbarLink(int betaIdx) {
-	Inventory* in = inv();
-	if (!in || betaIdx < 72 || betaIdx > 80)
-		return -1;
-	int real = resolveHotbar(betaIdx);
-	if (real >= 0)
-		return real;
-	int link = betaIdx - 72;
-	for (int s = 9; s < in->getContainerSize(); s++) {
-		ItemInstance* it = in->getItem(s);
-		if (!it || it->isNull()) {
-			for (int l = 0; l < in->numLinkedSlots; l++) {
-				if (l != link && in->linkedSlots[l].inventorySlot == s)
-					in->linkedSlots[l].inventorySlot = -1;
-			}
-			if (in->linkSlot(link, s, false))
-				return s;
-			return -1;
-		}
-	}
-	return -1;
-}
-
 int Beta18CreativeScreen::betaToPe(int betaIdx) {
 	if (betaIdx >= 72 && betaIdx <= 80)
-		return resolveHotbar(betaIdx);
+		return 36 + (betaIdx - 72);
 	return -1;
-}
-
-bool Beta18CreativeScreen::isLinkedMain(int peSlot) {
-	Inventory* in = inv();
-	if (!in || peSlot < 9 || peSlot >= in->getContainerSize())
-		return false;
-	for (int l = 0; l < in->numLinkedSlots; l++) {
-		if (in->linkedSlots[l].inventorySlot == peSlot)
-			return true;
-	}
-	return false;
 }
 
 ItemInstance* Beta18CreativeScreen::getSlotItem(int betaIdx) {
@@ -125,7 +80,7 @@ ItemInstance* Beta18CreativeScreen::getSlotItem(int betaIdx) {
 		return it.isNull() ? NULL : &it;
 	}
 	if (betaIdx >= 72 && betaIdx <= 80) {
-		ItemInstance* it = in->getItem(betaIdx - 72);
+		ItemInstance* it = in->getItem(36 + (betaIdx - 72));
 		if (!it || it->isNull())
 			return NULL;
 		return it;
@@ -140,33 +95,78 @@ void Beta18CreativeScreen::setSlotItem(int betaIdx, const ItemInstance* item) {
 		return;
 	bool empty = !item || item->isNull();
 	if (betaIdx >= 72 && betaIdx <= 80) {
-		int real = resolveHotbar(betaIdx);
-		if (real < 0 && !empty)
-			real = ensureHotbarLink(betaIdx);
-		if (real < 0)
-			return;
+		int pe = 36 + (betaIdx - 72);
 		if (empty) {
-			in->clearSlot(real);
-			in->linkedSlots[betaIdx - 72].inventorySlot = -1;
-		} else in->setItem(real, const_cast<ItemInstance*>(item));
-		for (int l = 0; l < in->numLinkedSlots; l++) {
-			if (l != betaIdx - 72 && in->linkedSlots[l].inventorySlot == real)
-				in->linkedSlots[l].inventorySlot = -1;
+			in->clearSlot(pe);
+		} else {
+			in->setItem(pe, const_cast<ItemInstance*>(item));
 		}
 	}
 }
 
-// Blocks never shown in creative (fluids, fire, portal, technical).
+// Blocks never shown in creative (fluids, fire, portal, technical, untextured, duplicate placed tiles).
 static bool isHiddenCreativeBlock(int id) {
-	return id == 0 || id == 8 || id == 9 || id == 10 || id == 11
-		|| id == 34 || id == 36 || id == 51 || id == 90;
+	// Air, fluids, fire
+	if (id == 0 || id == 8 || id == 9 || id == 10 || id == 11 || id == 51)
+		return true;
+	// Technical blocks: pistons, portal
+	if (id == 34 || id == 36 || id == 90)
+		return true;
+	// Placed multi-blocks / tile entities that have dedicated Item instances (id >= 256)
+	if (id == 26)  // bed (use Item::bed = 355)
+		return true;
+	if (id == 55)  // redStoneDust (use Item::redStone = 331)
+		return true;
+	if (id == 63 || id == 68) // sign, wallSign (use Item::sign = 323)
+		return true;
+	if (id == 64)  // door_wood (use Item::door_wood = 324)
+		return true;
+	if (id == 71)  // door_iron (use Item::door_iron = 330)
+		return true;
+	if (id == 83)  // reeds (use Item::reeds = 338)
+		return true;
+	if (id == 92)  // cake (use Item::cake = 354)
+		return true;
+	if (id == 93 || id == 94) // diodeOff, diodeOn (use Item::diode = 356)
+		return true;
+	// Non-obtainable block states and crops
+	if (id == 43)  // stoneSlab (double slab; use stoneSlabHalf = 44)
+		return true;
+	if (id == 59)  // crops (use seeds_wheat = 295 / wheat = 296)
+		return true;
+	if (id == 60)  // farmland / tilledField (tilled with hoe; no item texture)
+		return true;
+	if (id == 62)  // furnace_lit (use idle furnace = 61)
+		return true;
+	if (id == 74)  // redStoneOre_lit (use idle ore = 73)
+		return true;
+	if (id == 75)  // notGate_off (unlit redstone torch; use redstone torch = 76)
+		return true;
+	if (id == 104 || id == 105) // pumpkinStem, melonStem
+		return true;
+	// PE internal, invisible and debug blocks
+	if (id == 95)  // invisible_bedrock (world boundary wall; no texture)
+		return true;
+	if (id == 246) // glowingObsidian (nether reactor remnant)
+		return true;
+	if (id == 248 || id == 249) // info_updateGame1, info_updateGame2 ("update!" / "ate!")
+		return true;
+	if (id == 253 || id == 254) // grass_carried, leaves_carried
+		return true;
+	if (id == 255) // info_reserved6
+		return true;
+	return false;
 }
 
 // Damage variants per Beta 1.8 creative (only when stacked by data).
 static int creativeVariants(int id) {
 	if (id == 35) return 16; // wool
-	if (id == 44) return 6;  // stone slab
-	if (id == 6 || id == 17 || id == 18 || id == 31) return 3;
+	if (id == 44) return 6;  // stone slab (stone, sandstone, wood, cobble, brick, stone brick)
+	if (id == 6 || id == 17 || id == 18 || id == 31) return 3; // sapling, log, leaves, tall grass
+	if (id == 24) return 3;  // sandstone (normal, chiseled, smooth)
+	if (id == 98) return 3;  // stone bricks (normal, mossy, cracked)
+	if (id == 155) return 3; // quartz block (default, chiseled, lines)
+	if (id == 263) return 2; // coal (coal, charcoal)
 	return 1;
 }
 
@@ -176,7 +176,7 @@ void Beta18CreativeScreen::buildFullList() {
 		if (!Tile::tiles[id] || isHiddenCreativeBlock(id))
 			continue;
 		int variants = 1;
-		if (Item::items[id] && Item::items[id]->isStackedByData())
+		if (id == 31 || (Item::items[id] && Item::items[id]->isStackedByData()))
 			variants = creativeVariants(id);
 		for (int aux = 0; aux < variants; aux++)
 			fullList.push_back(ItemInstance(id, 1, aux));
@@ -186,10 +186,14 @@ void Beta18CreativeScreen::buildFullList() {
 			continue;
 		if (!Item::items[id])
 			continue;
-		fullList.push_back(ItemInstance(id, 1, 0));
+		int variants = 1;
+		if (Item::items[id]->isStackedByData())
+			variants = creativeVariants(id);
+		for (int aux = 0; aux < variants; aux++)
+			fullList.push_back(ItemInstance(id, 1, aux));
 	}
 	if (Item::MAX_ITEMS > 351 && Item::items[351]) {
-		for (int aux = 1; aux <= 15; aux++)
+		for (int aux = 0; aux <= 15; aux++) // Ink Sac (0) through Bone Meal (15)
 			fullList.push_back(ItemInstance(351, 1, aux));
 	}
 }
@@ -266,7 +270,7 @@ bool Beta18CreativeScreen::mergeIntoHotbar(ItemInstance& stack) {
 	bool moved = false;
 	if (stack.isStackable()) {
 		for (int pass = 0; pass < 2 && !stack.isNull(); pass++) {
-			for (int s = 9; s < in->getContainerSize(); s++) {
+			for (int s = 9; s < 36 && s < in->getContainerSize(); s++) {
 				ItemInstance* dst = in->getItem(s);
 				if (pass == 0) {
 					if (!dst || dst->isNull() || !sameStack(&stack, dst))
@@ -281,8 +285,6 @@ bool Beta18CreativeScreen::mergeIntoHotbar(ItemInstance& stack) {
 				} else {
 					if (dst && !dst->isNull())
 						continue;
-					if (isLinkedMain(s))
-						continue;
 					ItemInstance v = stack;
 					in->setItem(s, &v);
 					ItemInstance* check = in->getItem(s);
@@ -294,9 +296,7 @@ bool Beta18CreativeScreen::mergeIntoHotbar(ItemInstance& stack) {
 			}
 		}
 	} else {
-		for (int s = 9; s < in->getContainerSize(); s++) {
-			if (isLinkedMain(s))
-				continue;
+		for (int s = 9; s < 36 && s < in->getContainerSize(); s++) {
 			ItemInstance* dst = in->getItem(s);
 			if (!dst || dst->isNull()) {
 				ItemInstance v = stack;
@@ -543,7 +543,7 @@ void Beta18CreativeScreen::render(int xm, int ym, float a) {
 		blit(px, py, 0, 0, PANEL_W, PANEL_H);
 	}
 
-	drawString(minecraft->font, "Item selection", px + 8, py + 6, 0xff404040);
+	drawString(minecraft->font, "Item selection", px + 8, py + 6, 0xffe0e0e0);
 
 	for (int i = 0; i <= 80; i++) {
 		int sx, sy;

@@ -17,7 +17,6 @@ Inventory::Inventory( Player* player, bool creativeMode )
 	selected(0)
 {
 	setupDefault();
-	compressLinkedSlotList(0);
 }
 
 Inventory::~Inventory() {
@@ -286,7 +285,10 @@ void Inventory::setupDefault() {
 	}
 
 	for (int i = 0; i < MAX_SELECTION_SIZE; ++i) {
-		linkedSlots[i] = LinkedSlot(Sel[i]);
+		if (_isCreative && Sel[i] >= (int)numLinkedSlots && Sel[i] < (int)items.size() && items[Sel[i]]) {
+			items[36 + i] = ItemInstance::clone(items[Sel[i]]);
+		}
+		linkedSlots[i] = LinkedSlot(36 + i);
 	}
 
 	//LOGI("Inventory has %d items\n", (int)items.size());

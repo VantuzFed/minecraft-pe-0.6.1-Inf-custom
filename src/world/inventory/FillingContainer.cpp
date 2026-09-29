@@ -36,7 +36,7 @@ FillingContainer::~FillingContainer()
 void FillingContainer::clearInventory()
 {
 	for (int i = 0; i < numLinkedSlots; ++i) {
-		linkedSlots[i] = LinkedSlot(i);
+		linkedSlots[i] = LinkedSlot(36 + i);
 	}
 
 	//@todo: i = MAX_ -> get() transforms count=255-ptrs to real
@@ -292,7 +292,9 @@ void FillingContainer::load( ListTag* inventoryList )
 			}
 		}
 	}
-	compressLinkedSlotList(0);
+	for (int i = 0; i < numLinkedSlots; i++) {
+		linkedSlots[i].inventorySlot = 36 + i;
+	}
 }
 
 int FillingContainer::getContainerSize() const
@@ -419,7 +421,18 @@ int FillingContainer::getNumLinkedSlots() {
 
 int FillingContainer::getSlotWithRemainingSpace( const ItemInstance& item )
 {
-	for (unsigned int i = 0; i < items.size(); i++) {
+	// Search hotbar (36..44) first
+	for (unsigned int i = 36; i < items.size() && i <= 44; i++) {
+		if (items[i] != NULL && items[i]->id == item.id
+		 && items[i]->isStackable()
+		 && items[i]->count < items[i]->getMaxStackSize()
+		 && items[i]->count < getMaxStackSize()
+		 && (!items[i]->isStackedByData() || items[i]->getAuxValue() == item.getAuxValue())) {
+			return i;
+		}
+	}
+	// Then search main inventory (9..35)
+	for (unsigned int i = numLinkedSlots; i < 36 && i < items.size(); i++) {
 		if (items[i] != NULL && items[i]->id == item.id
 		 && items[i]->isStackable()
 		 && items[i]->count < items[i]->getMaxStackSize()
@@ -482,7 +495,12 @@ int FillingContainer::addResource( const ItemInstance& itemInstance )
 
 int FillingContainer::getFreeSlot() const
 {
-	for (unsigned int i = numLinkedSlots; i < items.size(); i++) {
+	// Search hotbar (36..44) first
+	for (unsigned int i = 36; i < items.size() && i <= 44; i++) {
+		if (items[i] == NULL || items[i]->isNull()) return i;
+	}
+	// Then search main inventory (9..35)
+	for (unsigned int i = numLinkedSlots; i < 36 && i < items.size(); i++) {
 		if (items[i] == NULL || items[i]->isNull()) return i;
 	}
 	return -1;
@@ -503,12 +521,10 @@ void FillingContainer::clearSlot( int slot )
 
 	if (slot < numLinkedSlots) {
 		release(linkedSlots[slot].inventorySlot);
-		linkedSlots[slot].inventorySlot = -1;
 	}
 	else {
 		release(slot);
 	}
-	compressLinkedSlotList(slot);
 }
 
 int FillingContainer::addItem(ItemInstance* item) {
@@ -594,32 +610,13 @@ bool FillingContainer::linkSlot(int selectionSlot, int inventorySlot, bool propa
 
 bool FillingContainer::linkEmptySlot( int inventorySlot )
 {
-	// Check if we already got the inventory slot
-	for (int i = 0; i < numLinkedSlots; ++i)
-		if (linkedSlots[i].inventorySlot == inventorySlot) return true;
-
-	// Check if there's an empty slot to place the new resource in
-	for (int i = 0; i < numLinkedSlots; ++i) {
-		ItemInstance* item = getLinked(i);
-		if (!item) {
-			linkedSlots[i].inventorySlot = inventorySlot;
-			return true;
-		}
-	}
-	return false;
+	// On desktop/beta inventory layout, hotbar slots are statically mapped (36 + i).
+	return true;
 }
 
 void FillingContainer::compressLinkedSlotList(int slot)
 {
-	int i = slot-1, j = 0;
-	while (++i < numLinkedSlots) {
-		linkedSlots[i-j] = linkedSlots[i];
-
-		ItemInstance* item = getLinked(i);
-		if (!item) ++j;
-	}
-	for (int k = i-j; k < i; ++k)
-		linkedSlots[k].inventorySlot = -1;
+	// On desktop/beta inventory layout, hotbar slots are fixed and do not shift.
 }
 
 void FillingContainer::doDrop( ItemInstance* item, bool randomly )

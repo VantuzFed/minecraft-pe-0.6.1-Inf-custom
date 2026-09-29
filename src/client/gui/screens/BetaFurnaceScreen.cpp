@@ -71,57 +71,10 @@ Inventory* BetaFurnaceScreen::inv() {
 	return player->inventory;
 }
 
-int BetaFurnaceScreen::resolveHotbar(int betaIdx) {
-	Inventory* in = inv();
-	if (!in || betaIdx < 30 || betaIdx > 38)
-		return -1;
-	int real = in->linkedSlots[betaIdx - 30].inventorySlot;
-	if (real >= 9 && real < in->getContainerSize())
-		return real;
-	return -1;
-}
-
-int BetaFurnaceScreen::ensureHotbarLink(int betaIdx) {
-	Inventory* in = inv();
-	if (!in || betaIdx < 30 || betaIdx > 38)
-		return -1;
-	int real = resolveHotbar(betaIdx);
-	if (real >= 0)
-		return real;
-	int link = betaIdx - 30;
-	for (int s = 9; s < in->getContainerSize(); s++) {
-		ItemInstance* it = in->getItem(s);
-		if (!it || it->isNull()) {
-			// One main = one link (see BetaInventoryScreen).
-			for (int l = 0; l < in->numLinkedSlots; l++) {
-				if (l != link && in->linkedSlots[l].inventorySlot == s)
-					in->linkedSlots[l].inventorySlot = -1;
-			}
-			if (in->linkSlot(link, s, false))
-				return s;
-			return -1;
-		}
-	}
-	return -1;
-}
-
 int BetaFurnaceScreen::betaToPe(int betaIdx) {
-	if (betaIdx >= 3 && betaIdx <= 29)
+	if (betaIdx >= 3 && betaIdx <= 38)
 		return betaIdx + 6;
-	if (betaIdx >= 30 && betaIdx <= 38)
-		return resolveHotbar(betaIdx);
 	return -1;
-}
-
-bool BetaFurnaceScreen::isLinkedMain(int peSlot) {
-	Inventory* in = inv();
-	if (!in || peSlot < 9 || peSlot >= in->getContainerSize())
-		return false;
-	for (int l = 0; l < in->numLinkedSlots; l++) {
-		if (in->linkedSlots[l].inventorySlot == peSlot)
-			return true;
-	}
-	return false;
 }
 
 ItemInstance* BetaFurnaceScreen::getSlotItem(int betaIdx) {
@@ -137,17 +90,8 @@ ItemInstance* BetaFurnaceScreen::getSlotItem(int betaIdx) {
 	}
 	if (!player || !in)
 		return NULL;
-	if (betaIdx >= 3 && betaIdx <= 29) {
-		// Linked storage renders in the hotbar row, not here.
-		if (isLinkedMain(betaIdx + 6))
-			return NULL;
+	if (betaIdx >= 3 && betaIdx <= 38) {
 		ItemInstance* it = in->getItem(betaIdx + 6);
-		if (!it || it->isNull())
-			return NULL;
-		return it;
-	}
-	if (betaIdx >= 30 && betaIdx <= 38) {
-		ItemInstance* it = in->getItem(betaIdx - 30);
 		if (!it || it->isNull())
 			return NULL;
 		return it;
@@ -172,29 +116,9 @@ void BetaFurnaceScreen::setSlotItem(int betaIdx, const ItemInstance* item) {
 		}
 		return;
 	}
-	if (betaIdx >= 30 && betaIdx <= 38) {
-		int real = resolveHotbar(betaIdx);
-		if (real < 0 && !empty)
-			real = ensureHotbarLink(betaIdx);
-		if (real < 0)
-			return;
-		if (empty) {
-			in->clearSlot(real);
-			in->linkedSlots[betaIdx - 30].inventorySlot = -1;
-		} else in->setItem(real, const_cast<ItemInstance*>(item));
-		// One main = one link (see BetaInventoryScreen).
-		for (int l = 0; l < in->numLinkedSlots; l++) {
-			if (l != betaIdx - 30 && in->linkedSlots[l].inventorySlot == real)
-				in->linkedSlots[l].inventorySlot = -1;
-		}
-		return;
-	}
-	int pe = -1;
-	if (betaIdx >= 3 && betaIdx <= 29)
-		pe = betaIdx + 6;
-	if (pe >= 0) {
-		if (empty) in->clearSlot(pe);
-		else in->setItem(pe, const_cast<ItemInstance*>(item));
+	if (betaIdx >= 3 && betaIdx <= 38) {
+		if (empty) in->clearSlot(betaIdx + 6);
+		else in->setItem(betaIdx + 6, const_cast<ItemInstance*>(item));
 	}
 }
 
@@ -243,10 +167,6 @@ bool BetaFurnaceScreen::mergeIntoRange(ItemInstance& stack, int from, int to, bo
 					stack.count -= take;
 					moved = true;
 				} else if (!dst || dst->isNull()) {
-					// Furnace hotbar is 30-38; other linked storage
-					// is hidden, never park stacks there.
-					if ((idx < 30 || idx > 38) && isLinkedMain(betaToPe(idx)))
-						continue;
 					ItemInstance v = stack;
 					setSlotItem(idx, &v);
 					ItemInstance* check = getSlotItem(idx);
@@ -261,8 +181,6 @@ bool BetaFurnaceScreen::mergeIntoRange(ItemInstance& stack, int from, int to, bo
 		for (int i = from; i < to; i++) {
 			int idx = reverse ? (to - 1 - (i - from)) : i;
 			if (skipPe >= 0 && betaToPe(idx) == skipPe)
-				continue;
-			if ((idx < 30 || idx > 38) && isLinkedMain(betaToPe(idx)))
 				continue;
 			if (!getSlotItem(idx)) {
 				ItemInstance v = stack;
@@ -285,10 +203,10 @@ bool BetaFurnaceScreen::quickTransfer(int betaIdx) {
 	ItemInstance stack = *src;
 	int srcPe = betaToPe(betaIdx);
 	bool moved = false;
-	if (betaIdx == 2) {
-		moved = mergeIntoRange(stack, 3, 39, false, srcPe);
-	} else if (betaIdx == 0 || betaIdx == 1) {
-		moved = mergeIntoRange(stack, 3, 39, false, srcPe);
+	if (betaIdx == 2 || betaIdx == 0 || betaIdx == 1) {
+		moved = mergeIntoRange(stack, 30, 39, false, srcPe);
+		if (!moved || !stack.isNull())
+			moved = mergeIntoRange(stack, 3, 30, false, srcPe) || moved;
 	} else if (betaIdx >= 3 && betaIdx <= 29) {
 		// Smeltables prefer the ingredient slot, fuel prefers fuel.
 		if (canSmelt(&stack) && !getSlotItem(0)) {
@@ -305,7 +223,7 @@ bool BetaFurnaceScreen::quickTransfer(int betaIdx) {
 			moved = mergeIntoRange(stack, 30, 39, false, srcPe);
 		}
 	} else {
-	 if (canSmelt(&stack) && !getSlotItem(0)) {
+		if (canSmelt(&stack) && !getSlotItem(0)) {
 			ItemInstance v = stack;
 			setSlotItem(0, &v);
 			stack.setNull();
@@ -363,8 +281,8 @@ void BetaFurnaceScreen::render(int xm, int ym, float a) {
 		blit(px, py, 0, 0, 176, 166);
 	}
 
-	drawString(minecraft->font, I18n::get("container.furnace"), px + 56, py + 6, 0xff404040);
-	drawString(minecraft->font, I18n::get("container.inventory"), px + 8, py + 72, 0xff404040);
+	drawString(minecraft->font, I18n::get("container.furnace"), px + 56, py + 6, 0xffe0e0e0);
+	drawString(minecraft->font, I18n::get("container.inventory"), px + 8, py + 72, 0xffe0e0e0);
 
 	// Flame: 14px tall, burns bottom-up. Arrow: 24px wide, fills left-right.
 	if (furnace && !furnaceGone()) {

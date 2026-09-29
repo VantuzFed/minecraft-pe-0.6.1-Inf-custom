@@ -1133,6 +1133,9 @@ void Minecraft::setScreen( Screen* screen )
 	Mouse::reset();
 	Multitouch::reset();
 	Multitouch::resetThisUpdate();
+	if (player) {
+		player->releaseAllKeys();
+	}
 
 	if (screenMutex) {
 		hasScheduledScreen = true;

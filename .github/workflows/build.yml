@@ -37,8 +37,9 @@ jobs:
 
       - name: Download llvm-mingw
         run: |
-          curl -L https://github.com/mstorsjo/llvm-mingw/releases/download/20260311/llvm-mingw-20260311-msvcrt-ubuntu-22.04-x86_64.tar.xz -o llvm-mingw.tar.xz
+          curl -fsSL https://github.com/mstorsjo/llvm-mingw/releases/download/20240619/llvm-mingw-20240619-msvcrt-ubuntu-22.04-x86_64.tar.xz -o llvm-mingw.tar.xz
           tar -xf llvm-mingw.tar.xz
+          rm -f llvm-mingw.tar.xz
           mv llvm-mingw-* llvm-mingw
     
       - name: Create Build Environment
@@ -117,7 +118,7 @@ jobs:
       - name: Setup Environment
         run: |
           sudo apt-get update -qq
-          sudo apt-get install gcc-multilib
+          sudo apt-get install -y gcc-multilib
           sudo apt-get install -y --no-install-recommends build-essential libgl-dev libwayland-dev xorg-dev libxkbcommon-dev
       
       - name: Configure CMake
@@ -155,8 +156,8 @@ jobs:
     env:
       ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
       ANDROID_NDK_PATH: ${{ github.workspace }}/android-ndk-r14b
-      ANDROID_PLATFORM_API: 36
-      ANDROID_BUILD_TOOLS_VERSION: 36.0.0
+      ANDROID_PLATFORM_API: 34
+      ANDROID_BUILD_TOOLS_VERSION: 34.0.0
       ADB: /bin/true
       # build.sh reads MATRIX_ABI to decide which ABI to build when no --abi flag is passed
       MATRIX_ABI: ${{ matrix.abi }}
@@ -170,7 +171,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ env.ANDROID_SDK_ROOT }}
-          key: android-cmdline-tools-v36
+          key: android-cmdline-tools-v34
 
       - name: Setup Android command line tools
         if: steps.cache-android-tools.outputs.cache-hit != 'true'
@@ -202,7 +203,7 @@ jobs:
       - name: Install system prerequisites
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends wget unzip curl git python3 libncurses6 libtinfo6
+          sudo apt-get install -y --no-install-recommends wget unzip curl git python3 libncurses6 libtinfo6 zip
           if ! ldconfig -p | grep -q "libncurses.so.5"; then
             sudo ln -sf /lib/x86_64-linux-gnu/libncurses.so.6 /usr/lib/x86_64-linux-gnu/libncurses.so.5 || true
           fi
@@ -210,11 +211,11 @@ jobs:
             sudo ln -sf /lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5 || true
           fi
 
-      - name: Setup Java 25
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 25
+          java-version: 17
 
       - name: Run Android build script
         run: |
@@ -249,7 +250,7 @@ jobs:
       - name: Setup emsdk
         uses: mymindstorm/setup-emsdk@v14
         with:
-          version: 5.0.3
+          version: 3.1.64
           actions-cache-folder: 'emsdk-cache'
 
       - name: Create Build Environment
@@ -288,7 +289,7 @@ jobs:
       - name: Declare Version Variables
         id: ref
         run: |
-          echo "version=$(cat VERSION | xargs)" >> $GITHUB_OUTPUT
+          echo "version=$([ -f VERSION ] && cat VERSION | xargs || echo '0.6.1-inf')" >> $GITHUB_OUTPUT
           echo "hash=$(git rev-parse --short "$GITHUB_SHA")" >> $GITHUB_OUTPUT
 
       - name: Download Artifacts

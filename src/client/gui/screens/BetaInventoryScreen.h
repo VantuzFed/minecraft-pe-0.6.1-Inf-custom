@@ -35,14 +35,7 @@ public:
 
 private:
 	static const int PANEL_W = 176;
-	static const int PANEL_BASE_H = 166;
-	static const int OVERFLOW_H = 18;
-
-	// The 4th row (PE mains 36-44, which beta never had) is only drawn
-	// while something is actually stored there; the rest of the time
-	// the panel is the plain 176x166 beta one.
-	bool showOverflow() const;
-	int panelH() const { return PANEL_BASE_H + (showOverflow() ? OVERFLOW_H : 0); }
+	static const int PANEL_H = 166;
 
 	// Beta container slot index -> panel coords. Returns false for bad idx.
 	static bool slotPos(int betaIdx, int& sx, int& sy);
@@ -52,21 +45,10 @@ private:
 	Inventory* inv() const;
 	// Live item in a beta slot (NULL when empty). Never keep across calls.
 	ItemInstance* getSlotItem(int betaIdx);
-	// Write an item into a beta slot (copies). Hotbar writes resolve
-	// links; clearing uses link-aware clearSlot.
+	// Write an item into a beta slot (copies).
 	void setSlotItem(int betaIdx, const ItemInstance* item);
-	// Resolve a beta hotbar slot (36-44) to its real PE slot, or -1.
-	int resolveHotbar(int betaIdx);
-	// Resolve, linking to a free main slot first when placing.
-	int ensureHotbarLink(int betaIdx);
-	// Beta slot -> underlying PE main slot (links resolved), or -1 for
-	// crafting/result/armor. Hotbar and overflow row can alias the same
-	// storage; shift-click must skip the source's own cell.
+	// Beta slot -> underlying PE slot (9-44), or -1 for crafting/result/armor.
 	int betaToPe(int betaIdx);
-	// True when a PE main slot is shown through a hotbar link. Such
-	// storage is hidden from the main/overflow rows so every stack is
-	// rendered exactly once (otherwise link mirrors look like dupes).
-	bool isLinkedMain(int peSlot) const;
 	// Recompute the crafting result from the matrix.
 	void updateCraftResult();
 	// Consume one unit from every non-empty matrix cell.
@@ -91,7 +73,7 @@ private:
 	void renderPlayerModel(float xo, float yo);
 
 	int panelX() const { return (width - PANEL_W) / 2; }
-	int panelY() const { return (height - panelH()) / 2; }
+	int panelY() const { return (height - PANEL_H) / 2; }
 
 	ItemInstance craftMatrix[4];
 	ItemInstance craftResult;

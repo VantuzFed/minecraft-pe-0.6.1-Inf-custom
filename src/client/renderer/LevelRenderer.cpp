@@ -1171,17 +1171,6 @@ void LevelRenderer::renderSky(float alpha) {
 	// rest of the celestial pass - verified against RenderGlobal.
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 	Lighting::turnOff();
-	// The whole celestial shell (sunrise fan, sun, moon, stars) is
-	// locked to the camera like modern Minecraft: fixed apparent size,
-	// no parallax. Around the world origin it would slide and swell
-	// as the player roams (fan R=120, bodies/stars R=100).
-	Mob* celestialVp = mc->cameraTargetPlayer ? mc->cameraTargetPlayer : (Mob*)mc->player;
-	float celestialVx = 0.0f, celestialVy = 0.0f, celestialVz = 0.0f;
-	if (celestialVp) {
-		celestialVx = (float)(celestialVp->xOld + (celestialVp->x - celestialVp->xOld) * alpha);
-		celestialVy = (float)(celestialVp->yOld + (celestialVp->y - celestialVp->yOld) * alpha);
-		celestialVz = (float)(celestialVp->zOld + (celestialVp->z - celestialVp->zOld) * alpha);
-	}
 	float* c = level->dimension->getSunriseColor(level->getTimeOfDay(alpha), alpha);
 	if (c != nullptr)
 	{
@@ -1189,7 +1178,6 @@ void LevelRenderer::renderSky(float alpha) {
 		glShadeModel(GL_SMOOTH);
 
 		glPushMatrix();
-		glTranslatef(celestialVx, celestialVy, celestialVz);
 		glRotatef(90.0f, 1.0f, 0.0f, 0.0f);
 		glRotatef(level->getTimeOfDay(alpha) > 0.5f ? 180 : 0, 0.0f, 0.0f, 1.0f);
 		t.begin(GL_TRIANGLE_FAN);
@@ -1223,14 +1211,11 @@ void LevelRenderer::renderSky(float alpha) {
 	glDisable(GL_FOG);
 	glPushMatrix();
 
-	// Sun/moon body brightness follows beta (1-celestialAngle), but the
-	// shell itself stays camera-locked (see above) instead of orbiting
-	// the world origin like beta's RenderGlobal did.
+	// Sun/moon body brightness follows beta (1-celestialAngle).
 	float celestialFade = 1.0f - level->getTimeOfDay(alpha);
 	if (celestialFade < 0.0f) celestialFade = 0.0f;
 	if (celestialFade > 1.0f) celestialFade = 1.0f;
 	glColor4f(1.0f, 1.0f, 1.0f, celestialFade);
-	glTranslatef(celestialVx, celestialVy, celestialVz);
 	glRotatef(0.0f, 0.0f, 0.0f, 1.0f);
 	glRotatef(level->getTimeOfDay(alpha) * 360.0f, 1.0f, 0.0f, 0.0f);
 

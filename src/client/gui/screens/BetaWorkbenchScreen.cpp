@@ -89,57 +89,10 @@ Inventory* BetaWorkbenchScreen::inv() {
 	return player->inventory;
 }
 
-int BetaWorkbenchScreen::resolveHotbar(int betaIdx) {
-	Inventory* in = inv();
-	if (!in || betaIdx < 37 || betaIdx > 45)
-		return -1;
-	int real = in->linkedSlots[betaIdx - 37].inventorySlot;
-	if (real >= 9 && real < in->getContainerSize())
-		return real;
-	return -1;
-}
-
-int BetaWorkbenchScreen::ensureHotbarLink(int betaIdx) {
-	Inventory* in = inv();
-	if (!in || betaIdx < 37 || betaIdx > 45)
-		return -1;
-	int real = resolveHotbar(betaIdx);
-	if (real >= 0)
-		return real;
-	int link = betaIdx - 37;
-	for (int s = 9; s < in->getContainerSize(); s++) {
-		ItemInstance* it = in->getItem(s);
-		if (!it || it->isNull()) {
-			// One main = one link (see BetaInventoryScreen).
-			for (int l = 0; l < in->numLinkedSlots; l++) {
-				if (l != link && in->linkedSlots[l].inventorySlot == s)
-					in->linkedSlots[l].inventorySlot = -1;
-			}
-			if (in->linkSlot(link, s, false))
-				return s;
-			return -1;
-		}
-	}
-	return -1;
-}
-
 int BetaWorkbenchScreen::betaToPe(int betaIdx) {
-	if (betaIdx >= 10 && betaIdx <= 36)
+	if (betaIdx >= 10 && betaIdx <= 45)
 		return betaIdx - 1;
-	if (betaIdx >= 37 && betaIdx <= 45)
-		return resolveHotbar(betaIdx);
 	return -1;
-}
-
-bool BetaWorkbenchScreen::isLinkedMain(int peSlot) {
-	Inventory* in = inv();
-	if (!in || peSlot < 9 || peSlot >= in->getContainerSize())
-		return false;
-	for (int l = 0; l < in->numLinkedSlots; l++) {
-		if (in->linkedSlots[l].inventorySlot == peSlot)
-			return true;
-	}
-	return false;
 }
 
 ItemInstance* BetaWorkbenchScreen::getSlotItem(int betaIdx) {
@@ -153,18 +106,8 @@ ItemInstance* BetaWorkbenchScreen::getSlotItem(int betaIdx) {
 		ItemInstance& it = craftMatrix[betaIdx - 1];
 		return it.isNull() ? NULL : &it;
 	}
-	if (betaIdx >= 10 && betaIdx <= 36) {
-		// Linked storage renders in the hotbar row, not here: every
-		// stack is visible exactly once (no link-mirror "dupes").
-		if (isLinkedMain(betaIdx - 1))
-			return NULL;
+	if (betaIdx >= 10 && betaIdx <= 45) {
 		ItemInstance* it = in->getItem(betaIdx - 1);
-		if (!it || it->isNull())
-			return NULL;
-		return it;
-	}
-	if (betaIdx >= 37 && betaIdx <= 45) {
-		ItemInstance* it = in->getItem(betaIdx - 37);
 		if (!it || it->isNull())
 			return NULL;
 		return it;
@@ -183,29 +126,9 @@ void BetaWorkbenchScreen::setSlotItem(int betaIdx, const ItemInstance* item) {
 		updateCraftResult();
 		return;
 	}
-	if (betaIdx >= 37 && betaIdx <= 45) {
-		int real = resolveHotbar(betaIdx);
-		if (real < 0 && !empty)
-			real = ensureHotbarLink(betaIdx);
-		if (real < 0)
-			return;
-		if (empty) {
-			in->clearSlot(real);
-			in->linkedSlots[betaIdx - 37].inventorySlot = -1;
-		} else in->setItem(real, const_cast<ItemInstance*>(item));
-		// One main = one link (see BetaInventoryScreen).
-		for (int l = 0; l < in->numLinkedSlots; l++) {
-			if (l != betaIdx - 37 && in->linkedSlots[l].inventorySlot == real)
-				in->linkedSlots[l].inventorySlot = -1;
-		}
-		return;
-	}
-	int pe = -1;
-	if (betaIdx >= 10 && betaIdx <= 36)
-		pe = betaIdx - 1;
-	if (pe >= 0) {
-		if (empty) in->clearSlot(pe);
-		else in->setItem(pe, const_cast<ItemInstance*>(item));
+	if (betaIdx >= 10 && betaIdx <= 45) {
+		if (empty) in->clearSlot(betaIdx - 1);
+		else in->setItem(betaIdx - 1, const_cast<ItemInstance*>(item));
 	}
 }
 
@@ -285,10 +208,6 @@ bool BetaWorkbenchScreen::mergeIntoRange(ItemInstance& stack, int from, int to, 
 					stack.count -= take;
 					moved = true;
 				} else if (!dst || dst->isNull()) {
-					// Workbench hotbar is 37-45; other linked storage
-					// is hidden, never park stacks there.
-					if ((idx < 37 || idx > 45) && isLinkedMain(betaToPe(idx)))
-						continue;
 					ItemInstance v = stack;
 					setSlotItem(idx, &v);
 					ItemInstance* check = getSlotItem(idx);
@@ -303,8 +222,6 @@ bool BetaWorkbenchScreen::mergeIntoRange(ItemInstance& stack, int from, int to, 
 		for (int i = from; i < to; i++) {
 			int idx = reverse ? (to - 1 - (i - from)) : i;
 			if (skipPe >= 0 && betaToPe(idx) == skipPe)
-				continue;
-			if ((idx < 37 || idx > 45) && isLinkedMain(betaToPe(idx)))
 				continue;
 			if (!getSlotItem(idx)) {
 				ItemInstance v = stack;
@@ -353,9 +270,11 @@ bool BetaWorkbenchScreen::takeResultToCursor() {
 
 bool BetaWorkbenchScreen::takeResultToInventory() {
 	bool moved = false;
-	while (hasCraftResult && spaceFor(craftResult, 10, 46) >= craftResult.count) {
+	while (hasCraftResult && (spaceFor(craftResult, 37, 46) + spaceFor(craftResult, 10, 37)) >= craftResult.count) {
 		ItemInstance one = craftResult;
-		mergeIntoRange(one, 10, 46, false);
+		mergeIntoRange(one, 37, 46, false);
+		if (!one.isNull())
+			mergeIntoRange(one, 10, 37, false);
 		if (!one.isNull())
 			break;
 		consumeMatrix();
@@ -374,7 +293,9 @@ bool BetaWorkbenchScreen::quickTransfer(int betaIdx) {
 	int srcPe = betaToPe(betaIdx);
 	bool moved = false;
 	if (betaIdx >= 1 && betaIdx <= 9) {
-		moved = mergeIntoRange(stack, 10, 46, false, srcPe);
+		moved = mergeIntoRange(stack, 37, 46, false, srcPe);
+		if (!moved || !stack.isNull())
+			moved = mergeIntoRange(stack, 10, 37, false, srcPe) || moved;
 	} else if (betaIdx >= 10 && betaIdx <= 36) {
 		moved = mergeIntoRange(stack, 37, 46, false, srcPe);
 	} else {
@@ -425,6 +346,9 @@ void BetaWorkbenchScreen::render(int xm, int ym, float a) {
 		glColor4f2(1, 1, 1, 1);
 		blit(px, py, 0, 0, 176, 166);
 	}
+
+	drawString(minecraft->font, "Crafting", px + 28, py + 6, 0xffe0e0e0);
+	drawString(minecraft->font, "Inventory", px + 8, py + 72, 0xffe0e0e0);
 
 	for (int i = 0; i <= 45; i++) {
 		int sx, sy;

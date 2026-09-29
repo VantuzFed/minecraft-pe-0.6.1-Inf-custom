@@ -28,7 +28,10 @@ LOCAL_SRC_FILES := ../../../src/main.cpp \
 ../../../src/client/gamemode/GameMode.cpp \
 ../../../src/client/gamemode/CreativeMode.cpp \
 ../../../src/client/gamemode/SurvivalMode.cpp \
+../../../src/client/gamemode/CreatorMode.cpp \
 ../../../src/client/gui/components/Button.cpp \
+../../../src/client/gui/components/GButton.cpp \
+../../../src/client/gui/components/SmallButton.cpp \
 ../../../src/client/gui/components/GuiElement.cpp \
 ../../../src/client/gui/components/GuiElementContainer.cpp \
 ../../../src/client/gui/components/ImageButton.cpp \
@@ -38,6 +41,7 @@ LOCAL_SRC_FILES := ../../../src/main.cpp \
 ../../../src/client/gui/components/NinePatch.cpp \
 ../../../src/client/gui/components/OptionsGroup.cpp \
 ../../../src/client/gui/components/OptionsItem.cpp \
+../../../src/client/gui/components/OptionsPane.cpp \
 ../../../src/client/gui/components/KeyOption.cpp \
 ../../../src/client/gui/components/TextOption.cpp \
 ../../../src/client/gui/components/RolledSelectionListH.cpp \
@@ -61,6 +65,10 @@ LOCAL_SRC_FILES := ../../../src/main.cpp \
 ../../../src/client/gui/screens/ChestScreen.cpp \
 ../../../src/client/gui/screens/DeathScreen.cpp \
 ../../../src/client/gui/screens/FurnaceScreen.cpp \
+../../../src/client/gui/screens/BetaFurnaceScreen.cpp \
+../../../src/client/gui/screens/BetaWorkbenchScreen.cpp \
+../../../src/client/gui/screens/BetaInventoryScreen.cpp \
+../../../src/client/gui/screens/Beta18CreativeScreen.cpp \
 ../../../src/client/gui/screens/InBedScreen.cpp \
 ../../../src/client/gui/screens/IngameBlockSelectionScreen.cpp \
 ../../../src/client/gui/screens/JoinGameScreen.cpp \
@@ -141,7 +149,9 @@ LOCAL_SRC_FILES := ../../../src/main.cpp \
 ../../../src/network/RakNetInstance.cpp \
 ../../../src/network/ServerSideNetworkHandler.cpp \
 ../../../src/server/ServerLevel.cpp \
+../../../src/server/CreatorLevel.cpp \
 ../../../src/server/ServerPlayer.cpp \
+../../../src/server/ArgumentsSettings.cpp \
 ../../../src/util/DataIO.cpp \
 ../../../src/util/Mth.cpp \
 ../../../src/util/StringUtils.cpp \
@@ -222,10 +232,19 @@ LOCAL_SRC_FILES := ../../../src/main.cpp \
 ../../../src/world/level/levelgen/LargeCaveFeature.cpp \
 ../../../src/world/level/levelgen/LargeFeature.cpp \
 ../../../src/world/level/levelgen/RandomLevelSource.cpp \
+../../../src/world/level/levelgen/Beta173LevelSource.cpp \
+../../../src/world/level/levelgen/Beta173Biome.cpp \
+../../../src/world/level/levelgen/Beta173Features.cpp \
+../../../src/world/level/levelgen/Beta173TerrainGen.cpp \
+../../../src/world/level/levelgen/Beta173Caves.cpp \
+../../../src/world/level/levelgen/Alpha112LevelSource.cpp \
+../../../src/world/level/levelgen/Alpha112TerrainGen.cpp \
 ../../../src/world/level/levelgen/feature/Feature.cpp \
 ../../../src/world/level/levelgen/synth/ImprovedNoise.cpp \
 ../../../src/world/level/levelgen/synth/PerlinNoise.cpp \
 ../../../src/world/level/levelgen/synth/Synth.cpp \
+../../../src/world/level/levelgen/synth/BetaNoise.cpp \
+../../../src/world/level/levelgen/synth/Alpha112Noise.cpp \
 ../../../src/world/level/material/Material.cpp \
 ../../../src/world/level/pathfinder/Path.cpp \
 ../../../src/world/level/storage/ExternalFileLevelStorage.cpp \
@@ -245,6 +264,7 @@ LOCAL_SRC_FILES := ../../../src/main.cpp \
 ../../../src/world/level/tile/LightGemTile.cpp \
 ../../../src/world/level/tile/MelonTile.cpp \
 ../../../src/world/level/tile/Mushroom.cpp \
+../../../src/world/level/tile/SandTile.cpp \
 ../../../src/world/level/tile/NetherReactor.cpp \
 ../../../src/world/level/tile/NetherReactorPattern.cpp \
 ../../../src/world/level/tile/StairTile.cpp \

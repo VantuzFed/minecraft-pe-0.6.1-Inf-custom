@@ -79,45 +79,12 @@ bool BetaInventoryScreen::slotPos(int betaIdx, int& sx, int& sy) {
 		sy = 142;
 		return true;
 	}
-	if (betaIdx >= 45 && betaIdx <= 53) { // PE overflow row (main 36-44)
-		sx = 8 + (betaIdx - 45) * 18;
-		sy = 160;
-		return true;
-	}
-	return false;
-}
-
-bool BetaInventoryScreen::showOverflow() const {
-	Player* player = minecraft ? minecraft->player : NULL;
-	Inventory* in = player ? player->inventory : NULL;
-	if (!in)
-		return false;
-	for (int s = 36; s <= 44; s++) {
-		ItemInstance* it = in->getItem(s);
-		// Linked storage renders in the hotbar row, not in the strip.
-		if (it && !it->isNull() && !isLinkedMain(s))
-			return true;
-	}
-	return false;
-}
-
-bool BetaInventoryScreen::isLinkedMain(int peSlot) const {
-	Inventory* in = inv();
-	if (!in || peSlot < 9 || peSlot >= in->getContainerSize())
-		return false;
-	for (int l = 0; l < in->numLinkedSlots; l++) {
-		if (in->linkedSlots[l].inventorySlot == peSlot)
-			return true;
-	}
 	return false;
 }
 
 int BetaInventoryScreen::slotAt(int x, int y) const {
 	int px = panelX(), py = panelY();
-	bool overflow = showOverflow();
-	for (int i = 0; i <= 53; i++) {
-		if (i >= 45 && !overflow)
-			continue;
+	for (int i = 0; i <= 44; i++) {
 		int sx, sy;
 		if (!slotPos(i, sx, sy))
 			continue;
@@ -134,54 +101,9 @@ Inventory* BetaInventoryScreen::inv() const {
 	return player->inventory;
 }
 
-// PE hotbar slots are links (views) into main storage, not storage.
-// Resolve beta hotbar slot to the real main slot, or -1.
-int BetaInventoryScreen::resolveHotbar(int betaIdx) {
-	Inventory* in = inv();
-	if (!in || betaIdx < 36 || betaIdx > 44)
-		return -1;
-	int link = betaIdx - 36;
-	int real = in->linkedSlots[link].inventorySlot;
-	if (real >= 9 && real < in->getContainerSize())
-		return real;
-	return -1;
-}
-
-// Link an empty hotbar position to a free main slot for placement.
-int BetaInventoryScreen::ensureHotbarLink(int betaIdx) {
-	Inventory* in = inv();
-	if (!in || betaIdx < 36 || betaIdx > 44)
-		return -1;
-	int real = resolveHotbar(betaIdx);
-	if (real >= 0)
-		return real;
-	int link = betaIdx - 36;
-	for (int s = 9; s < in->getContainerSize(); s++) {
-		ItemInstance* it = in->getItem(s);
-		if (!it || it->isNull()) {
-			// One main = one link, always: a stale (dangling) link may
-			// still point at this just-emptied main from an earlier
-			// placement. Without the steal-cleanup two hotbar cells
-			// would render the same stack ("dupes in every cell").
-			for (int l = 0; l < in->numLinkedSlots; l++) {
-				if (l != link && in->linkedSlots[l].inventorySlot == s)
-					in->linkedSlots[l].inventorySlot = -1;
-			}
-			if (in->linkSlot(link, s, false))
-				return s;
-			return -1;
-		}
-	}
-	return -1;
-}
-
 int BetaInventoryScreen::betaToPe(int betaIdx) {
-	if (betaIdx >= 9 && betaIdx <= 35)
+	if (betaIdx >= 9 && betaIdx <= 44)
 		return betaIdx;
-	if (betaIdx >= 36 && betaIdx <= 44)
-		return resolveHotbar(betaIdx);
-	if (betaIdx >= 45 && betaIdx <= 53)
-		return betaIdx - 9;
 	return -1;
 }
 
@@ -198,26 +120,8 @@ ItemInstance* BetaInventoryScreen::getSlotItem(int betaIdx) {
 	}
 	if (betaIdx >= 5 && betaIdx <= 8)
 		return player->getArmor(betaIdx - 5);
-	if (betaIdx >= 9 && betaIdx <= 35) {
-		// Linked storage renders in the hotbar row, not here.
-		if (isLinkedMain(betaIdx))
-			return NULL;
+	if (betaIdx >= 9 && betaIdx <= 44) {
 		ItemInstance* it = in->getItem(betaIdx);
-		if (!it || it->isNull())
-			return NULL;
-		return it;
-	}
-	if (betaIdx >= 36 && betaIdx <= 44) {
-		// Link-following read; never the orphan link storage.
-		ItemInstance* it = in->getItem(betaIdx - 36);
-		if (!it || it->isNull())
-			return NULL;
-		return it;
-	}
-	if (betaIdx >= 45 && betaIdx <= 53) {
-		if (isLinkedMain(betaIdx - 9))
-			return NULL;
-		ItemInstance* it = in->getItem(betaIdx - 9);
 		if (!it || it->isNull())
 			return NULL;
 		return it;
@@ -241,35 +145,9 @@ void BetaInventoryScreen::setSlotItem(int betaIdx, const ItemInstance* item) {
 		player->setArmor(betaIdx - 5, empty ? NULL : item);
 		return;
 	}
-	if (betaIdx >= 36 && betaIdx <= 44) {
-		// Never write the orphan link storage: resolve or link first.
-		int real = resolveHotbar(betaIdx);
-		if (real < 0 && !empty)
-			real = ensureHotbarLink(betaIdx);
-		if (real < 0)
-			return;
-		if (empty) {
-			in->clearSlot(real);
-			// Drop the link too: a dangling link to the just-emptied
-			// main would alias the next placement into another cell.
-			in->linkedSlots[betaIdx - 36].inventorySlot = -1;
-		} else in->setItem(real, const_cast<ItemInstance*>(item));
-		// One main = one link: whenever this cell owns storage, no
-		// other hotbar cell may view it (kills live mirrors too).
-		for (int l = 0; l < in->numLinkedSlots; l++) {
-			if (l != betaIdx - 36 && in->linkedSlots[l].inventorySlot == real)
-				in->linkedSlots[l].inventorySlot = -1;
-		}
-		return;
-	}
-	int pe = -1;
-	if (betaIdx >= 9 && betaIdx <= 35)
-		pe = betaIdx; // main 9-35 maps 1:1
-	else if (betaIdx >= 45 && betaIdx <= 53)
-		pe = betaIdx - 9; // overflow row -> main 36-44
-	if (pe >= 0) {
-		if (empty) in->clearSlot(pe);
-		else in->setItem(pe, const_cast<ItemInstance*>(item));
+	if (betaIdx >= 9 && betaIdx <= 44) {
+		if (empty) in->clearSlot(betaIdx);
+		else in->setItem(betaIdx, const_cast<ItemInstance*>(item));
 	}
 }
 
@@ -349,15 +227,8 @@ bool BetaInventoryScreen::mergeIntoRange(ItemInstance& stack, int from, int to, 
 					stack.count -= take;
 					moved = true;
 				} else if (!dst || dst->isNull()) {
-					// Never park stacks in storage that is hidden
-					// behind a hotbar link (hotbar cells themselves
-					// are fine: 36-44 resolve through their links).
-					if ((idx < 36 || idx > 44) && isLinkedMain(betaToPe(idx)))
-						continue;
 					ItemInstance v = stack;
 					setSlotItem(idx, &v);
-					// setSlotItem can silently drop (no free main to
-					// link a hotbar cell): only consume when it landed.
 					ItemInstance* check = getSlotItem(idx);
 					if (!check || check->isNull())
 						continue;
@@ -370,8 +241,6 @@ bool BetaInventoryScreen::mergeIntoRange(ItemInstance& stack, int from, int to, 
 		for (int i = from; i < to; i++) {
 			int idx = reverse ? (to - 1 - (i - from)) : i;
 			if (skipPe >= 0 && betaToPe(idx) == skipPe)
-				continue;
-			if ((idx < 36 || idx > 44) && isLinkedMain(betaToPe(idx)))
 				continue;
 			if (!getSlotItem(idx)) {
 				ItemInstance v = stack;
@@ -424,9 +293,11 @@ bool BetaInventoryScreen::takeResultToCursor() {
 // Shift-click the result: whole crafts while they fully fit.
 bool BetaInventoryScreen::takeResultToInventory() {
 	bool moved = false;
-	while (hasCraftResult && spaceFor(craftResult, 9, 54) >= craftResult.count) {
+	while (hasCraftResult && (spaceFor(craftResult, 36, 45) + spaceFor(craftResult, 9, 36)) >= craftResult.count) {
 		ItemInstance one = craftResult;
-		mergeIntoRange(one, 9, 54, false);
+		mergeIntoRange(one, 36, 45, false);
+		if (!one.isNull())
+			mergeIntoRange(one, 9, 36, false);
 		if (!one.isNull())
 			break; // space accounting lied; keep matrix intact
 		consumeMatrix();
@@ -445,15 +316,11 @@ bool BetaInventoryScreen::quickTransfer(int betaIdx) {
 	int srcPe = betaToPe(betaIdx);
 	bool moved = false;
 	if (betaIdx >= 1 && betaIdx <= 8) {
-		moved = mergeIntoRange(stack, 9, 54, false, srcPe);
+		moved = mergeIntoRange(stack, 36, 45, false, srcPe);
+		if (!moved || !stack.isNull())
+			moved = mergeIntoRange(stack, 9, 36, false, srcPe) || moved;
 	} else if (betaIdx >= 9 && betaIdx <= 35) {
 		moved = mergeIntoRange(stack, 36, 45, false, srcPe);
-		if (!moved)
-			moved = mergeIntoRange(stack, 45, 54, false, srcPe);
-	} else if (betaIdx >= 45 && betaIdx <= 53) {
-		moved = mergeIntoRange(stack, 36, 45, false, srcPe);
-		if (!moved)
-			moved = mergeIntoRange(stack, 9, 36, false, srcPe);
 	} else {
 		// Armor pieces prefer their armor slot, like the original.
 		if (ItemInstance::isArmorItem(&stack)) {
@@ -467,8 +334,6 @@ bool BetaInventoryScreen::quickTransfer(int betaIdx) {
 		}
 		if (!moved)
 			moved = mergeIntoRange(stack, 9, 36, false, srcPe);
-		if (!moved)
-			moved = mergeIntoRange(stack, 45, 54, false, srcPe);
 	}
 	if (moved) {
 		if (stack.isNull()) {
@@ -608,30 +473,12 @@ void BetaInventoryScreen::render(int xm, int ym, float a) {
 		glColor4f2(1, 1, 1, 1);
 		blit(px, py, 0, 0, 176, 166);
 	}
-	// Overflow row extension (PE mains 36-44): gray strip, black bottom
-	// edge, slot recesses. Only while occupied, otherwise plain beta.
-	bool overflow = showOverflow();
-	int ph = panelH();
-	if (overflow) {
-		fill(px, py + 166, px + 176, py + ph, 0xffc6c6c6);
-		fill(px, py + ph - 1, px + 176, py + ph, 0xff000000);
-		for (int i = 45; i <= 53; i++) {
-			int sx, sy;
-			if (!slotPos(i, sx, sy))
-				continue;
-			int x0 = px + sx, y0 = py + sy;
-			fill(x0, y0, x0 + 18, y0 + 18, 0xff373737);
-			fill(x0 + 1, y0 + 1, x0 + 17, y0 + 17, 0xff8b8b8b);
-		}
-	}
 
-	drawString(minecraft->font, "Crafting", px + 86, py + 16, 0xff404040);
+	drawString(minecraft->font, "Crafting", px + 86, py + 16, 0xffe0e0e0);
 
 	renderPlayerModel((float)(px + 51), (float)(py + 75));
 
-	for (int i = 0; i <= 53; i++) {
-		if (i >= 45 && !overflow)
-			continue;
+	for (int i = 0; i <= 44; i++) {
 		int sx, sy;
 		if (!slotPos(i, sx, sy))
 			continue;

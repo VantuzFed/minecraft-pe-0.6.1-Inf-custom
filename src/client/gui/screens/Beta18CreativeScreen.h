@@ -44,10 +44,7 @@ private:
 	Inventory* inv();
 	ItemInstance* getSlotItem(int betaIdx);
 	void setSlotItem(int betaIdx, const ItemInstance* item);
-	int resolveHotbar(int betaIdx);
-	int ensureHotbarLink(int betaIdx);
 	int betaToPe(int betaIdx);
-	bool isLinkedMain(int peSlot);
 	// Hotbar place/merge/swap (normal survival semantics).
 	void placeIntoHotbar(int slot);
 	bool mergeIntoHotbar(ItemInstance& stack);

@@ -502,6 +502,8 @@ void LocalPlayer::aiStep() {
     bool screenCovering = minecraft->screen && !minecraft->screen->passEvents;
 	if (!screenCovering)
 		input->tick(this);
+	else
+		input->releaseAllKeys();
 
 	// Sprint: detect W double-tap
 	{
@@ -525,6 +527,8 @@ void LocalPlayer::aiStep() {
     if (input->sneaking) {
         if (ySlideOffset < 0.2f) ySlideOffset = 0.2f;
     }
+#else
+	input->tick(this);
 #endif
 	if (abilities.mayfly) {
 		// Check for flight toggle
@@ -623,6 +627,14 @@ void LocalPlayer::move(double xa, double ya, double za) {
 
 void LocalPlayer::updateAi() {
     super::updateAi();
+#ifndef STANDALONE_SERVER
+    if (minecraft->screen && !minecraft->screen->passEvents) {
+        this->xxa = 0;
+        this->yya = 0;
+        this->jumping = false;
+        return;
+    }
+#endif
     this->xxa = input->xa;
     this->yya = input->ya;
     this->jumping = input->jumping || autoJumpTime > 0;
