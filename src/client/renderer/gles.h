@@ -122,9 +122,18 @@ int glhUnProjectf(	float winx, float winy, float winz,
 	#define glLoadIdentity2 glLoadIdentity
 
 	//gl double functions
+#if defined(ANDROID) || (defined(__APPLE__) && TARGET_OS_IPHONE) || defined(__EMSCRIPTEN__)
+	#define glTranslated(x, y, z)          glTranslatef((GLfloat)(x), (GLfloat)(y), (GLfloat)(z))
+	#define glRotated(a, x, y, z)          glRotatef((GLfloat)(a), (GLfloat)(x), (GLfloat)(y), (GLfloat)(z))
+	#define glScaled(x, y, z)              glScalef((GLfloat)(x), (GLfloat)(y), (GLfloat)(z))
+	#define glTranslated2(x, y, z)         glTranslatef((GLfloat)(x), (GLfloat)(y), (GLfloat)(z))
+	#define glRotated2(a, x, y, z)         glRotatef((GLfloat)(a), (GLfloat)(x), (GLfloat)(y), (GLfloat)(z))
+	#define glScaled2(x, y, z)             glScalef((GLfloat)(x), (GLfloat)(y), (GLfloat)(z))
+#else
 	#define glTranslated2	glTranslated
 	#define glRotated2		glRotated
 	#define glScaled2		glScaled
+#endif
 
 	#define glVertexPointer2	glVertexPointer
 	#define glColorPointer2		glColorPointer
