@@ -319,7 +319,7 @@ if (${PLATFORM} STREQUAL "Desktop")
 endif()
 
 # Server
-if(UNIX)
+if(UNIX AND NOT ${PLATFORM} STREQUAL "Web")
     if (APPLE)
         list(APPEND SERVER_SOURCES src/world/level/storage/MoveFolder.mm)
     endif()
@@ -421,6 +421,7 @@ else()
         TARGET ${PROJECT_NAME} 
         POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/misc/web/index.html" $<TARGET_FILE_DIR:${PROJECT_NAME}>
+            COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/misc/web/coi-serviceworker.js" $<TARGET_FILE_DIR:${PROJECT_NAME}>
     )
 endif()
 
