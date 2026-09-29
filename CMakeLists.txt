@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.21)
 project(MinecraftPE)
 
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 include(cmake/CPM.cmake)
 
 set(CMAKE_CXX_STANDARD 14)
