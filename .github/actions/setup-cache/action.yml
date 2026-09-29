@@ -3,10 +3,10 @@ description: Sets up sccache, CPM cache, etc.
 
 inputs:
   host:
-    description: 'Host platform: win or linux'
+    description: 'Host platform: win, linux, or mac'
     required: true
   target:
-    description: 'Target platform: win, linux'
+    description: 'Target platform: win, linux, or mac'
     required: true
 
 runs:
@@ -17,6 +17,10 @@ runs:
     with:
       variant: sccache
       key: ${{ inputs.target }}-v1
+
+  - name: Ensure CPM Cache Directory
+    shell: bash
+    run: mkdir -p cpm-cache
 
   - name: Setup CPM Cache
     uses: actions/cache@v4
