@@ -117,7 +117,7 @@ public:
 	}
 	virtual int getKeyFromKeyCode(int keyCode, int metaState, int deviceId) {return 0;}
 #ifdef __APPLE__
-    virtual bool isSuperFast() = 0;
+    virtual bool isSuperFast() { return false; }
 #endif
 
 	virtual void openURL(const std::string& url) {}

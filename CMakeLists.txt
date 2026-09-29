@@ -37,6 +37,12 @@ if (${PLATFORM} STREQUAL "Desktop")
     elseif(UNIX)
         find_library(pthread NAMES pthread)
         set(EXTRA_LIBS pthread m)
+        if (APPLE)
+            find_library(FOUNDATION_FRAMEWORK Foundation)
+            find_library(APPKIT_FRAMEWORK AppKit)
+            find_library(OPENGL_FRAMEWORK OpenGL)
+            set(EXTRA_LIBS ${EXTRA_LIBS} ${FOUNDATION_FRAMEWORK} ${APPKIT_FRAMEWORK} ${OPENGL_FRAMEWORK})
+        endif()
     endif()
 
 elseif (${PLATFORM} STREQUAL "Web")
@@ -97,6 +103,11 @@ else()
     )
 endif()
 
+set(OPENAL_EXTRA_OPTS)
+if(NOT APPLE)
+    list(APPEND OPENAL_EXTRA_OPTS "ALSOFT_STATIC_STDCXX ON" "ALSOFT_STATIC_LIBGCC ON")
+endif()
+
 CPMAddPackage(
     NAME "openal"
     GIT_REPOSITORY "https://github.com/kcat/openal-soft.git"
@@ -107,8 +118,7 @@ CPMAddPackage(
         "ALSOFT_UTILS OFF"
         "LIBTYPE ${AL_LIBTYPE}"
         "ALSOFT_ENABLE_MODULES OFF"
-        "ALSOFT_STATIC_STDCXX ON"
-        "ALSOFT_STATIC_LIBGCC ON"
+        ${OPENAL_EXTRA_OPTS}
 )
 
 # TODO: Clear this paths with *
@@ -303,10 +313,17 @@ file(GLOB CLIENT_SOURCES
 
 if (${PLATFORM} STREQUAL "Desktop")
     list(APPEND CLIENT_SOURCES glad/src/glad.c)
+    if (APPLE)
+        list(APPEND CLIENT_SOURCES src/world/level/storage/MoveFolder.mm)
+    endif()
 endif()
 
 # Server
 if(UNIX)
+    if (APPLE)
+        list(APPEND SERVER_SOURCES src/world/level/storage/MoveFolder.mm)
+    endif()
+
     add_executable("${PROJECT_NAME}-server" ${SERVER_SOURCES})
 
     target_compile_definitions("${PROJECT_NAME}-server" PUBLIC "STANDALONE_SERVER" "SERVER_PROFILER")
@@ -317,7 +334,7 @@ if(UNIX)
         "project/lib_projects/raknet/jni/RaknetSources"
     )
 
-    target_link_libraries("${PROJECT_NAME}-server" ${CMAKE_THREAD_LIBS_INIT})
+    target_link_libraries("${PROJECT_NAME}-server" zlib ${PNG_LIB} ${CMAKE_THREAD_LIBS_INIT} ${EXTRA_LIBS})
 endif()
 
 add_executable(${PROJECT_NAME} ${CLIENT_SOURCES})

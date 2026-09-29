@@ -38,8 +38,12 @@ namespace Mth {
 	inline double abs(double a) { return a >= 0.0 ? a : -a; }
 	float Min(float a, float b);
 	inline double Min(double a, double b) { return a <= b ? a : b; }
+	inline double Min(double a, float b) { return a <= b ? a : b; }
+	inline double Min(float a, double b) { return a <= b ? a : b; }
 	float Max(float a, float b);
 	inline double Max(double a, double b) { return a >= b ? a : b; }
+	inline double Max(double a, float b) { return a >= b ? a : b; }
+	inline double Max(float a, double b) { return a >= b ? a : b; }
 	int abs(int a);
 	int Min(int a, int b);
 	int Max(int a, int b);
@@ -47,8 +51,14 @@ namespace Mth {
 	int   clamp(int v, int low, int high);
 	float clamp(float v, float low, float high);
 	inline double clamp(double v, double low, double high) { return v < low ? low : (v > high ? high : v); }
+	inline double clamp(float v, double low, float high) { return v < low ? low : (v > high ? high : v); }
+	inline double clamp(float v, double low, double high) { return v < low ? low : (v > high ? high : v); }
+	inline double clamp(double v, float low, double high) { return v < low ? low : (v > high ? high : v); }
+	inline double clamp(double v, double low, float high) { return v < low ? low : (v > high ? high : v); }
 	float lerp(float src, float dst, float alpha);
 	inline double lerp(double src, double dst, double alpha) { return src + (dst - src) * alpha; }
+	inline double lerp(float src, double dst, float alpha) { return src + (dst - src) * alpha; }
+	inline double lerp(double src, float dst, float alpha) { return src + (dst - src) * alpha; }
 	int   lerp(int src, int dst, float alpha);
 
 	///@param value The original signed value
