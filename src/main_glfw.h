@@ -66,7 +66,20 @@ void character_callback(GLFWwindow* window, unsigned int codepoint) {
 	}
 }
 
+static void getFramebufferScale(GLFWwindow* window, double* scaleX, double* scaleY) {
+	int winW = 1, winH = 1, fbW = 1, fbH = 1;
+	glfwGetWindowSize(window, &winW, &winH);
+	glfwGetFramebufferSize(window, &fbW, &fbH);
+	*scaleX = (winW > 0) ? ((double)fbW / (double)winW) : 1.0;
+	*scaleY = (winH > 0) ? ((double)fbH / (double)winH) : 1.0;
+}
+
 static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
+	double scaleX, scaleY;
+	getFramebufferScale(window, &scaleX, &scaleY);
+	xpos *= scaleX;
+	ypos *= scaleY;
+
 	static double lastX = 0.0, lastY = 0.0;
 	static bool firstMouse = true;
 
@@ -95,6 +108,10 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
 	double xpos, ypos;
 	glfwGetCursorPos(window, &xpos, &ypos);
+	double scaleX, scaleY;
+	getFramebufferScale(window, &scaleX, &scaleY);
+	xpos *= scaleX;
+	ypos *= scaleY;
 
 	if (button == GLFW_MOUSE_BUTTON_LEFT) {
 		Mouse::feed( MouseAction::ACTION_LEFT, action, xpos, ypos);
@@ -109,6 +126,10 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 	double xpos, ypos;
 	glfwGetCursorPos(window, &xpos, &ypos);
+	double scaleX, scaleY;
+	getFramebufferScale(window, &scaleX, &scaleY);
+	xpos *= scaleX;
+	ypos *= scaleY;
 
 	Mouse::feed(3, 0, xpos, ypos, 0, yoffset);
 }
@@ -190,7 +211,6 @@ int main(void) {
 	glfwSetCursorPosCallback(platform->window, cursor_position_callback);
 	glfwSetMouseButtonCallback(platform->window, mouse_button_callback);
 	glfwSetScrollCallback(platform->window, scroll_callback);
-	glfwSetWindowSizeCallback(platform->window, window_size_callback);
 	glfwSetFramebufferSizeCallback(platform->window, window_size_callback);
 
 	glfwMakeContextCurrent(platform->window);
