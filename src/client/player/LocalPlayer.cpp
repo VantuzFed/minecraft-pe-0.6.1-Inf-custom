@@ -42,6 +42,7 @@
 #include "../gui/screens/BetaWorkbenchScreen.h"
 #include "../gui/screens/BetaInventoryScreen.h"
 #include "../gui/screens/ChestScreen.h"
+#include "../gui/screens/BetaChestScreen.h"
 #include "../gui/screens/crafting/WorkbenchScreen.h"
 #include "../gui/screens/crafting/StonecutterScreen.h"
 #include "../gui/screens/InBedScreen.h"
@@ -824,9 +825,26 @@ void LocalPlayer::openFurnace( FurnaceTileEntity* e ) {
 }
 
 void LocalPlayer::openContainer( ChestTileEntity* container ) {
+	openContainer((Container*)container);
+}
+
+void LocalPlayer::openContainer( Container* container ) {
 #ifndef STANDALONE_SERVER
-	if (!minecraft->isCreativeMode())
-		minecraft->setScreen( new ChestScreen(this, container) );
+	if (minecraft->isCreativeMode() || !container)
+		return;
+#if defined(PLATFORM_DESKTOP)
+	minecraft->setScreen( new BetaChestScreen(container) );
+#else
+	if (minecraft->options.getIntValue(OPTIONS_MENU_STYLE) == 2 || !minecraft->useTouchscreen()) {
+		minecraft->setScreen( new BetaChestScreen(container) );
+	} else {
+		ChestTileEntity* cte = dynamic_cast<ChestTileEntity*>(container);
+		if (cte)
+			minecraft->setScreen( new ChestScreen(this, cte) );
+		else
+			minecraft->setScreen( new BetaChestScreen(container) );
+	}
+#endif
 #endif
 }
 

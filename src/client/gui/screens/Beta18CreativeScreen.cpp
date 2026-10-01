@@ -13,6 +13,7 @@
 #include "../../../platform/input/Keyboard.h"
 #include "../../../platform/input/Mouse.h"
 #include "../../../platform/time.h"
+#include "../../../locale/I18n.h"
 #include <cstdio>
 
 Beta18CreativeScreen::Beta18CreativeScreen()
@@ -569,7 +570,7 @@ void Beta18CreativeScreen::render(int xm, int ym, float a) {
 		blit(px, py, 0, 0, PANEL_W, PANEL_H);
 	}
 
-	drawString(minecraft->font, "Item selection", px + 8, py + 6, 0xffffffff);
+	drawString(minecraft->font, I18n::get("container.creative"), px + 8, py + 6, 0xffffffff);
 
 	for (int i = 0; i <= 80; i++) {
 		int sx, sy;

@@ -76,25 +76,33 @@ void ConsoleScreen::execute()
         return;
     }
 
-    if (_input[0] == '/') {
-        // Command
-        std::string result = processCommand(_input);
-        if (!result.empty())
-            minecraft->gui.addMessage(result);
-    } else {
-        // Chat message: <name> message
-        std::string msg = std::string("<") + minecraft->player->name + "> " + _input;
-        if (minecraft->netCallback && minecraft->raknetInstance->isServer()) {
-            // Hosting a LAN game: displayGameMessage shows locally + broadcasts MessagePacket to clients
-            static_cast<ServerSideNetworkHandler*>(minecraft->netCallback)->displayGameMessage(msg);
-        } else if (minecraft->netCallback) {
-            // Connected client: send ChatPacket to server; server echoes it back as MessagePacket
-            ChatPacket chatPkt(msg);
-            minecraft->raknetInstance->send(chatPkt);
+    try {
+        if (_input[0] == '/') {
+            // Command
+            std::string result = processCommand(_input);
+            if (!result.empty())
+                minecraft->gui.addMessage(result);
         } else {
-            // Singleplayer: show locally only
-            minecraft->gui.addMessage(msg);
+            // Chat message: <name> message
+            std::string msg = std::string("<") + minecraft->player->name + "> " + _input;
+            if (minecraft->netCallback && minecraft->raknetInstance->isServer()) {
+                // Hosting a LAN game: displayGameMessage shows locally + broadcasts MessagePacket to clients
+                static_cast<ServerSideNetworkHandler*>(minecraft->netCallback)->displayGameMessage(msg);
+            } else if (minecraft->netCallback) {
+                // Connected client: send ChatPacket to server; server echoes it back as MessagePacket
+                ChatPacket chatPkt(msg);
+                minecraft->raknetInstance->send(chatPkt);
+            } else {
+                // Singleplayer: show locally only
+                minecraft->gui.addMessage(msg);
+            }
         }
+    } catch (const std::exception& e) {
+        LOGE("Error in ConsoleScreen::execute: %s", e.what());
+        minecraft->gui.addMessage(std::string("Error: ") + e.what());
+    } catch (...) {
+        LOGE("Unknown error in ConsoleScreen::execute");
+        minecraft->gui.addMessage("An unknown error occurred while executing command.");
     }
 
     minecraft->setScreen(NULL);
@@ -231,6 +239,38 @@ std::string ConsoleScreen::processCommand(const std::string& raw)
         out << "Teleported player to "
             << x << " " << y << " " << z;
         return out.str();
+    }
+
+    // -----------------------------------------------------------------------
+    // /gamemode <survival|creative|0|1|s|c>
+    // -----------------------------------------------------------------------
+    if (args[0] == "gamemode" || args[0] == "defaultgamemode") {
+        if (args.size() < 2) {
+            return "Usage: /gamemode <survival|creative|0|1|s|c>";
+        }
+
+        std::string mode = args[1];
+        std::transform(mode.begin(), mode.end(), mode.begin(), ::tolower);
+
+        bool isCreative = false;
+        std::string modeName;
+
+        if (mode == "0" || mode == "s" || mode == "survival") {
+            isCreative = false;
+            modeName = "Survival";
+        } else if (mode == "1" || mode == "c" || mode == "creative") {
+            isCreative = true;
+            modeName = "Creative";
+        } else {
+            return "Unknown game mode '" + args[1] + "'. Usage: /gamemode <survival|creative|0|1|s|c>";
+        }
+
+        minecraft->setIsCreativeMode(isCreative);
+        if (level->getLevelData()) {
+            level->getLevelData()->setGameType(isCreative ? GameType::Creative : GameType::Survival);
+        }
+
+        return "Your game mode has been updated to " + modeName + " Mode";
     }
 
     // -----------------------------------------------------------------------

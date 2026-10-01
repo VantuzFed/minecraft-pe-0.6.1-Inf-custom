@@ -347,8 +347,8 @@ void BetaWorkbenchScreen::render(int xm, int ym, float a) {
 		blit(px, py, 0, 0, 176, 166);
 	}
 
-	drawString(minecraft->font, "Crafting", px + 28, py + 6, 0xffffffff);
-	drawString(minecraft->font, "Inventory", px + 8, py + 72, 0xffffffff);
+	drawString(minecraft->font, I18n::get("container.crafting"), px + 28, py + 6, 0xffffffff);
+	drawString(minecraft->font, I18n::get("container.inventory"), px + 8, py + 72, 0xffffffff);
 
 	for (int i = 0; i <= 45; i++) {
 		int sx, sy;

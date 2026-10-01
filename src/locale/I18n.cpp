@@ -51,12 +51,15 @@ void I18n::fillTranslations( AppPlatform* platform, const std::string& filename,
 			continue;
 
 		std::string key   = Util::stringTrim(line.substr(0, spos));
+		if (key.empty() || key[0] == '#')
+			continue;
+
 		Map::const_iterator cit = _strings.find(key);
 		if (!overwrite && cit != _strings.end())
 			continue;
 
 		std::string value = Util::stringTrim(line.substr(spos + 1));
-		_strings.insert( std::make_pair(key, value ) );
+		_strings[key] = value;
 	}
 
 	delete[] blob.data;

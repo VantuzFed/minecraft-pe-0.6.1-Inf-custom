@@ -23,6 +23,8 @@ public:
     /*@Override*/
     bool isCubeShaped();
 
+    bool shouldRenderFace(LevelSource* level, int x, int y, int z, int face) override;
+
     int getRenderShape();
 
 	bool mayPlace(Level* level, int x, int y, int z, unsigned char face);

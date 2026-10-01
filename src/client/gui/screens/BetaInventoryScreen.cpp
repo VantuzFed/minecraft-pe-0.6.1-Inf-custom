@@ -480,7 +480,7 @@ void BetaInventoryScreen::render(int xm, int ym, float a) {
 		blit(px, py, 0, 0, 176, 166);
 	}
 
-	drawString(minecraft->font, "Crafting", px + 86, py + 16, 0xffffffff);
+	drawString(minecraft->font, I18n::get("container.crafting"), px + 86, py + 16, 0xffffffff);
 
 	glClear(GL_DEPTH_BUFFER_BIT);
 	renderPlayerModel((float)(px + 51), (float)(py + 75));

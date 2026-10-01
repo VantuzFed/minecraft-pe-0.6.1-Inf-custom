@@ -2,27 +2,25 @@
 #define NET_MINECRAFT_CLIENT_GUI_SCREENS__SelectWorldScreen_H__
 
 #include "../Screen.h"
-#include "../TweenData.h"
 #include "../components/Button.h"
-#include "../components/RolledSelectionListH.h"
+#include "../components/RolledSelectionListV.h"
 #include "../../Minecraft.h"
 #include "../../../world/level/storage/LevelStorageSource.h"
-
+#include "ConfirmScreen.h"
 
 class SelectWorldScreen;
 
 //
-// Scrolling World selection list
+// Desktop Beta 1.7.3 vertical World selection list
 //
-class WorldSelectionList : public RolledSelectionListH
+class WorldSelectionList : public RolledSelectionListV
 {
 public:
 	WorldSelectionList(Minecraft* _minecraft, int _width, int _height);
-	virtual void tick();
-	void stepLeft();
-	void stepRight();
+	virtual ~WorldSelectionList() {}
 
 	void commit();
+
 protected:
 	virtual int getNumberOfItems();
 	virtual void selectItem(int item, bool doubleClick);
@@ -30,34 +28,23 @@ protected:
 
 	virtual void renderBackground() {}
 	virtual void renderItem(int i, int x, int y, int h, Tesselator& t);
-	virtual float getPos(float alpha);
-	virtual void touched() { mode = 0; }
-	virtual bool capXPosition();
-private:
-	TweenData td;
-	void tweenInited();
 
+private:
 	int selectedItem;
-	int _height;
+	int lastClickedItem;
+	long long lastClickTime;
+
 	LevelSummaryList levels;
-	std::vector<StringVector> _descriptions;
-	StringVector _imageNames;
 
 	bool hasPickedLevel;
 	LevelSummary pickedLevel;
 
-	int stoppedTick;
-	int currentTick;
-	float accRatio;
-	int mode;
-	
 	friend class SelectWorldScreen;
 };
 
 //
 // Delete World screen
 //
-#include "ConfirmScreen.h"
 class DeleteWorldScreen: public ConfirmScreen
 {
 public:
@@ -68,9 +55,8 @@ private:
 	LevelSummary _level;
 };
 
-
 //
-// Select world screen
+// Select world screen (Desktop Beta 1.7.3 style)
 //
 class SelectWorldScreen: public Screen
 {
@@ -88,8 +74,6 @@ public:
 	virtual void keyPressed(int eventKey);
 
 	void render(int xm, int ym, float a);
-
-	// mouse wheel scroll (new in desktop implementation)
 	virtual void mouseWheel(int dx, int dy, int xm, int ym);
 
 	bool isInGameScreen();
@@ -97,16 +81,17 @@ private:
 	void loadLevelSource();
 	std::string getUniqueLevelName(const std::string& level);
 
-	Button bDelete;
+	Button bSelect;
 	Button bCreate;
-	Button bBack;
-	Button bWorldView;
+	Button bRename;
+	Button bDelete;
+	Button bCancel;
+
 	WorldSelectionList* worldsList;
 	LevelSummaryList levels;
 
 	bool _mouseHasBeenUp;
 	bool _hasStartedLevel;
-	//LevelStorageSource* levels;
 };
 
 #endif /*NET_MINECRAFT_CLIENT_GUI_SCREENS__SelectWorldScreen_H__*/

@@ -46,6 +46,7 @@ public:
 	void startStonecutting(int x, int y, int z);
 
 	void openContainer(ChestTileEntity* container);
+	void openContainer(Container* container);
 	void openFurnace(FurnaceTileEntity* e);
 
     bool isSneaking();

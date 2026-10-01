@@ -125,7 +125,7 @@ static int detectSystemLanguage() {
 	return 0;
 }
 
-OptionInt languageOpt("language", detectSystemLanguage(), 0, 1);
+OptionInt languageOpt("language", 1, 0, 1);
 
 void Options::initTable() {
     m_options[OPTIONS_DIFFICULTY] = &difficulty;

@@ -63,6 +63,7 @@ LOCAL_SRC_FILES := ../../../src/main.cpp \
 ../../../src/client/gui/screens/UsernameScreen.cpp \
 ../../../src/client/gui/screens/ConfirmScreen.cpp \
 ../../../src/client/gui/screens/ChestScreen.cpp \
+../../../src/client/gui/screens/BetaChestScreen.cpp \
 ../../../src/client/gui/screens/DeathScreen.cpp \
 ../../../src/client/gui/screens/FurnaceScreen.cpp \
 ../../../src/client/gui/screens/BetaFurnaceScreen.cpp \

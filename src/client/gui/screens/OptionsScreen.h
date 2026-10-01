@@ -53,6 +53,26 @@ private:
 	// itself lives in the group being rebuilt).
 	bool m_pendingOptionsRefresh;
 
+	bool isBetaStyle() const;
+	void updateBetaButtonTexts();
+
+	// Beta style buttons
+	Button bMusic;
+	Button bSound;
+	Button bInvertMouse;
+	Button bSensitivity;
+	Button bRenderDistance;
+	Button bViewBobbing;
+	Button bFramerate;
+	Button b3DAnaglyph;
+	Button bDifficulty;
+	Button bGraphics;
+	Button bSmoothLighting;
+	Button bMenuStyle;
+	Button bControls;
+	Button bCreditsBeta;
+	Button bDone;
+
 	// drag-to-scroll state (mouse + touch, touch emulates left button)
 	bool m_dragActive;
 	bool m_dragScrolling;

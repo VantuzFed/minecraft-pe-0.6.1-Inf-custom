@@ -1,237 +1,127 @@
 #include "SelectWorldScreen.h"
 #include "StartMenuScreen.h"
 #include "ProgressScreen.h"
-#include "DialogDefinitions.h"
+#include "RenameMPLevelScreen.h"
+#include "SimpleChooseLevelScreen.h"
 #include "../../renderer/Tesselator.h"
+#include "../../renderer/Textures.h"
+#include "../../../platform/input/Mouse.h"
+#include "../../../platform/input/Keyboard.h"
+#include "../../../platform/time.h"
+#include "../../../locale/I18n.h"
+#include "../../../world/level/LevelSettings.h"
 #include "../../../AppPlatform.h"
 #include "../../../util/StringUtils.h"
-#include "../../../util/Mth.h"
-#include "../../../platform/input/Mouse.h"
-#include "../../../Performance.h"
-#include "../../../world/level/LevelSettings.h"
 
 #include <algorithm>
 #include <set>
-#include "../../renderer/Textures.h"
-#include "SimpleChooseLevelScreen.h"
-
-static float Max(float a, float b) {
-	return a>b? a : b;
-}
+#include <sstream>
 
 //
-// World Selection List
+// World Selection List (Desktop Beta 1.7.3 vertical GuiSlot style)
 //
-WorldSelectionList::WorldSelectionList( Minecraft* minecraft, int width, int height )
-:	_height(height),
-	hasPickedLevel(false),
-	currentTick(0),
-	stoppedTick(-1),
-	mode(0),
-	RolledSelectionListH(minecraft, width, height, 0, width, 26, height-32, 120)
+WorldSelectionList::WorldSelectionList(Minecraft* minecraft, int width, int height)
+:	RolledSelectionListV(minecraft, width, height, 0, width, 32, height - 64, 36),
+	selectedItem(-1),
+	lastClickedItem(-1),
+	lastClickTime(0),
+	hasPickedLevel(false)
 {
+	setRenderSelection(true);
 }
 
 int WorldSelectionList::getNumberOfItems() {
 	return (int)levels.size();
 }
 
-void WorldSelectionList::selectItem( int item, bool doubleClick ) {
-	//LOGI("sel: %d, item %d\n", selectedItem, item);
-	if (selectedItem < 0 || (selectedItem != item))
-		return;
-	
-	if (!hasPickedLevel) {
-		hasPickedLevel = true;
-		pickedLevel = levels[item];
+void WorldSelectionList::selectItem(int item, bool doubleClick) {
+	long long now = getTimeMs();
+	bool isDouble = doubleClick || (selectedItem == item && (now - lastClickTime < 400));
+	selectedItem = item;
+	lastClickTime = now;
+	lastClickedItem = item;
+
+	if (isDouble && item >= 0 && item < (int)levels.size()) {
+		if (!hasPickedLevel) {
+			hasPickedLevel = true;
+			pickedLevel = levels[item];
+		}
 	}
 }
 
-bool WorldSelectionList::isSelectedItem( int item ) {
+bool WorldSelectionList::isSelectedItem(int item) {
 	return item == selectedItem;
 }
 
-void WorldSelectionList::renderItem( int i, int x, int y, int h, Tesselator& t ) {
+void WorldSelectionList::renderItem(int i, int x, int y, int h, Tesselator& t) {
+	if (i < 0 || i >= (int)levels.size()) return;
 
-	int centerx = x + itemWidth/2;
+	int boxX = width / 2 - 110;
+	int boxW = 220;
 
-	float a0 = Max(1.1f - std::abs( width / 2 - centerx ) * 0.0055f, 0.2f);
-	if (a0 > 1) a0 = 1;
-	int textColor =  (int)(255.0f * a0) * 0x010101;
-	int textColor2 = (int)(140.0f * a0) * 0x010101;
+	if (isSelectedItem(i)) {
+		glDisable2(GL_TEXTURE_2D);
+		glColor4f2(1, 1, 1, 1);
+		t.begin();
+		t.color(0x80, 0x80, 0x80);
+		t.vertex(boxX - 2, y + h + 2, 0);
+		t.vertex(boxX + boxW + 2, y + h + 2, 0);
+		t.vertex(boxX + boxW + 2, y - 2, 0);
+		t.vertex(boxX - 2, y - 2, 0);
 
-	const int TY = y + 42;
-	const int TX = centerx - itemWidth / 2 + 5;
-
-	StringVector v = _descriptions[i];
-	drawString(minecraft->font, v[0].c_str(), TX, TY +  0, textColor);
-	drawString(minecraft->font, v[1].c_str(), TX, TY + 10, textColor2);
-	drawString(minecraft->font, v[2].c_str(), TX, TY + 20, textColor2);
-	drawString(minecraft->font, v[3].c_str(), TX, TY + 30, textColor2);
-
-	minecraft->textures->loadAndBindTexture(_imageNames[i]);
-	t.color(0.3f, 1.0f, 0.2f);
-
-	//float x0 = (float)x;
-	//float x1 = (float)x + (float)itemWidth;
-
-	const float IY = (float)y - 8;
-	t.begin();
-		t.color(textColor);
-		t.vertexUV((float)(centerx-32), IY,      blitOffset, 0, 0);
-		t.vertexUV((float)(centerx-32), IY + 48, blitOffset, 0, 1);
-		t.vertexUV((float)(centerx+32), IY + 48, blitOffset, 1, 1);
-		t.vertexUV((float)(centerx+32), IY,      blitOffset, 1, 0);
-	t.draw();
-}
-
-void WorldSelectionList::stepLeft() {
-	if (selectedItem > 0) {
-		td.start = xo;
-		td.stop = xo - itemWidth;
-		td.cur = 0;
-		td.dur = 8;
-		mode = 1;
-		tweenInited();
+		t.color(0x00, 0x00, 0x00);
+		t.vertex(boxX - 1, y + h + 1, 0);
+		t.vertex(boxX + boxW + 1, y + h + 1, 0);
+		t.vertex(boxX + boxW + 1, y - 1, 0);
+		t.vertex(boxX - 1, y - 1, 0);
+		t.draw();
+		glEnable2(GL_TEXTURE_2D);
 	}
-}
 
-void WorldSelectionList::stepRight() {
-	if (selectedItem >= 0 && selectedItem < getNumberOfItems()-1) {
-		td.start = xo;
-		td.stop = xo + itemWidth;
-		td.cur = 0;
-		td.dur = 8;
-		mode = 1;
-		tweenInited();
+	LevelSummary& level = levels[i];
+	std::string name = level.name;
+	if (name.empty()) {
+		std::stringstream ss;
+		ss << I18n::get("selectWorld.world") << " " << (i + 1);
+		name = ss.str();
 	}
+
+	std::string info = level.id;
+	std::string dateStr = minecraft->platform()->getDateString(level.lastPlayed);
+	if (!dateStr.empty()) {
+		info += " (" + dateStr + ")";
+	}
+
+	std::string mode = I18n::get("selectWorld.gameMode") + " " + LevelSettings::gameTypeToString(level.gameType);
+
+	drawString(minecraft->font, name, boxX + 2, y + 1, 0xffffffff);
+	drawString(minecraft->font, info, boxX + 2, y + 12, 0x808080ff);
+	drawString(minecraft->font, mode, boxX + 2, y + 23, 0x808080ff);
 }
 
 void WorldSelectionList::commit() {
-	for (unsigned int i = 0; i < levels.size(); ++i) {
-		LevelSummary& level = levels[i];
-
-		std::stringstream ss;
-		ss << level.name << "/preview.png";
-		TextureId id = Textures::InvalidId;//minecraft->textures->loadTexture(ss.str(), false);
-
-		if (id != Textures::InvalidId) {
-			_imageNames.push_back( ss.str() );
-		} else {
-			_imageNames.push_back("gui/default_world.png");
-		}
-
-		StringVector lines;
-		lines.push_back(level.name);
-		lines.push_back(minecraft->platform()->getDateString(level.lastPlayed));
-		lines.push_back(level.id);
-		lines.push_back(LevelSettings::gameTypeToString(level.gameType));
-		_descriptions.push_back(lines);
-
+	if (!levels.empty()) {
 		selectedItem = 0;
+	} else {
+		selectedItem = -1;
 	}
-}
-
-static float quadraticInOut(float t, float dur, float start, float stop) {
-	const float delta = stop - start;
-	const float T = (t / dur) * 2.0f;
-	if (T < 1) return 0.5f*delta*T*T + start;
-	return -0.5f*delta * ((T-1)*(T-3) - 1) + start;
-}
-
-void WorldSelectionList::tick()
-{
-	RolledSelectionListH::tick();
-
-	++currentTick;
-
-	if (Mouse::isButtonDown(MouseAction::ACTION_LEFT) || dragState == 0)
-		return;
-
-	// Handle the tween (when in "mode 1")
-	selectedItem = -1; 
-	if (mode == 1) {
-		if (++td.cur == td.dur) {
-			mode = 0;
-			xInertia = 0;
-			xoo = xo = td.stop;
-			selectedItem = getItemAtPosition(width/2, height/2);
-		} else {
-			tweenInited();
-		}
-		return;
-	}
-
-	// It's still going fast, let it run
-	float speed = Mth::abs(xInertia);
-	bool slowEnoughToBeBothered = speed < 5.0f;
-	if (!slowEnoughToBeBothered) {
-		xInertia = xInertia * .9f;
-		return;
-	}
-
-	xInertia *= 0.8f;
-
-	if (speed < 1 && dragState < 0) {
-		const int offsetx = (width-itemWidth) / 2;
-		const float pxo = xo + offsetx;
-		int index = getItemAtXPositionRaw((int)(pxo - 10*xInertia));
-		int indexPos = index*itemWidth;
-
-		// Pick closest
-		float diff = (float)indexPos - pxo;
-		if (diff < -itemWidth/2) {
-			diff += itemWidth;
-			index++;
-			//indexPos += itemWidth;
-		}
-		if (Mth::abs(diff) < 1 && speed < 0.1f) {
-			selectedItem = getItemAtPosition(width/2, height/2);
-			return;
-		}
-
-		td.start = xo;
-		td.stop = xo + diff;
-		td.cur = 0;
-		td.dur = (float) Mth::Min(7, 1 + (int)(Mth::abs(diff) * 0.25f));
-		mode = 1;
-		//LOGI("inited-t %d\n", dragState);
-		tweenInited();
-	}
-}
-
-float WorldSelectionList::getPos( float alpha )
-{
-	if (mode != 1) return RolledSelectionListH::getPos(alpha);
-
-	float x0 = quadraticInOut(td.cur, td.dur, td.start, td.stop);
-	float x1 = quadraticInOut(td.cur+1, td.dur, td.start, td.stop);
-	return x0 + (x1-x0)*alpha;
-}
-
-bool WorldSelectionList::capXPosition() {
-	bool capped = RolledSelectionListH::capXPosition();
-	if (capped) mode = 0;
-	return capped;
-}
-
-void WorldSelectionList::tweenInited() {
-	float x0 = quadraticInOut(td.cur,   td.dur, td.start, td.stop);
-	float x1 = quadraticInOut(td.cur+1, td.dur, td.start, td.stop);
-	xInertia = x0-x1; // yes, it's all backwards and messed up..
 }
 
 //
-// Select World Screen
+// Select World Screen (Faithful Desktop Beta 1.7.3 GuiSelectWorld)
 //
 SelectWorldScreen::SelectWorldScreen()
-:	bDelete (1, "Delete"),
-	bCreate (2, "Create new"),
-	bBack   (3, "Back"),
-	bWorldView(4, ""),
+:	bSelect (1, "Play Selected World"),
+	bDelete (2, "Delete"),
+	bCreate (3, "Create New World"),
+	bRename (6, "Rename"),
+	bCancel (0, "Cancel"),
 	worldsList(NULL),
+	_mouseHasBeenUp(false),
 	_hasStartedLevel(false)
 {
+	bSelect.active = false;
+	bRename.active = false;
 	bDelete.active = false;
 }
 
@@ -242,48 +132,49 @@ SelectWorldScreen::~SelectWorldScreen()
 
 void SelectWorldScreen::buttonClicked(Button* button)
 {
-	if (button->id == bCreate.id) {
-		// open in-game world-creation screen instead of using platform dialog
-		if (!_hasStartedLevel) {
-		std::string name = getUniqueLevelName("world");
-		minecraft->setScreen(new SimpleChooseLevelScreen(name));
-	}
-	}
-	if (button->id == bDelete.id) {
+	if (button->id == bSelect.id) {
 		if (isIndexValid(worldsList->selectedItem)) {
-			LevelSummary level = worldsList->levels[worldsList->selectedItem];
-			LOGI("level: %s, %s\n", level.id.c_str(), level.name.c_str());
-			minecraft->setScreen( new DeleteWorldScreen(level) );
+			worldsList->hasPickedLevel = true;
+			worldsList->pickedLevel = worldsList->levels[worldsList->selectedItem];
 		}
 	}
-	if (button->id == bBack.id) {
+	else if (button->id == bCreate.id) {
+		if (!_hasStartedLevel) {
+			std::string name = getUniqueLevelName("World");
+			minecraft->setScreen(new SimpleChooseLevelScreen(name));
+		}
+	}
+	else if (button->id == bRename.id) {
+		if (isIndexValid(worldsList->selectedItem)) {
+			LevelSummary level = worldsList->levels[worldsList->selectedItem];
+			minecraft->setScreen(new RenameMPLevelScreen(level.id));
+		}
+	}
+	else if (button->id == bDelete.id) {
+		if (isIndexValid(worldsList->selectedItem)) {
+			LevelSummary level = worldsList->levels[worldsList->selectedItem];
+			minecraft->setScreen(new DeleteWorldScreen(level));
+		}
+	}
+	else if (button->id == bCancel.id) {
 		minecraft->cancelLocateMultiplayer();
 		minecraft->screenChooser.setScreen(SCREEN_STARTMENU);
-	}
-	if (button->id == bWorldView.id) {
-		// Try to "click" the item in the middle
-		worldsList->selectItem( worldsList->getItemAtPosition(width/2, height/2), false );
 	}
 }
 
 bool SelectWorldScreen::handleBackEvent(bool isDown)
 {
-	if (!isDown)
-	{
+	if (!isDown) {
 		minecraft->cancelLocateMultiplayer();
 		minecraft->screenChooser.setScreen(SCREEN_STARTMENU);
 	}
 	return true;
 }
 
-bool SelectWorldScreen::isIndexValid( int index )
+bool SelectWorldScreen::isIndexValid(int index)
 {
 	return worldsList && index >= 0 && index < worldsList->getNumberOfItems();
 }
-
-static char ILLEGAL_FILE_CHARACTERS[] = {
-	'/', '\n', '\r', '\t', '\0', '\f', '`', '?', '*', '\\', '<', '>', '|', '\"', ':'
-};
 
 void SelectWorldScreen::tick()
 {
@@ -300,16 +191,10 @@ void SelectWorldScreen::tick()
 		return;
 	}
 
-	// copy the currently selected item
-	LevelSummary selectedWorld;
-	//bool hasSelection = false;
-	if (isIndexValid(worldsList->selectedItem))
-	{
-		selectedWorld = worldsList->levels[worldsList->selectedItem];
-		//hasSelection = true;
-	}
-
-	bDelete.active = isIndexValid(worldsList->selectedItem);
+	bool hasSelection = isIndexValid(worldsList->selectedItem);
+	bSelect.active = hasSelection;
+	bRename.active = hasSelection;
+	bDelete.active = hasSelection;
 }
 
 void SelectWorldScreen::init()
@@ -318,74 +203,72 @@ void SelectWorldScreen::init()
 	loadLevelSource();
 	worldsList->commit();
 
-	buttons.push_back(&bDelete);
+	bSelect.msg = I18n::get("selectWorld.select");
+	bCreate.msg = I18n::get("selectWorld.create");
+	bRename.msg = I18n::get("selectWorld.rename");
+	bDelete.msg = I18n::get("selectWorld.delete");
+	bCancel.msg = I18n::get("gui.cancel");
+
+	buttons.clear();
+	tabButtons.clear();
+
+	buttons.push_back(&bSelect);
 	buttons.push_back(&bCreate);
-	buttons.push_back(&bBack);
+	buttons.push_back(&bRename);
+	buttons.push_back(&bDelete);
+	buttons.push_back(&bCancel);
+
+	tabButtons.push_back(&bSelect);
+	tabButtons.push_back(&bCreate);
+	tabButtons.push_back(&bRename);
+	tabButtons.push_back(&bDelete);
+	tabButtons.push_back(&bCancel);
 
 	_mouseHasBeenUp = !Mouse::getButtonState(MouseAction::ACTION_LEFT);
-
-	tabButtons.push_back(&bWorldView);
-	tabButtons.push_back(&bDelete);
-	tabButtons.push_back(&bCreate);
-	tabButtons.push_back(&bBack);
 }
 
-void SelectWorldScreen::setupPositions() {
-	int yBase = height - 28;
-
-	//#ifdef ANDROID
-	bCreate.y =	yBase;
-	bBack.y   = yBase;
-	bDelete.y = yBase;
-
-	bBack.width = bDelete.width = bCreate.width = 84;
-	//bDelete.h = bCreate.h = bBack.h = 24;
-	//#endif
-
-	// Center buttons
-	bDelete.x   = width / 2 - 4 - bDelete.width - bDelete.width / 2;
-	bCreate.x   = width / 2					- bCreate.width / 2;
-	bBack.x     = width / 2 + 4 + bCreate.width - bBack.width / 2;
-}
-
-void SelectWorldScreen::render( int xm, int ym, float a )
+void SelectWorldScreen::setupPositions()
 {
-	//Performance::watches.get("sws-full").start();
-	//Performance::watches.get("sws-renderbg").start();
-	renderBackground();
-	//Performance::watches.get("sws-renderbg").stop();
-	//Performance::watches.get("sws-worlds").start();
+	int yRow1 = height - 52;
+	int yRow2 = height - 28;
 
-	worldsList->setComponentSelected(bWorldView.selected);
-	// #ifdef PLATFORM_DESKTOP
+	bSelect.y = yRow1;
+	bCreate.y = yRow1;
+	bSelect.width = 150;
+	bCreate.width = 150;
+	bSelect.height = 20;
+	bCreate.height = 20;
+	bSelect.x = width / 2 - 154;
+	bCreate.x = width / 2 + 4;
 
-	// desktop: render the list normally (mouse wheel handled separately below)
+	bRename.y = yRow2;
+	bDelete.y = yRow2;
+	bCancel.y = yRow2;
+	bRename.width = 98;
+	bDelete.width = 98;
+	bCancel.width = 98;
+	bRename.height = 20;
+	bDelete.height = 20;
+	bCancel.height = 20;
+	bRename.x = width / 2 - 154;
+	bDelete.x = width / 2 - 49;
+	bCancel.x = width / 2 + 56;
+}
+
+void SelectWorldScreen::render(int xm, int ym, float a)
+{
+	renderDirtBackground(0);
+
 	if (_mouseHasBeenUp)
 		worldsList->render(xm, ym, a);
 	else {
 		worldsList->render(0, 0, a);
 		_mouseHasBeenUp = !Mouse::getButtonState(MouseAction::ACTION_LEFT);
 	}
-	// #else
-	// 	if (_mouseHasBeenUp)
-	// 	worldsList->render(xm, ym, a);
-	// 	else {
-	// 		worldsList->render(0, 0, a);
-	// 		_mouseHasBeenUp = !Mouse::getButtonState(MouseAction::ACTION_LEFT);
-	// 	}
-	// #endif
 
-	//Performance::watches.get("sws-worlds").stop();
-	//Performance::watches.get("sws-screen").start();
 	Screen::render(xm, ym, a);
-	//Performance::watches.get("sws-screen").stop();
 
-	//Performance::watches.get("sws-string").start();
-	drawCenteredString(minecraft->font, "Select world", width / 2, 8, 0xffffffff);
-	//Performance::watches.get("sws-string").stop();
-
-	//Performance::watches.get("sws-full").stop();
-	//Performance::watches.printEvery(128);
+	drawCenteredString(minecraft->font, I18n::get("selectWorld.title"), width / 2, 16, 0xffffffff);
 }
 
 void SelectWorldScreen::loadLevelSource()
@@ -396,54 +279,55 @@ void SelectWorldScreen::loadLevelSource()
 
 	for (unsigned int i = 0; i < levels.size(); ++i) {
 		if (levels[i].id != LevelStorageSource::TempLevelId)
-			worldsList->levels.push_back( levels[i] );
+			worldsList->levels.push_back(levels[i]);
 	}
 }
 
-
-std::string SelectWorldScreen::getUniqueLevelName( const std::string& level )
+std::string SelectWorldScreen::getUniqueLevelName(const std::string& level)
 {
 	std::set<std::string> Set;
 	for (unsigned int i = 0; i < levels.size(); ++i)
 		Set.insert(levels[i].id);
 
 	std::string s = level;
-	while ( Set.find(s) != Set.end() )
+	while (Set.find(s) != Set.end())
 		s += "-";
 	return s;
 }
 
-bool SelectWorldScreen::isInGameScreen() { return true;  }
+bool SelectWorldScreen::isInGameScreen() {
+	return true;
+}
 
 void SelectWorldScreen::mouseWheel(int dx, int dy, int xm, int ym)
 {
-	if (!worldsList)
+	if (!worldsList || dy == 0)
 		return;
-	if (dy == 0)
-		return;
-	int num = worldsList->getNumberOfItems();
-	int idx = worldsList->selectedItem;
-	if (dy > 0) {
-		if (idx > 0) {
-			idx--;
-			worldsList->stepLeft();
-		}
-	} else {
-		if (idx < num - 1) {
-			idx++;
-			worldsList->stepRight();
-		}
-	}
-	worldsList->selectedItem = idx;
+	worldsList->yo -= dy * 12;
+	worldsList->capYPosition();
 }
 
-void SelectWorldScreen::keyPressed( int eventKey )
+void SelectWorldScreen::keyPressed(int eventKey)
 {
-	if (bWorldView.selected) {
-		if (eventKey == minecraft->options.getIntValue(OPTIONS_KEY_RIGHT))
-			worldsList->stepLeft();
-		if (eventKey == minecraft->options.getIntValue(OPTIONS_KEY_LEFT))
-			worldsList->stepRight();
+	if (eventKey == Keyboard::KEY_ESCAPE) {
+		minecraft->cancelLocateMultiplayer();
+		minecraft->screenChooser.setScreen(SCREEN_STARTMENU);
+		return;
+	}
+	if (worldsList) {
+		int count = worldsList->getNumberOfItems();
+		if (eventKey == Keyboard::KEY_W) {
+			if (worldsList->selectedItem > 0)
+				worldsList->selectedItem--;
+		} else if (eventKey == Keyboard::KEY_S) {
+			if (worldsList->selectedItem < count - 1)
+				worldsList->selectedItem++;
+		} else if (eventKey == Keyboard::KEY_RETURN) {
+			if (isIndexValid(worldsList->selectedItem)) {
+				worldsList->hasPickedLevel = true;
+				worldsList->pickedLevel = worldsList->levels[worldsList->selectedItem];
+			}
+		}
 	}
 
 	Screen::keyPressed(eventKey);
@@ -453,15 +337,17 @@ void SelectWorldScreen::keyPressed( int eventKey )
 // Delete World Screen
 //
 DeleteWorldScreen::DeleteWorldScreen(const LevelSummary& level)
-:	ConfirmScreen(NULL, "Are you sure you want to delete this world?",
-						"'" + level.name + "' will be lost forever!",
-						"Delete", "Cancel", 0),
+:	ConfirmScreen(NULL,
+				  I18n::get("selectWorld.deleteQuestion"),
+				  "'" + level.name + "' " + I18n::get("selectWorld.deleteWarning"),
+				  I18n::get("selectWorld.deleteButton"),
+				  I18n::get("gui.cancel"), 0),
 	_level(level)
 {
 	tabButtonIndex = 1;
 }
 
-void DeleteWorldScreen::postResult( bool isOk )
+void DeleteWorldScreen::postResult(bool isOk)
 {
 	if (isOk) {
 		LevelStorageSource* storageSource = minecraft->getLevelSource();

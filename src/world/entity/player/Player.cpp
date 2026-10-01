@@ -825,6 +825,10 @@ void Player::openContainer(ChestTileEntity* container)
 {
 }
 
+void Player::openContainer(Container* container)
+{
+}
+
 void Player::tileEntityDestroyed( int tileEntityId ) {
 
 	//LOGI("TileEntityDestroyed, container: %p, %p\n", this, containerMenu);

@@ -167,6 +167,46 @@ void Font::draw( const std::string& str, float x, float y, int color )
 	draw(str, x, y, color, false);
 }
 
+static bool isColorCode(const std::string& str, unsigned int i, int& advance, int& colorIdx) {
+	static const std::string hex("0123456789abcdef");
+	if ((unsigned char)str[i] == 0xA7 && i + 1 < str.length()) {
+		int cc = hex.find((char)tolower((unsigned char)str[i + 1]));
+		if (cc >= 0 && cc < 16) {
+			advance = 2;
+			colorIdx = cc;
+			return true;
+		}
+	} else if ((unsigned char)str[i] == 0xC2 && i + 2 < str.length() && (unsigned char)str[i + 1] == 0xA7) {
+		int cc = hex.find((char)tolower((unsigned char)str[i + 2]));
+		if (cc >= 0 && cc < 16) {
+			advance = 3;
+			colorIdx = cc;
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool isColorCodeRaw(const char* str, int& advance, int& colorIdx) {
+	static const std::string hex("0123456789abcdef");
+	if ((unsigned char)str[0] == 0xA7 && str[1]) {
+		int cc = hex.find((char)tolower((unsigned char)str[1]));
+		if (cc >= 0 && cc < 16) {
+			advance = 2;
+			colorIdx = cc;
+			return true;
+		}
+	} else if ((unsigned char)str[0] == 0xC2 && (unsigned char)str[1] == 0xA7 && str[2]) {
+		int cc = hex.find((char)tolower((unsigned char)str[2]));
+		if (cc >= 0 && cc < 16) {
+			advance = 3;
+			colorIdx = cc;
+			return true;
+		}
+	}
+	return false;
+}
+
 void Font::draw( const char* str, float x, float y, int color )
 {
 	draw(str, x, y, color, false);
@@ -174,8 +214,11 @@ void Font::draw( const char* str, float x, float y, int color )
 
 void Font::draw( const char* str, float x, float y, int color, bool darken )
 {
+	if (!str) return;
 #ifdef USE_VBO
 	drawSlow(str, x, y, color, darken);
+#else
+	draw(std::string(str), x, y, color, darken);
 #endif
 }
 
@@ -202,15 +245,25 @@ void Font::draw( const std::string& str, float x, float y, int color, bool darke
 	if (a == 0) a = 1;
 	glColor4f2(r, g, b, a);
 
-	static const std::string hex("0123456789abcdef");
-
 	index = 0;
 	glPushMatrix2();
 	glTranslatef2((GLfloat)x, (GLfloat)y, 0.0f);
-	for (unsigned int i = 0; i < str.length(); i++) {
-		// Decode multibyte characters first: a UTF-8 trail byte may
-		// numerically equal '\xa7' (e.g. Ч = D0 A7) and must never be
-		// mistaken for a color code.
+	for (unsigned int i = 0; i < str.length(); ) {
+		int advance = 0, colorIdx = 0;
+		if (isColorCode(str, i, advance, colorIdx)) {
+			lists[index++] = listPos + 256 + colorIdx + (darken ? 16 : 0);
+			if (index == 1024) {
+				count = index;
+				index = 0;
+#ifndef USE_VBO
+				glCallLists(count, GL_UNSIGNED_INT, lists);
+#endif
+				count = 1024;
+			}
+			i += advance;
+			continue;
+		}
+
 		if ((unsigned char)str[i] >= 0x80) {
 			int cell = utf8Cell(str, i);
 			if (cell >= 0)
@@ -224,41 +277,21 @@ void Font::draw( const std::string& str, float x, float y, int color, bool darke
 #endif
 				count = 1024;
 			}
+			i++;
 		} else {
-			while (str.length() > i + 1 && str[i] == '\xa7') {
-				int cc = hex.find((char)tolower(str[i + 1]));
-				if (cc < 0 || cc > 15) cc = 15;
-				lists[index++] = listPos + 256 + cc + (darken ? 16 : 0);
-
-				if (index == 1024) {
-					count = index;
-					index = 0;
-#ifndef USE_VBO
-					glCallLists(count, GL_UNSIGNED_INT, lists);
-#endif
-					count = 1024;
-				}
-
-				i += 2;
+			char ch = str[i];
+			if (ch >= 0) {
+				lists[index++] = listPos + ch;
 			}
-
-			if (i < str.length()) {
-				//int ch = SharedConstants.acceptableLetters.indexOf(str.charAt(i));
-				char ch = str[i];
-				if (ch >= 0) {
-					//ib.put(listPos + ch + 32);
-					lists[index++] = listPos + ch;
-				}
-			}
-		}
-
-		if (index == 1024) {
-			count = index;
-			index = 0;
+			if (index == 1024) {
+				count = index;
+				index = 0;
 #ifndef USE_VBO
-			glCallLists(count, GL_UNSIGNED_INT, lists);
+				glCallLists(count, GL_UNSIGNED_INT, lists);
 #endif
-			count = 1024;
+				count = 1024;
+			}
+			i++;
 		}
 	}
 	count = index;
@@ -274,31 +307,30 @@ int Font::width( const std::string& str )
 	int maxLen = 0;
 	int len = 0;
 
-	for (unsigned int i = 0; i < str.length(); i++) {
+	for (unsigned int i = 0; i < str.length(); ) {
+		int advance = 0, colorIdx = 0;
+		if (isColorCode(str, i, advance, colorIdx)) {
+			i += advance;
+			continue;
+		}
+
 		if ((unsigned char)str[i] >= 0x80) {
-			// Multibyte character: measure the mapped cell, never the
-			// raw bytes (a trail byte like A7 in Ч must not count).
 			int cell = utf8Cell(str, i);
 			if (cell >= 0)
 				len += charWidths[cell];
-		} else if (str[i] == '\xa7') {
 			i++;
 		} else {
-			//int ch = SharedConstants.acceptableLetters.indexOf(str.charAt(i));
-			//if (ch >= 0) {
-			//    len += charWidths[ch + 32];
-			//}
 			if (str[i] == '\n') {
 				if (len > maxLen) maxLen = len;
 				len = 0;
-			}
-			else {
-				int charWidth = charWidths[ (unsigned char) str[i] ];
+			} else {
+				int charWidth = charWidths[(unsigned char)str[i]];
 				len += charWidth;
 			}
+			i++;
 		}
 	}
-	return maxLen>len? maxLen : len;
+	return maxLen > len ? maxLen : len;
 }
 
 int Font::height( const std::string& str ) {
@@ -319,24 +351,23 @@ std::string Font::sanitize( const std::string& str )
 	std::string sanitized(str.length() + 1, 0);
 	int j = 0;
 
-	for (unsigned int i = 0; i < str.length(); i++) {
+	for (unsigned int i = 0; i < str.length(); ) {
+		int advance = 0, colorIdx = 0;
+		if (isColorCode(str, i, advance, colorIdx)) {
+			i += advance;
+			continue;
+		}
+
 		if ((unsigned char)str[i] >= 0x80) {
-			// Multibyte character: copy whole so a trail byte like A7
-			// in Ч is never mistaken for a § color code.
 			unsigned char lead = str[i];
 			int cell = utf8Cell(str, i);
 			if (cell >= 0) {
-				// utf8Cell leaves i on the trail byte; copy both bytes.
 				sanitized[j++] = (char)lead;
 				sanitized[j++] = str[i];
 			}
-			// Unsupported script: drop the lead byte, the loop advance
-			// drops the trail byte right after.
-		} else if (str[i] == '\xa7') {
 			i++;
-			//} else if (SharedConstants.acceptableLetters.indexOf(str.charAt(i)) >= 0) {
 		} else {
-			sanitized[j++] = str[i];
+			sanitized[j++] = str[i++];
 		}
 	}
 	return sanitized.erase(j);
@@ -396,14 +427,25 @@ void Font::drawSlow( const char* str, float x, float y, int color, bool darken /
 	float yOffset = 0;
 
 	while (*str) {
+		int advance = 0, colorIdx = 0;
+		if (isColorCodeRaw(str, advance, colorIdx)) {
+			int br = ((colorIdx >> 3) & 1) * 0x55;
+			int cr = ((colorIdx >> 2) & 1) * 0xaa + br;
+			int cg = ((colorIdx >> 1) & 1) * 0xaa + br;
+			int cb = ((colorIdx >> 0) & 1) * 0xaa + br;
+			if (colorIdx == 6) cr += 0x55;
+			if (darken) { cr /= 4; cg /= 4; cb /= 4; }
+			t.color(cr, cg, cb, alpha);
+			str += advance;
+			continue;
+		}
+
 		unsigned char ch = (unsigned char)*str;
 		if (ch == '\n') {
 			xOffset = 0;
 			yOffset += lineHeight;
 			str++;
 		} else if (ch >= 0x80) {
-			// Same mapping as utf8Cell, on raw bytes (str is NUL
-			// terminated, so str[1] is always safe to read).
 			unsigned char c1 = (unsigned char)str[1];
 			int cell = -1;
 			int adv = 1;

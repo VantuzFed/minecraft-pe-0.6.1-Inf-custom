@@ -51,6 +51,8 @@ private:
 	OptionsScreen* m_screen;
 };
 
+#include <sstream>
+
 OptionsScreen::OptionsScreen()
 	: btnClose(NULL),
 	bHeader(NULL),
@@ -58,10 +60,78 @@ OptionsScreen::OptionsScreen()
 	currentOptionsGroup(NULL),
 	selectedCategory(0),
 	m_pendingOptionsRefresh(false),
+	bMusic(101, ""),
+	bSound(102, ""),
+	bInvertMouse(103, ""),
+	bSensitivity(104, ""),
+	bRenderDistance(105, ""),
+	bViewBobbing(106, ""),
+	bFramerate(107, ""),
+	b3DAnaglyph(108, ""),
+	bDifficulty(109, ""),
+	bGraphics(110, ""),
+	bSmoothLighting(111, ""),
+	bMenuStyle(112, ""),
+	bControls(113, ""),
+	bCreditsBeta(114, ""),
+	bDone(200, ""),
 	m_dragActive(false),
 	m_dragScrolling(false),
 	m_dragStartY(0),
 	m_dragStartScroll(0) {
+}
+
+bool OptionsScreen::isBetaStyle() const {
+	return minecraft && minecraft->options.getIntValue(OPTIONS_MENU_STYLE) == 2;
+}
+
+void OptionsScreen::updateBetaButtonTexts() {
+	Options& o = minecraft->options;
+
+	bMusic.msg = I18n::get("options.music") + ": " + (o.music > 0.05f ? I18n::get("options.on") : I18n::get("options.off"));
+	bSound.msg = I18n::get("options.sound") + ": " + (o.sound > 0.05f ? I18n::get("options.on") : I18n::get("options.off"));
+	bInvertMouse.msg = I18n::get("options.invertMouse") + ": " + (o.getIntValue(OPTIONS_INVERT_Y_MOUSE) ? I18n::get("options.on") : I18n::get("options.off"));
+
+	int sens = o.getIntValue(OPTIONS_SENSITIVITY);
+	{
+		std::stringstream ss;
+		ss << I18n::get("options.sensitivity") << ": " << (sens * 20) << "%";
+		bSensitivity.msg = ss.str();
+	}
+
+	int rd = o.getIntValue(OPTIONS_VIEW_DISTANCE);
+	std::string rdStr;
+	switch (rd) {
+		case 0: rdStr = I18n::get("options.renderDistance.far"); break;
+		case 1: rdStr = I18n::get("options.renderDistance.normal"); break;
+		case 2: rdStr = I18n::get("options.renderDistance.short"); break;
+		default: rdStr = I18n::get("options.renderDistance.tiny"); break;
+	}
+	bRenderDistance.msg = I18n::get("options.renderDistance") + ": " + rdStr;
+
+	bViewBobbing.msg = I18n::get("options.viewBobbing") + ": " + (o.getIntValue(OPTIONS_VIEW_BOBBING) ? I18n::get("options.on") : I18n::get("options.off"));
+	bFramerate.msg = I18n::get("options.framerateLimit") + ": " + (o.getIntValue(OPTIONS_LIMIT_FRAMERATE) ? I18n::get("options.on") : I18n::get("options.off"));
+	b3DAnaglyph.msg = I18n::get("options.anaglyph") + ": " + (o.getIntValue(OPTIONS_ANAGLYPH_3D) ? I18n::get("options.on") : I18n::get("options.off"));
+
+	int diff = o.getIntValue(OPTIONS_DIFFICULTY);
+	std::string diffStr;
+	switch (diff) {
+		case 0: diffStr = I18n::get("options.difficulty.peaceful"); break;
+		case 1: diffStr = I18n::get("options.difficulty.easy"); break;
+		case 2: diffStr = I18n::get("options.difficulty.normal"); break;
+		default: diffStr = I18n::get("options.difficulty.hard"); break;
+	}
+	bDifficulty.msg = I18n::get("options.difficulty") + ": " + diffStr;
+
+	bGraphics.msg = I18n::get("options.graphics") + ": " + (o.getIntValue(OPTIONS_FANCY_GRAPHICS) ? I18n::get("options.graphics.fancy") : I18n::get("options.graphics.fast"));
+	bSmoothLighting.msg = I18n::get("options.ao") + ": " + (o.getIntValue(OPTIONS_AMBIENT_OCCLUSION) ? I18n::get("options.on") : I18n::get("options.off"));
+
+	int style = o.getIntValue(OPTIONS_MENU_STYLE);
+	bMenuStyle.msg = I18n::get("options.menuStyle") + ": " + (style == 2 ? I18n::get("options.menuStyle.java") : I18n::get("options.menuStyle.pocket"));
+
+	bControls.msg = I18n::get("options.controls");
+	bCreditsBeta.msg = "Credits";
+	bDone.msg = I18n::get("gui.done");
 }
 
 OptionsScreen::~OptionsScreen() {
@@ -98,6 +168,32 @@ OptionsScreen::~OptionsScreen() {
 }
 
 void OptionsScreen::init() {
+	buttons.clear();
+	tabButtons.clear();
+
+	if (isBetaStyle()) {
+		updateBetaButtonTexts();
+
+		buttons.push_back(&bMusic);
+		buttons.push_back(&bSound);
+		buttons.push_back(&bInvertMouse);
+		buttons.push_back(&bSensitivity);
+		buttons.push_back(&bRenderDistance);
+		buttons.push_back(&bViewBobbing);
+		buttons.push_back(&bFramerate);
+		buttons.push_back(&b3DAnaglyph);
+		buttons.push_back(&bDifficulty);
+		buttons.push_back(&bGraphics);
+		buttons.push_back(&bSmoothLighting);
+		buttons.push_back(&bMenuStyle);
+		buttons.push_back(&bDone);
+
+		for (size_t i = 0; i < buttons.size(); i++) {
+			tabButtons.push_back(buttons[i]);
+		}
+		return;
+	}
+
 	bHeader = new Touch::THeader(0, "Options");
 
 	btnClose = new ImageButton(1, "");
@@ -110,12 +206,18 @@ void OptionsScreen::init() {
 	def.setSrc(IntRectangle(150, 0, (int)def.width, (int)def.height));
 	btnClose->setImageDef(def, true);
 
+	for (size_t i = 0; i < categoryButtons.size(); i++) {
+		if (categoryButtons[i]) delete categoryButtons[i];
+	}
+	categoryButtons.clear();
+
 	categoryButtons.push_back(new Touch::TButton(2, "General"));
 	categoryButtons.push_back(new Touch::TButton(3, "Game"));
 	categoryButtons.push_back(new Touch::TButton(4, "Controls"));
 	categoryButtons.push_back(new Touch::TButton(5, "Graphics"));
 	categoryButtons.push_back(new Touch::TButton(6, "Tweaks"));
 
+	if (btnCredits) delete btnCredits;
 	btnCredits = new Touch::TButton(11, "Credits");
 
 	buttons.push_back(bHeader);
@@ -127,12 +229,63 @@ void OptionsScreen::init() {
 		tabButtons.push_back(*it);
 	}
 
+	for (size_t i = 0; i < optionPanes.size(); i++) {
+		if (optionPanes[i]) delete optionPanes[i];
+	}
+	optionPanes.clear();
+	currentOptionsGroup = NULL;
+
 	generateOptionScreens();
 	// start with first category selected
 	selectCategory(0);
 }
 
 void OptionsScreen::setupPositions() {
+	if (isBetaStyle()) {
+		int totalRows = 6;
+		int totalH = totalRows * 24 + 32;
+		int startY = (height - totalH) / 2;
+		if (startY < 32) startY = 32;
+
+		int leftX = width / 2 - 155;
+		int rightX = width / 2 + 5;
+		int btnW = 150;
+		int btnH = 20;
+
+		// Row 0: Music / Sound
+		bMusic.x = leftX; bMusic.y = startY + 0 * 24; bMusic.width = btnW; bMusic.height = btnH;
+		bSound.x = rightX; bSound.y = startY + 0 * 24; bSound.width = btnW; bSound.height = btnH;
+
+		// Row 1: Invert Mouse / Sensitivity
+		bInvertMouse.x = leftX; bInvertMouse.y = startY + 1 * 24; bInvertMouse.width = btnW; bInvertMouse.height = btnH;
+		bSensitivity.x = rightX; bSensitivity.y = startY + 1 * 24; bSensitivity.width = btnW; bSensitivity.height = btnH;
+
+		// Row 2: Render Distance / View Bobbing
+		bRenderDistance.x = leftX; bRenderDistance.y = startY + 2 * 24; bRenderDistance.width = btnW; bRenderDistance.height = btnH;
+		bViewBobbing.x = rightX; bViewBobbing.y = startY + 2 * 24; bViewBobbing.width = btnW; bViewBobbing.height = btnH;
+
+		// Row 3: Performance (Framerate) / 3D Anaglyph
+		bFramerate.x = leftX; bFramerate.y = startY + 3 * 24; bFramerate.width = btnW; bFramerate.height = btnH;
+		b3DAnaglyph.x = rightX; b3DAnaglyph.y = startY + 3 * 24; b3DAnaglyph.width = btnW; b3DAnaglyph.height = btnH;
+
+		// Row 4: Difficulty / Graphics
+		bDifficulty.x = leftX; bDifficulty.y = startY + 4 * 24; bDifficulty.width = btnW; bDifficulty.height = btnH;
+		bGraphics.x = rightX; bGraphics.y = startY + 4 * 24; bGraphics.width = btnW; bGraphics.height = btnH;
+
+		// Row 5: Smooth Lighting / UI Style
+		bSmoothLighting.x = leftX; bSmoothLighting.y = startY + 5 * 24; bSmoothLighting.width = btnW; bSmoothLighting.height = btnH;
+		bMenuStyle.x = rightX; bMenuStyle.y = startY + 5 * 24; bMenuStyle.width = btnW; bMenuStyle.height = btnH;
+
+		// Done button
+		bDone.x = width / 2 - 100;
+		bDone.y = height - 28;
+		bDone.width = 200;
+		bDone.height = 20;
+
+		return;
+	}
+
+	if (!btnClose) return;
 	int buttonHeight = btnClose->height;
 
 	btnClose->x = width - btnClose->width;
@@ -179,6 +332,20 @@ void OptionsScreen::setupPositions() {
 
 
 void OptionsScreen::render(int xm, int ym, float a) {
+	if (isBetaStyle()) {
+		renderDirtBackground(0);
+
+		int totalRows = 6;
+		int totalH = totalRows * 24 + 32;
+		int startY = (height - totalH) / 2;
+		if (startY < 32) startY = 32;
+
+		drawCenteredString(minecraft->font, I18n::get("options.title"), width / 2, startY - 16, 0xffffffff);
+
+		Screen::render(xm, ym, a);
+		return;
+	}
+
 	renderBackground();
 
 	int xmm = xm * width / minecraft->width;
@@ -194,6 +361,83 @@ void OptionsScreen::removed() {
 }
 
 void OptionsScreen::buttonClicked(Button* button) {
+	if (isBetaStyle()) {
+		if (button->id == bDone.id) {
+			minecraft->options.save();
+			if (minecraft->screen != NULL) {
+				minecraft->setScreen(NULL);
+			} else {
+				minecraft->screenChooser.setScreen(SCREEN_STARTMENU);
+			}
+			return;
+		}
+		if (button->id == bMusic.id) {
+			minecraft->options.music = (minecraft->options.music > 0.05f) ? 0.0f : 1.0f;
+			minecraft->options.save();
+		}
+		else if (button->id == bSound.id) {
+			minecraft->options.sound = (minecraft->options.sound > 0.05f) ? 0.0f : 1.0f;
+			minecraft->options.save();
+		}
+		else if (button->id == bInvertMouse.id) {
+			bool val = minecraft->options.getIntValue(OPTIONS_INVERT_Y_MOUSE) != 0;
+			minecraft->options.set(OPTIONS_INVERT_Y_MOUSE, !val);
+			minecraft->options.save();
+		}
+		else if (button->id == bSensitivity.id) {
+			int sens = minecraft->options.getIntValue(OPTIONS_SENSITIVITY);
+			sens = (sens + 1) % 6;
+			if (sens == 0) sens = 1;
+			minecraft->options.set(OPTIONS_SENSITIVITY, sens);
+			minecraft->options.save();
+		}
+		else if (button->id == bRenderDistance.id) {
+			int rd = (minecraft->options.getIntValue(OPTIONS_VIEW_DISTANCE) + 1) % 4;
+			minecraft->options.set(OPTIONS_VIEW_DISTANCE, rd);
+			minecraft->options.save();
+		}
+		else if (button->id == bViewBobbing.id) {
+			bool val = minecraft->options.getIntValue(OPTIONS_VIEW_BOBBING) != 0;
+			minecraft->options.set(OPTIONS_VIEW_BOBBING, !val);
+			minecraft->options.save();
+		}
+		else if (button->id == bFramerate.id) {
+			bool val = minecraft->options.getIntValue(OPTIONS_LIMIT_FRAMERATE) != 0;
+			minecraft->options.set(OPTIONS_LIMIT_FRAMERATE, !val);
+			minecraft->options.save();
+		}
+		else if (button->id == b3DAnaglyph.id) {
+			bool val = minecraft->options.getIntValue(OPTIONS_ANAGLYPH_3D) != 0;
+			minecraft->options.set(OPTIONS_ANAGLYPH_3D, !val);
+			minecraft->options.save();
+		}
+		else if (button->id == bDifficulty.id) {
+			int diff = (minecraft->options.getIntValue(OPTIONS_DIFFICULTY) + 1) % 4;
+			minecraft->options.set(OPTIONS_DIFFICULTY, diff);
+			minecraft->options.save();
+		}
+		else if (button->id == bGraphics.id) {
+			bool val = minecraft->options.getIntValue(OPTIONS_FANCY_GRAPHICS) != 0;
+			minecraft->options.set(OPTIONS_FANCY_GRAPHICS, !val);
+			minecraft->options.save();
+		}
+		else if (button->id == bSmoothLighting.id) {
+			bool val = minecraft->options.getIntValue(OPTIONS_AMBIENT_OCCLUSION) != 0;
+			minecraft->options.set(OPTIONS_AMBIENT_OCCLUSION, !val);
+			minecraft->options.save();
+		}
+		else if (button->id == bMenuStyle.id) {
+			int cur = minecraft->options.getIntValue(OPTIONS_MENU_STYLE);
+			int next = (cur == 2) ? 0 : 2;
+			minecraft->options.set(OPTIONS_MENU_STYLE, next);
+			minecraft->options.save();
+			refreshOptions();
+			return;
+		}
+		updateBetaButtonTexts();
+		return;
+	}
+
 	if (button == btnClose) {
 		minecraft->options.save();
 		if (minecraft->screen != NULL) {
@@ -213,7 +457,6 @@ void OptionsScreen::buttonClicked(Button* button) {
 
 void OptionsScreen::applyVisualPreset(bool beta) {
 	Options& o = minecraft->options;
-	// One click bundles the scattered beta/PE-look settings.
 	o.set(OPTIONS_FOLIAGE_TINT, true);
 	o.set(OPTIONS_TINTED_SIDE, beta);
 	o.set(OPTIONS_JAVA_HUD, beta);
@@ -225,25 +468,12 @@ void OptionsScreen::applyVisualPreset(bool beta) {
 	o.set(OPTIONS_RESTORED_ANIMS, beta);
 	o.set(OPTIONS_MENU_STYLE, beta ? 2 : 0);
 	o.save();
-	// The option rows show the new values only after a rebuild; do it on
-	// the next tick, never from inside event dispatch (the firing button
-	// lives in the group being rebuilt).
 	m_pendingOptionsRefresh = true;
 }
 
 void OptionsScreen::refreshOptions() {
 	m_pendingOptionsRefresh = false;
-	int category = selectedCategory;
-	for (std::vector<OptionsGroup*>::iterator it = optionPanes.begin(); it != optionPanes.end(); ++it) {
-		if (*it != NULL) {
-			delete* it;
-			*it = NULL;
-		}
-	}
-	optionPanes.clear();
-	currentOptionsGroup = NULL;
-	generateOptionScreens();
-	selectCategory(category);
+	init();
 	setupPositions();
 }
 
@@ -284,7 +514,6 @@ void OptionsScreen::generateOptionScreens() {
 
 	// General Pane
 	optionPanes[0]->addOptionItem(OPTIONS_USERNAME, minecraft)
-		.addOptionItem(OPTIONS_LANGUAGE, minecraft)
 		.addOptionItem(OPTIONS_SENSITIVITY, minecraft);
 
 	// Game Pane
@@ -353,6 +582,11 @@ void OptionsScreen::generateOptionScreens() {
 }
 
 void OptionsScreen::mouseClicked(int x, int y, int buttonNum) {
+	if (isBetaStyle()) {
+		super::mouseClicked(x, y, buttonNum);
+		return;
+	}
+
 	if (currentOptionsGroup != NULL)
 		currentOptionsGroup->mouseClicked(minecraft, x, y, buttonNum);
 
@@ -375,6 +609,11 @@ void OptionsScreen::mouseClicked(int x, int y, int buttonNum) {
 }
 
 void OptionsScreen::mouseReleased(int x, int y, int buttonNum) {
+	if (isBetaStyle()) {
+		super::mouseReleased(x, y, buttonNum);
+		return;
+	}
+
 	if (currentOptionsGroup != NULL)
 		currentOptionsGroup->mouseReleased(minecraft, x, y, buttonNum);
 
@@ -385,6 +624,7 @@ void OptionsScreen::mouseReleased(int x, int y, int buttonNum) {
 }
 
 void OptionsScreen::mouseWheel(int dx, int dy, int xm, int ym) {
+	if (isBetaStyle()) return;
 	if (currentOptionsGroup == NULL) return;
 	if (dy == 0 && dx == 0) return;
 	// GLFW: dy > 0 = wheel up. Scrolling up shows earlier items (scrollY down).
@@ -394,6 +634,20 @@ void OptionsScreen::mouseWheel(int dx, int dy, int xm, int ym) {
 }
 
 void OptionsScreen::keyPressed(int eventKey) {
+	if (isBetaStyle()) {
+		if (eventKey == Keyboard::KEY_ESCAPE) {
+			minecraft->options.save();
+			if (minecraft->screen != NULL) {
+				minecraft->setScreen(NULL);
+			} else {
+				minecraft->screenChooser.setScreen(SCREEN_STARTMENU);
+			}
+			return;
+		}
+		super::keyPressed(eventKey);
+		return;
+	}
+
 	if (currentOptionsGroup != NULL)
 		currentOptionsGroup->keyPressed(minecraft, eventKey);
 	if (eventKey == Keyboard::KEY_ESCAPE) 
@@ -403,6 +657,7 @@ void OptionsScreen::keyPressed(int eventKey) {
 }
 
 void OptionsScreen::charPressed(char inputChar) {
+	if (isBetaStyle()) return;
 	if (currentOptionsGroup != NULL)
 		currentOptionsGroup->charPressed(minecraft, inputChar);
 
@@ -410,9 +665,13 @@ void OptionsScreen::charPressed(char inputChar) {
 }
 
 void OptionsScreen::tick() {
-
 	if (m_pendingOptionsRefresh)
 		refreshOptions();
+
+	if (isBetaStyle()) {
+		super::tick();
+		return;
+	}
 
 	if (currentOptionsGroup != NULL)
 		currentOptionsGroup->tick(minecraft);

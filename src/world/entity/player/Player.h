@@ -17,6 +17,7 @@ class FillingContainer;
 class FurnaceTileEntity;
 class CompoundTag;
 class ChestTileEntity;
+class Container;
 class BaseContainerMenu;
 class TileEntity;
 class BedSleepingResult {
@@ -117,6 +118,7 @@ public:
 	virtual void startStonecutting(int x, int y, int z);
 
 	virtual void openContainer(ChestTileEntity* container);
+	virtual void openContainer(Container* container);
 	virtual void openFurnace(FurnaceTileEntity* e);
 	void tileEntityDestroyed( int tileEntityId );
 

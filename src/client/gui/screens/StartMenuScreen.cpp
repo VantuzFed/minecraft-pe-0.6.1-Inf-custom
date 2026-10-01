@@ -20,6 +20,7 @@
 #include "SimpleChooseLevelScreen.h"
 #include "../../renderer/Textures.h"
 #include "../../../SharedConstants.h"
+#include "../../../locale/I18n.h"
 
 // Some kind of default settings, might be overridden in ::init
 StartMenuScreen::StartMenuScreen()
@@ -37,15 +38,15 @@ StartMenuScreen::~StartMenuScreen()
 void StartMenuScreen::init()
 {
 	if (minecraft->options.getIntValue(OPTIONS_MENU_STYLE) == 2){
-		bHost = new Button(    2, 0, 0, 200, 20, "Singleplayer");
-		bJoin = new Button(    3, 0, 0, 200, 20, "Multiplayer");
-		bOptions = new Button( 4, 0, 0, 200, 20, "Options...");
-		bQuit = new Button( 5, 0, 0, 200, 20, "Ouit Game");
+		bHost = new Button(    2, 0, 0, 200, 20, I18n::get("menu.singleplayer"));
+		bJoin = new Button(    3, 0, 0, 200, 20, I18n::get("menu.multiplayer"));
+		bOptions = new Button( 4, 0, 0, 200, 20, I18n::get("menu.options"));
+		bQuit = new Button( 5, 0, 0, 200, 20, I18n::get("menu.quit"));
 	} else {
 		bHost = new Button(    2, 0, 0, 160, 24, "Start Game");
 		bJoin = new Button(    3, 0, 0, 160, 24, "Join Game");
 		bOptions = new Button( 4, 0, 0, 160, 24, "Options");
-		bQuit = new Button( 5, 0, 0, 160, 24, "Ouit Game");
+		bQuit = new Button( 5, 0, 0, 160, 24, "Quit Game");
 	}
 	bJoin->active = bHost->active = bOptions->active = true;
 
