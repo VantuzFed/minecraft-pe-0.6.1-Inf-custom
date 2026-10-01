@@ -406,6 +406,9 @@ void BetaInventoryScreen::renderPlayerModel(float xo, float yo) {
 	float oybr = player->yBodyRot;
 	float oyr = player->yRot;
 	float oxr = player->xRot;
+	float oybrO = player->yBodyRotO;
+	float oyrO = player->yRotO;
+	float oxrO = player->xRotO;
 
 	float t = getTimeS();
 	float xd = 10 * Mth::sin(t);
@@ -416,9 +419,9 @@ void BetaInventoryScreen::renderPlayerModel(float xo, float yo) {
 
 	glRotatef(ytan, 1, 0, 0);
 
-	player->yBodyRot = xtan;
-	player->yRot = xtan + xtan;
-	player->xRot = ytan;
+	player->yBodyRot = player->yBodyRotO = xtan;
+	player->yRot = player->yRotO = xtan + xtan;
+	player->xRot = player->xRotO = ytan;
 	glTranslatef(0, player->heightOffset, 0);
 
 	float oldWAP = player->walkAnimPos;
@@ -439,6 +442,9 @@ void BetaInventoryScreen::renderPlayerModel(float xo, float yo) {
 	player->yBodyRot = oybr;
 	player->yRot = oyr;
 	player->xRot = oxr;
+	player->yBodyRotO = oybrO;
+	player->yRotO = oyrO;
+	player->xRotO = oxrO;
 
 	// Restore whatever the GUI/world had: slots and labels need blend
 	// and texture, the world behind needs its depth test and lighting.
@@ -474,9 +480,11 @@ void BetaInventoryScreen::render(int xm, int ym, float a) {
 		blit(px, py, 0, 0, 176, 166);
 	}
 
-	drawString(minecraft->font, "Crafting", px + 86, py + 16, 0xffe0e0e0);
+	drawString(minecraft->font, "Crafting", px + 86, py + 16, 0xffffffff);
 
+	glClear(GL_DEPTH_BUFFER_BIT);
 	renderPlayerModel((float)(px + 51), (float)(py + 75));
+	glClear(GL_DEPTH_BUFFER_BIT);
 
 	for (int i = 0; i <= 44; i++) {
 		int sx, sy;
@@ -485,12 +493,8 @@ void BetaInventoryScreen::render(int xm, int ym, float a) {
 		int x0 = px + sx, y0 = py + sy;
 		ItemInstance* it = getSlotItem(i);
 		if (it && !it->isNull()) {
-			ItemRenderer::renderGuiItem(minecraft->font, minecraft->textures, it, (float)(x0 + 1), (float)(y0 + 1), true);
-			if (it->count > 1) {
-				char buf[16];
-				sprintf(buf, "%d", it->count);
-				minecraft->font->drawShadow(buf, (float)(x0 + 17 - minecraft->font->width(buf)), (float)(y0 + 9), 0xffffffff);
-			}
+			ItemRenderer::renderGuiItem(minecraft->font, minecraft->textures, it, (float)x0, (float)y0, true);
+			ItemRenderer::renderGuiItemDecorations(minecraft->font, minecraft->textures, it, x0, y0);
 		}
 	}
 
@@ -499,16 +503,12 @@ void BetaInventoryScreen::render(int xm, int ym, float a) {
 	if (hover >= 0) {
 		int sx, sy;
 		if (slotPos(hover, sx, sy))
-			fill(px + sx + 1, py + sy + 1, px + sx + 17, py + sy + 17, 0x80ffffff);
+			fill(px + sx, py + sy, px + sx + 16, py + sy + 16, 0x80ffffff);
 	}
 
 	if (hasCarried && !carried.isNull()) {
 		ItemRenderer::renderGuiItem(minecraft->font, minecraft->textures, &carried, (float)(mx - 8), (float)(my - 8), true);
-		if (carried.count > 1) {
-			char buf[16];
-			sprintf(buf, "%d", carried.count);
-			minecraft->font->drawShadow(buf, (float)(mx + 8 - minecraft->font->width(buf)), (float)(my + 1), 0xffffffff);
-		}
+		ItemRenderer::renderGuiItemDecorations(minecraft->font, minecraft->textures, &carried, mx - 8, my - 8);
 	}
 
 	super::render(xm, ym, a);

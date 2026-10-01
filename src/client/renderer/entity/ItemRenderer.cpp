@@ -243,20 +243,15 @@ void ItemRenderer::renderGuiItemDecorations(Font* font, Textures* textures, Item
 		if (item->isDamaged()) {
 			float p = std::floor(13.5f - (float) item->getDamageValue() * 13.0f / (float) item->getMaxDamage() + 0.5);
 		    int cc = (int) std::floor(255.5f - (float) item->getDamageValue() * 255.0f / (float) item->getMaxDamage() + 0.5);
-			//			glDisable(GL_LIGHTING);
-			//			glDisable(GL_DEPTH_TEST);
-			//			glDisable(GL_TEXTURE_2D);
-			//            auto var8 = ::net::minecraft::client::renderer::Tesselator::instance();
+			glDisable2(GL_TEXTURE_2D);
 			Tesselator& t = Tesselator::instance;
 			int ca = ((255 - cc)<< 16 | (cc << 8));
 			int cb = (((255 - cc) / 4) << 16 | 16128);
 			fillRect(t, x + 2, y + 13, 13, 2, 0);
 			fillRect(t, x + 2, y + 13, 12, 1, cb);
 			fillRect(t, x + 2, y + 13, p, 1, ca);
-			//			glEnable(GL_TEXTURE_2D);
-			//			glEnable(GL_LIGHTING);
-			//			glEnable(GL_DEPTH_TEST);
-			glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+			glEnable2(GL_TEXTURE_2D);
+			glColor4f2(1.0f, 1.0f, 1.0f, 1.0f);
 		}
 	}
 }
@@ -266,9 +261,7 @@ void ItemRenderer::renderGuiItemDecorations(const ItemInstance* item, float x, f
 	if (item->count > 0 && item->isDamaged()) {
 		float p = std::floor(13.5f - (float) item->getDamageValue() * 13.0f / (float) item->getMaxDamage());
 		int cc = (int) std::floor(255.5f - (float) item->getDamageValue() * 255.0f / (float) item->getMaxDamage());
-		//glDisable(GL_LIGHTING);
-		//glDisable(GL_DEPTH_TEST);
-		//glDisable(GL_TEXTURE_2D);
+		glDisable2(GL_TEXTURE_2D);
 
 		Tesselator& t = Tesselator::instance;
 
@@ -278,9 +271,7 @@ void ItemRenderer::renderGuiItemDecorations(const ItemInstance* item, float x, f
 		fillRect(t, x + 2, y + 13, 12, 1, cb);
 		fillRect(t, x + 2, y + 13, p, 1, ca);
 
-		//glEnable(GL_TEXTURE_2D);
-		//glEnable(GL_LIGHTING);
-		//glEnable(GL_DEPTH_TEST);
+		glEnable2(GL_TEXTURE_2D);
 		glColor4f2(1, 1, 1, 1);
 	}
 }

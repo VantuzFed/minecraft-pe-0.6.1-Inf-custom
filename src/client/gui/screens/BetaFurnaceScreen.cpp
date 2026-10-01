@@ -281,8 +281,8 @@ void BetaFurnaceScreen::render(int xm, int ym, float a) {
 		blit(px, py, 0, 0, 176, 166);
 	}
 
-	drawString(minecraft->font, I18n::get("container.furnace"), px + 56, py + 6, 0xffe0e0e0);
-	drawString(minecraft->font, I18n::get("container.inventory"), px + 8, py + 72, 0xffe0e0e0);
+	drawString(minecraft->font, I18n::get("container.furnace"), px + 56, py + 6, 0xffffffff);
+	drawString(minecraft->font, I18n::get("container.inventory"), px + 8, py + 72, 0xffffffff);
 
 	// Flame: 14px tall, burns bottom-up. Arrow: 24px wide, fills left-right.
 	if (furnace && !furnaceGone()) {
@@ -301,12 +301,8 @@ void BetaFurnaceScreen::render(int xm, int ym, float a) {
 		int x0 = px + sx, y0 = py + sy;
 		ItemInstance* it = getSlotItem(i);
 		if (it && !it->isNull()) {
-			ItemRenderer::renderGuiItem(minecraft->font, minecraft->textures, it, (float)(x0 + 1), (float)(y0 + 1), true);
-			if (it->count > 1) {
-				char buf[16];
-				sprintf(buf, "%d", it->count);
-				minecraft->font->drawShadow(buf, (float)(x0 + 17 - minecraft->font->width(buf)), (float)(y0 + 9), 0xffffffff);
-			}
+			ItemRenderer::renderGuiItem(minecraft->font, minecraft->textures, it, (float)x0, (float)y0, true);
+			ItemRenderer::renderGuiItemDecorations(minecraft->font, minecraft->textures, it, x0, y0);
 		}
 	}
 
@@ -314,16 +310,12 @@ void BetaFurnaceScreen::render(int xm, int ym, float a) {
 	if (hover >= 0) {
 		int sx, sy;
 		if (slotPos(hover, sx, sy))
-			fill(px + sx + 1, py + sy + 1, px + sx + 17, py + sy + 17, 0x80ffffff);
+			fill(px + sx, py + sy, px + sx + 16, py + sy + 16, 0x80ffffff);
 	}
 
 	if (hasCarried && !carried.isNull()) {
 		ItemRenderer::renderGuiItem(minecraft->font, minecraft->textures, &carried, (float)(mx - 8), (float)(my - 8), true);
-		if (carried.count > 1) {
-			char buf[16];
-			sprintf(buf, "%d", carried.count);
-			minecraft->font->drawShadow(buf, (float)(mx + 8 - minecraft->font->width(buf)), (float)(my + 1), 0xffffffff);
-		}
+		ItemRenderer::renderGuiItemDecorations(minecraft->font, minecraft->textures, &carried, mx - 8, my - 8);
 	}
 
 	super::render(xm, ym, a);

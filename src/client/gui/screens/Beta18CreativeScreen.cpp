@@ -16,7 +16,7 @@
 #include <cstdio>
 
 Beta18CreativeScreen::Beta18CreativeScreen()
-	: hasCarried(false), scroll(0.0f),
+	: hasCarried(false), scroll(0.0f), isScrolling(false), wasMouseDown(false),
 	  pressed(false), pressSlot(-1), pressButton(0), pressPickedUp(false) {
 	for (int i = 0; i < VIEW_SIZE; i++)
 		viewport[i].setNull();
@@ -322,12 +322,16 @@ void Beta18CreativeScreen::mouseClicked(int x, int y, int buttonNum) {
 	Player* player = minecraft ? minecraft->player : NULL;
 	bool shift = Keyboard::isKeyDown(Keyboard::KEY_LSHIFT);
 
-	// Scrollbar track jump (no drag-motion events in this engine, so a
-	// click jumps; the wheel scrolls row by row like the original).
+	// Scrollbar track click & drag
 	{
 		int px = panelX(), py = panelY();
-		if (x >= px + 154 && x < px + 170 && y >= py + 17 && y < py + 179) {
-			float g = (float)(y - (py + 25)) / 146.0f;
+		int trackX = px + 154;
+		int trackY = py + 17;
+		int trackW = 16;
+		int trackH = 160;
+		if (buttonNum == MouseAction::ACTION_LEFT && x >= trackX && x < trackX + trackW && y >= trackY && y < trackY + trackH) {
+			isScrolling = true;
+			float g = ((float)(y - trackY) - 7.5f) / ((float)trackH - 15.0f);
 			setScroll(g);
 			pressSlot = -2;
 			return;
@@ -475,6 +479,9 @@ void Beta18CreativeScreen::mouseClicked(int x, int y, int buttonNum) {
 }
 
 void Beta18CreativeScreen::mouseReleased(int x, int y, int buttonNum) {
+	if (buttonNum == MouseAction::ACTION_LEFT) {
+		isScrolling = false;
+	}
 	if (!pressed || buttonNum != pressButton) {
 		pressed = false;
 		return;
@@ -536,6 +543,25 @@ void Beta18CreativeScreen::render(int xm, int ym, float a) {
 	int my = ym - 1;
 	int px = panelX(), py = panelY();
 
+	int trackX = px + 154;
+	int trackY = py + 17;
+	int trackW = 16;
+	int trackH = 160;
+
+	bool isDown = Mouse::isButtonDown(MouseAction::ACTION_LEFT);
+	if (!wasMouseDown && isDown && xm >= trackX && xm < trackX + trackW && ym >= trackY && ym < trackY + trackH) {
+		isScrolling = true;
+	}
+	if (!isDown) {
+		isScrolling = false;
+	}
+	wasMouseDown = isDown;
+
+	if (isScrolling) {
+		float g = ((float)(ym - trackY) - 7.5f) / ((float)trackH - 15.0f);
+		setScroll(g);
+	}
+
 	TextureId bg = minecraft->textures->loadTexture("gui/allitems.png");
 	if (Textures::isTextureIdValid(bg)) {
 		minecraft->textures->bind(bg);
@@ -543,7 +569,7 @@ void Beta18CreativeScreen::render(int xm, int ym, float a) {
 		blit(px, py, 0, 0, PANEL_W, PANEL_H);
 	}
 
-	drawString(minecraft->font, "Item selection", px + 8, py + 6, 0xffe0e0e0);
+	drawString(minecraft->font, "Item selection", px + 8, py + 6, 0xffffffff);
 
 	for (int i = 0; i <= 80; i++) {
 		int sx, sy;
@@ -552,12 +578,8 @@ void Beta18CreativeScreen::render(int xm, int ym, float a) {
 		int x0 = px + sx, y0 = py + sy;
 		ItemInstance* it = getSlotItem(i);
 		if (it && !it->isNull()) {
-			ItemRenderer::renderGuiItem(minecraft->font, minecraft->textures, it, (float)(x0 + 1), (float)(y0 + 1), true);
-			if (it->count > 1) {
-				char buf[16];
-				sprintf(buf, "%d", it->count);
-				minecraft->font->drawShadow(buf, (float)(x0 + 17 - minecraft->font->width(buf)), (float)(y0 + 9), 0xffffffff);
-			}
+			ItemRenderer::renderGuiItem(minecraft->font, minecraft->textures, it, (float)x0, (float)y0, true);
+			ItemRenderer::renderGuiItemDecorations(minecraft->font, minecraft->textures, it, x0, y0);
 		}
 	}
 
@@ -565,16 +587,12 @@ void Beta18CreativeScreen::render(int xm, int ym, float a) {
 	if (hover >= 0) {
 		int sx, sy;
 		if (slotPos(hover, sx, sy))
-			fill(px + sx + 1, py + sy + 1, px + sx + 17, py + sy + 17, 0x80ffffff);
+			fill(px + sx, py + sy, px + sx + 16, py + sy + 16, 0x80ffffff);
 	}
 
 	if (hasCarried && !carried.isNull()) {
 		ItemRenderer::renderGuiItem(minecraft->font, minecraft->textures, &carried, (float)(mx - 8), (float)(my - 8), true);
-		if (carried.count > 1) {
-			char buf[16];
-			sprintf(buf, "%d", carried.count);
-			minecraft->font->drawShadow(buf, (float)(mx + 8 - minecraft->font->width(buf)), (float)(my + 1), 0xffffffff);
-		}
+		ItemRenderer::renderGuiItemDecorations(minecraft->font, minecraft->textures, &carried, mx - 8, my - 8);
 	}
 
 	// Scrollbar thumb, like the original (16x16 at v=208).
@@ -583,7 +601,7 @@ void Beta18CreativeScreen::render(int xm, int ym, float a) {
 		if (Textures::isTextureIdValid(bg2)) {
 			minecraft->textures->bind(bg2);
 			glColor4f2(1, 1, 1, 1);
-			int ty = py + 17 + (int)(145.0f * scroll);
+			int ty = py + 18 + (int)(145.0f * scroll);
 			blit(px + 154, ty, 0, 208, 16, 16);
 		}
 	}

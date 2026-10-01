@@ -126,10 +126,7 @@ void Gui::render(float a, bool mouseFree, int xMouse, int yMouse) {
 		glEnable(GL_ALPHA_TEST);
 		glEnable(GL_DEPTH_TEST);
 	}
-	// The beta inventory screen draws its own slots (with its own
-	// hotbar row); the PE hotbar underneath would double-render.
-	bool invOpen = dynamic_cast<BetaInventoryScreen*>(minecraft->screen) != NULL;
-	if (!minecraft->options.getBooleanValue(OPTIONS_HIDEGUI) && !invOpen) {
+	if (!minecraft->options.getBooleanValue(OPTIONS_HIDEGUI)) {
 		renderToolBar(a, ySlot, screenWidth);
 
 	//	font->drawShadow("Minecraft - Pocket Edition ", 2, 2, 0xffffffff);

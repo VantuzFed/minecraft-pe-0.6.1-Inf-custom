@@ -65,6 +65,8 @@ private:
 	bool hasCarried;
 
 	float scroll;
+	bool isScrolling;
+	bool wasMouseDown;
 	bool pressed;
 	int pressSlot;
 	int pressButton;
