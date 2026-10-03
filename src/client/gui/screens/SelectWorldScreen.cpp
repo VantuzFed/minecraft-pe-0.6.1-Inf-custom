@@ -229,30 +229,36 @@ void SelectWorldScreen::init()
 
 void SelectWorldScreen::setupPositions()
 {
+	if (worldsList) {
+		worldsList->setSize(width, height, 0, width, 32, height - 64);
+	}
+
 	int yRow1 = height - 52;
 	int yRow2 = height - 28;
 
+	int row1BtnW = Mth::Min(150, (width - 24) / 2);
 	bSelect.y = yRow1;
 	bCreate.y = yRow1;
-	bSelect.width = 150;
-	bCreate.width = 150;
+	bSelect.width = row1BtnW;
+	bCreate.width = row1BtnW;
 	bSelect.height = 20;
 	bCreate.height = 20;
-	bSelect.x = width / 2 - 154;
+	bSelect.x = width / 2 - row1BtnW - 4;
 	bCreate.x = width / 2 + 4;
 
+	int row2BtnW = Mth::Min(98, (width - 24) / 3);
 	bRename.y = yRow2;
 	bDelete.y = yRow2;
 	bCancel.y = yRow2;
-	bRename.width = 98;
-	bDelete.width = 98;
-	bCancel.width = 98;
+	bRename.width = row2BtnW;
+	bDelete.width = row2BtnW;
+	bCancel.width = row2BtnW;
 	bRename.height = 20;
 	bDelete.height = 20;
 	bCancel.height = 20;
-	bRename.x = width / 2 - 154;
-	bDelete.x = width / 2 - 49;
-	bCancel.x = width / 2 + 56;
+	bRename.x = width / 2 - (row2BtnW * 3 + 8) / 2;
+	bDelete.x = bRename.x + row2BtnW + 4;
+	bCancel.x = bDelete.x + row2BtnW + 4;
 }
 
 void SelectWorldScreen::render(int xm, int ym, float a)

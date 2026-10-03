@@ -913,6 +913,7 @@ void GameRenderer::unZoomRegion()
 
 void GameRenderer::setupGuiScreen( bool clearColorBuffer )
 {
+	glViewport(0, 0, mc->width, mc->height);
 	int screenWidth = (int)(mc->width * Gui::InvGuiScale);
 	int screenHeight = (int)(mc->height * Gui::InvGuiScale);
 

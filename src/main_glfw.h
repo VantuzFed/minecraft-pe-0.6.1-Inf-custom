@@ -66,7 +66,18 @@ void character_callback(GLFWwindow* window, unsigned int codepoint) {
 	}
 }
 
+static void scaleCursorToFramebuffer(GLFWwindow* window, double& xpos, double& ypos) {
+	int winW = 0, winH = 0, fbW = 0, fbH = 0;
+	glfwGetWindowSize(window, &winW, &winH);
+	glfwGetFramebufferSize(window, &fbW, &fbH);
+	if (winW > 0 && winH > 0 && (winW != fbW || winH != fbH)) {
+		xpos *= ((double)fbW / winW);
+		ypos *= ((double)fbH / winH);
+	}
+}
+
 static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
+	scaleCursorToFramebuffer(window, xpos, ypos);
 	static double lastX = 0.0, lastY = 0.0;
 	static bool firstMouse = true;
 
@@ -95,6 +106,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
 	double xpos, ypos;
 	glfwGetCursorPos(window, &xpos, &ypos);
+	scaleCursorToFramebuffer(window, xpos, ypos);
 
 	if (button == GLFW_MOUSE_BUTTON_LEFT) {
 		Mouse::feed( MouseAction::ACTION_LEFT, action, xpos, ypos);
@@ -109,12 +121,19 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 	double xpos, ypos;
 	glfwGetCursorPos(window, &xpos, &ypos);
+	scaleCursorToFramebuffer(window, xpos, ypos);
 
 	Mouse::feed(3, 0, xpos, ypos, 0, yoffset);
 }
 
+void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+	if (g_app && width > 0 && height > 0) g_app->setSize(width, height);
+}
+
 void window_size_callback(GLFWwindow* window, int width, int height) {
-	if (g_app) g_app->setSize(width, height);
+	int fbW = width, fbH = height;
+	glfwGetFramebufferSize(window, &fbW, &fbH);
+	if (g_app && fbW > 0 && fbH > 0) g_app->setSize(fbW, fbH);
 }
 
 void error_callback(int error, const char* desc) {
@@ -188,6 +207,7 @@ int main(void) {
 	glfwSetMouseButtonCallback(platform->window, mouse_button_callback);
 	glfwSetScrollCallback(platform->window, scroll_callback);
 	glfwSetWindowSizeCallback(platform->window, window_size_callback);
+	glfwSetFramebufferSizeCallback(platform->window, framebuffer_size_callback);
 
 	glfwMakeContextCurrent(platform->window);
 	#ifndef __EMSCRIPTEN__
@@ -202,7 +222,13 @@ int main(void) {
 	((MAIN_CLASS*)g_app)->externalStoragePath = ".";
 	((MAIN_CLASS*)g_app)->externalCacheStoragePath = ".";
 	g_app->init(appContext);
-	g_app->setSize(appContext.platform->getScreenWidth(), appContext.platform->getScreenHeight());
+	int initFbW = 0, initFbH = 0;
+	glfwGetFramebufferSize(platform->window, &initFbW, &initFbH);
+	if (initFbW <= 0 || initFbH <= 0) {
+		initFbW = appContext.platform->getScreenWidth();
+		initFbH = appContext.platform->getScreenHeight();
+	}
+	g_app->setSize(initFbW, initFbH);
 
 #ifdef __EMSCRIPTEN__
 	emscripten_set_main_loop(loop, 0, 1);

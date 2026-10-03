@@ -130,6 +130,10 @@ void JoinGameScreen::setupPositions() {
 	// Center buttons
 	bJoin.x = width / 2 - 4 - bJoin.width;
 	bBack.x = width / 2 + 4;
+
+	if (gamesList) {
+		gamesList->setSize(width, height, 0, width, 24, height - 32);
+	}
 }
 
 void JoinGameScreen::render( int xm, int ym, float a )

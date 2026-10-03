@@ -115,6 +115,10 @@ void LightUpdate::update(Level* level)
                         if (level->isSkyLit(x, y, z)) emit = 15;
                     } else if (layer == &LightLayer::Block) {
                         emit = Tile::lightEmission[tile];
+                        if (level->isDynamicLight(x, y, z)) {
+                            int dyn = level->getDynamicLightEmission(x, y, z);
+                            if (dyn > emit) emit = dyn;
+                        }
                     }
 
                     if (block >= 15 && emit == 0) {

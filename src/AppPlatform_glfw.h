@@ -53,7 +53,9 @@ public:
 	}
 
     void saveScreenshot(const std::string& filename, int glWidth, int glHeight) override {
-        //@todo
+        std::vector<unsigned char> pixels(glWidth * glHeight * 4);
+        glReadPixels(0, 0, glWidth, glHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+        savePngToFile(filename, glWidth, glHeight, pixels.data(), true);
     }
 
     __inline unsigned int rgbToBgr(unsigned int p) {

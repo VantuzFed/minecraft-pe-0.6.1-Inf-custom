@@ -54,10 +54,17 @@
 #include "renderer/GameRenderer.h"
 #include "renderer/ItemInHandRenderer.h"
 #include "renderer/LevelRenderer.h"
-#include "renderer/entity/EntityRenderDispatcher.h"
-#include "gui/Screen.h"
 #include "gui/Font.h"
 #include "gui/screens/RenameMPLevelScreen.h"
+#include "../platform/PngLoader.h"
+#include "renderer/culling/AllowAllCuller.h"
+#include "renderer/entity/EntityRenderDispatcher.h"
+#include "renderer/Lighting.h"
+#include <sys/stat.h>
+#include <sys/types.h>
+#ifdef _WIN32
+#include <direct.h>
+#endif
 #include "sound/SoundEngine.h"
 #endif // STANDALONE_SERVER
 
@@ -361,6 +368,7 @@ void Minecraft::leaveGame(bool renameLevel /*=false*/)
 
 	LOGI("Erasing level\n");
 	if (level != NULL) {
+		level->clearDynamicLight();
 		delete level->getLevelStorage();
 		delete level;
 		level = NULL;
@@ -558,6 +566,26 @@ void Minecraft::tick(int nTick, int maxTick) {
 	TIMER_PUSH("gameMode");
 	if (level && !pause) {
 		gameMode->tick();
+#ifndef STANDALONE_SERVER
+		if (player) {
+			ItemInstance* held = player->getSelectedItem();
+			int heldLight = 0;
+			if (held) {
+				int id = held->id;
+				if (Tile::torch && id == Tile::torch->id) heldLight = 14;
+				else if (Tile::lightGem && id == Tile::lightGem->id) heldLight = 15;
+				else if (Tile::glowingObsidian && id == Tile::glowingObsidian->id) heldLight = 14;
+			}
+			if (heldLight > 0) {
+				int px = Mth::floor(player->x);
+				int py = Mth::floor(player->y + 0.6f);
+				int pz = Mth::floor(player->z);
+				level->updateDynamicLight(px, py, pz, heldLight);
+			} else {
+				level->clearDynamicLight();
+			}
+		}
+#endif
 	}
 
 	TIMER_POP_PUSH("commandServer");
@@ -800,6 +828,14 @@ void Minecraft::tickInput() {
 
 			if (!screen && key == Keyboard::KEY_T && level) {
 				setScreen(new ConsoleScreen());
+			}
+
+			if (key == Keyboard::KEY_F2) {
+				takeScreenshot();
+			}
+
+			if (key == Keyboard::KEY_F7) {
+				takeIsometricScreenshot();
 			}
 
 			if (key == Keyboard::KEY_F3) {
@@ -1286,68 +1322,15 @@ void Minecraft::setSize(int w, int h) {
 	int screenWidth;
 	int screenHeight;
 	//#ifdef PLATFORM_DESKTOP
-	if (options.getBooleanValue(OPTIONS_WINDOW_SCALE)){ // scales with resolution using a formula instead of having hardcoded if checks
-		int guiScale = options.getIntValue(OPTIONS_GUI_SCALE);
-		if (guiScale == 0) {
-			guiScale = 1000;
-		}
-
-		// determine gui scale, optionally overriding auto
-
-
-		Gui::GuiScale = (float)Mth::Min(guiScale, Mth::Max(1, Mth::Min(width / 320, height / 240)));
-
-
-
-	} else {
-
-
-		int guiScale = options.getIntValue(OPTIONS_GUI_SCALE);
-
-		// determine gui scale, optionally overriding auto
-		if (guiScale != 0) {
-			// manual selection: 1->small, 2->medium, 3->large, 4->larger, 5->largest
-			switch (guiScale) {
-			case 1: Gui::GuiScale = 2.0f; break;
-			case 2: Gui::GuiScale = 3.0f; break;
-			case 3: Gui::GuiScale = 4.0f; break;
-			case 4: Gui::GuiScale = 5.0f; break;
-			case 5: Gui::GuiScale = 6.0f; break;
-			default: Gui::GuiScale = 1.0f; break; // auto
-			}
-		} else {
-			// auto compute from resolution
-			if (width >= 1000) {
-#ifdef __APPLE__
-				Gui::GuiScale = (width > 2000)? 8.0f : 4.0f;
-#else
-				Gui::GuiScale = 4.0f;
-#endif
-			}
-			else if (width >= 800) {
-#ifdef __APPLE__
-				Gui::GuiScale = 4.0f;
-#else
-				Gui::GuiScale = 3.0f;
-#endif
-			}
-			else if (width >= 400)
-				Gui::GuiScale = 2.0f;
-			else
-				Gui::GuiScale = 1.0f;
-		}
-
-
-
-		// if (platform()) {
-		// 	float pixelsPerMillimeter = options.getProgressValue(&Option::PIXELS_PER_MILLIMETER);
-		// 	pixelCalc.setPixelsPerMillimeter(pixelsPerMillimeter);
-		// 	pixelCalcUi.setPixelsPerMillimeter(pixelsPerMillimeter * Gui::InvGuiScale);
-		// }
-
+	int guiScaleOpt = options.getIntValue(OPTIONS_GUI_SCALE);
+	int scale = 1;
+	while (scale < 1000 && width / (scale + 1) >= 320 && height / (scale + 1) >= 240) {
+		scale++;
 	}
-
-
+	if (guiScaleOpt > 0 && scale > guiScaleOpt) {
+		scale = guiScaleOpt;
+	}
+	Gui::GuiScale = (float)scale;
 	Gui::InvGuiScale = 1.0f / Gui::GuiScale;
 	screenWidth  = (int)(width  * Gui::InvGuiScale);
 	screenHeight = (int)(height * Gui::InvGuiScale);
@@ -1773,4 +1756,134 @@ void Minecraft::optionUpdated(OptionId option, int value ) {
 	else if (option == OPTIONS_LOG_LEVEL) {
 		g_mcpeLogLevel = value;
 	}
+}
+
+void Minecraft::takeScreenshot() {
+#ifndef STANDALONE_SERVER
+	if (!level) return;
+
+	std::vector<unsigned char> pixels(width * height * 4);
+	glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+#ifdef _WIN32
+	_mkdir("screenshots");
+#else
+	mkdir("screenshots", 0755);
+#endif
+
+	time_t rawtime;
+	time(&rawtime);
+	struct tm* timeinfo = localtime(&rawtime);
+	char timeStr[64];
+	strftime(timeStr, sizeof(timeStr), "%Y-%m-%d_%H.%M.%S", timeinfo);
+
+	std::string filename = "screenshots/" + std::string(timeStr) + ".png";
+	bool saved = savePngToFile(filename, width, height, pixels.data(), true);
+
+	if (saved) {
+		gui.addMessage("Saved screenshot as " + filename);
+	} else {
+		gui.addMessage("Failed to save screenshot!");
+	}
+#endif
+}
+
+void Minecraft::takeIsometricScreenshot() {
+#ifndef STANDALONE_SERVER
+	if (!level || !player) return;
+
+	int sw = width;
+	int sh = height;
+	double targetX = player->x;
+	double targetY = player->y;
+	double targetZ = player->z;
+
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix2();
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix2();
+
+	glViewport(0, 0, sw, sh);
+	glClearColor(0.5f, 0.7f, 1.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	// Setup Orthographic Projection
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity2();
+	float aspect = (float)sw / (float)sh;
+	float orthoHeight = 48.0f; // Shows ~48 blocks vertically
+	float orthoWidth = orthoHeight * aspect;
+	glOrthof(-orthoWidth, orthoWidth, -orthoHeight, orthoHeight, -1000.0f, 1000.0f);
+
+	// Setup Isometric Camera (classic Indev angles: pitch 30 deg, yaw 45 deg)
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity2();
+	glRotatef2(30.0f, 1.0f, 0.0f, 0.0f);
+	glRotatef2(45.0f, 0.0f, 1.0f, 0.0f);
+	glTranslatef2((float)-targetX, (float)-targetY, (float)-targetZ);
+
+	glEnable2(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
+	glEnable2(GL_CULL_FACE);
+	glEnable2(GL_ALPHA_TEST);
+	glAlphaFunc(GL_GREATER, 0.1f);
+	glDisable2(GL_FOG);
+
+	textures->loadAndBindTexture("terrain.png");
+	Lighting::turnOff();
+
+	AllowAllCuller culler;
+	levelRenderer->cull(&culler, 0.0f);
+
+	// Pass 0: Opaque blocks
+	levelRenderer->render((Mob*)player, 0, 0.0f);
+
+	// Pass 1: Cutout blocks (foliage, saplings, flowers)
+	glEnable2(GL_ALPHA_TEST);
+	levelRenderer->render((Mob*)player, 1, 0.0f);
+
+	// Render Entities (mobs, items, player)
+	Lighting::turnOn(this);
+	levelRenderer->renderEntities(player->getPos(0.0f), &culler, 0.0f);
+	Lighting::turnOff();
+
+	// Pass 2: Translucent blocks (water, ice)
+	glEnable2(GL_BLEND);
+	glBlendFunc2(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	textures->loadAndBindTexture("terrain.png");
+	levelRenderer->render((Mob*)player, 2, 0.0f);
+	glDisable2(GL_BLEND);
+
+	// Read pixels from framebuffer
+	std::vector<unsigned char> pixels(sw * sh * 4);
+	glReadPixels(0, 0, sw, sh, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+	// Restore GL state
+	glMatrixMode(GL_MODELVIEW);
+	glPopMatrix2();
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix2();
+
+#ifdef _WIN32
+	_mkdir("screenshots");
+#else
+	mkdir("screenshots", 0755);
+#endif
+
+	time_t rawtime;
+	time(&rawtime);
+	struct tm* timeinfo = localtime(&rawtime);
+	char timeStr[64];
+	strftime(timeStr, sizeof(timeStr), "%Y-%m-%d_%H.%M.%S", timeinfo);
+
+	std::string filename = "screenshots/mc_map_" + std::string(timeStr) + ".png";
+	bool saved = savePngToFile(filename, sw, sh, pixels.data(), true);
+	savePngToFile("screenshots/mc_map.png", sw, sh, pixels.data(), true);
+
+	if (saved) {
+		gui.addMessage("Saved screenshot as " + filename);
+	} else {
+		gui.addMessage("Failed to save screenshot!");
+	}
+#endif
 }

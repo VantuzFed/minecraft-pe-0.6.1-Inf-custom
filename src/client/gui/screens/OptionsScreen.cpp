@@ -245,12 +245,17 @@ void OptionsScreen::setupPositions() {
 		int totalRows = 6;
 		int totalH = totalRows * 24 + 32;
 		int startY = (height - totalH) / 2;
-		if (startY < 32) startY = 32;
+		if (startY < 26) startY = 26;
 
-		int leftX = width / 2 - 155;
-		int rightX = width / 2 + 5;
 		int btnW = 150;
 		int btnH = 20;
+		int leftX = width / 2 - 155;
+		int rightX = width / 2 + 5;
+		if (width < 330) {
+			btnW = Mth::Max(80, (width - 24) / 2);
+			leftX = width / 2 - btnW - 2;
+			rightX = width / 2 + 2;
+		}
 
 		// Row 0: Music / Sound
 		bMusic.x = leftX; bMusic.y = startY + 0 * 24; bMusic.width = btnW; bMusic.height = btnH;
@@ -277,10 +282,14 @@ void OptionsScreen::setupPositions() {
 		bMenuStyle.x = rightX; bMenuStyle.y = startY + 5 * 24; bMenuStyle.width = btnW; bMenuStyle.height = btnH;
 
 		// Done button
-		bDone.x = width / 2 - 100;
-		bDone.y = height - 28;
-		bDone.width = 200;
+		int doneW = Mth::Min(200, width - 20);
+		bDone.width = doneW;
 		bDone.height = 20;
+		bDone.x = (width - doneW) / 2;
+		int doneY = height - 28;
+		int minDoneY = startY + totalRows * 24 + 4;
+		if (doneY < minDoneY) doneY = minDoneY;
+		bDone.y = doneY;
 
 		return;
 	}
@@ -324,6 +333,7 @@ void OptionsScreen::setupPositions() {
 			(*it)->width = width - categoryButtons[0]->width;
 
 			(*it)->setViewHeight(height - bHeader->height);
+			(*it)->setupPositions();
 		}
 	}
 
@@ -338,9 +348,10 @@ void OptionsScreen::render(int xm, int ym, float a) {
 		int totalRows = 6;
 		int totalH = totalRows * 24 + 32;
 		int startY = (height - totalH) / 2;
-		if (startY < 32) startY = 32;
+		if (startY < 26) startY = 26;
+		int titleY = startY > 20 ? (startY - 16) : 6;
 
-		drawCenteredString(minecraft->font, I18n::get("options.title"), width / 2, startY - 16, 0xffffffff);
+		drawCenteredString(minecraft->font, I18n::get("options.title"), width / 2, titleY, 0xffffffff);
 
 		Screen::render(xm, ym, a);
 		return;
@@ -348,11 +359,8 @@ void OptionsScreen::render(int xm, int ym, float a) {
 
 	renderBackground();
 
-	int xmm = xm * width / minecraft->width;
-	int ymm = ym * height / minecraft->height - 1;
-
 	if (currentOptionsGroup != NULL)
-		currentOptionsGroup->render(minecraft, xmm, ymm);
+		currentOptionsGroup->render(minecraft, xm, ym);
 
 	super::render(xm, ym, a);
 }

@@ -122,6 +122,10 @@ void StartMenuScreen::setupPositions() {
 		bQuit->y = bOptions->y + 24 + 4;
 	}
 
+	int btnW = Mth::Min(200, width - 20);
+	if (btnW < 80) btnW = 80;
+	bHost->width = bJoin->width = bOptions->width = bQuit->width = btnW;
+
 	// Center buttons
 	bHost->x = (width - bHost->width) / 2;
 	bJoin->x = (width - bJoin->width) / 2;

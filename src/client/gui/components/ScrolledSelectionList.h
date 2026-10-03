@@ -16,6 +16,8 @@ public:
 	ScrolledSelectionList(Minecraft* _minecraft, int _width, int _height, int _y0, int _y1, int _itemHeight);
 
 	virtual void setRenderSelection(bool _renderSelection);
+	void setSize(int _width, int _height, int _y0, int _y1);
+	void setSize(int _width, int _height, float _x0, float _x1, float _y0, float _y1);
 protected:
 	void setRenderHeader(bool _renderHeader, int _headerHeight);
 

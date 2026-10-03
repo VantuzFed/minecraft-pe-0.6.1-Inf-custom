@@ -297,3 +297,12 @@ void RolledSelectionListH::renderHoleBackground( /*float x0, float x1,*/ float y
 void RolledSelectionListH::touched()
 {
 }
+
+void RolledSelectionListH::setSize(int w, int h, int nx0, int nx1, int ny0, int ny1) {
+	this->width = w;
+	this->height = h;
+	this->x0 = (float)nx0;
+	this->x1 = (float)nx1;
+	this->y0 = (float)ny0;
+	this->y1 = (float)ny1;
+}

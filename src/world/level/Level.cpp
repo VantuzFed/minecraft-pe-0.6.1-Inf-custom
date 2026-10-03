@@ -52,7 +52,12 @@ Level::Level(LevelStorage* levelStorage, const std::string& levelName, const Lev
 	updatingTileEntities(false),
 	allPlayersAreSleeping(false),
 	_nightMode(false),
-	betaBiomeSource(NULL)
+	betaBiomeSource(NULL),
+	_dynLightActive(false),
+	_dynLightX(0),
+	_dynLightY(0),
+	_dynLightZ(0),
+	_dynLightLevel(0)
 {
 	_init(levelName, settings, generatorVersion, fixedDimension);
 }
@@ -1912,6 +1917,47 @@ void Level::setUpdateLights(bool doUpdate) {
 
 void Level::updateLight(const LightLayer& layer, int x0, int y0, int z0, int x1, int y1, int z1) {
 	updateLight(layer, x0, y0, z0, x1, y1, z1, true);
+}
+
+void Level::updateDynamicLight(int newX, int newY, int newZ, int newLight) {
+	if (_dynLightActive && _dynLightX == newX && _dynLightY == newY && _dynLightZ == newZ && _dynLightLevel == newLight) {
+		return;
+	}
+
+	int ox = _dynLightX;
+	int oy = _dynLightY;
+	int oz = _dynLightZ;
+	bool hadLight = _dynLightActive;
+
+	_dynLightX = newX;
+	_dynLightY = newY;
+	_dynLightZ = newZ;
+	_dynLightLevel = newLight;
+	_dynLightActive = (newLight > 0);
+
+	if (hadLight && _dynLightActive) {
+		int minX = Mth::Min(ox, newX) - 15;
+		int maxX = Mth::Max(ox, newX) + 15;
+		int minY = Mth::Min(oy, newY) - 15;
+		int maxY = Mth::Max(oy, newY) + 15;
+		int minZ = Mth::Min(oz, newZ) - 15;
+		int maxZ = Mth::Max(oz, newZ) + 15;
+		updateLight(LightLayer::Block, minX, minY, minZ, maxX, maxY, maxZ);
+	} else if (hadLight) {
+		updateLight(LightLayer::Block, ox - 15, oy - 15, oz - 15, ox + 15, oy + 15, oz + 15);
+	} else if (_dynLightActive) {
+		updateLight(LightLayer::Block, newX - 15, newY - 15, newZ - 15, newX + 15, newY + 15, newZ + 15);
+	}
+}
+
+void Level::clearDynamicLight() {
+	if (!_dynLightActive) return;
+	int ox = _dynLightX;
+	int oy = _dynLightY;
+	int oz = _dynLightZ;
+	_dynLightActive = false;
+	_dynLightLevel = 0;
+	updateLight(LightLayer::Block, ox - 15, oy - 15, oz - 15, ox + 15, oy + 15, oz + 15);
 }
 
 static int maxLoop = 0;

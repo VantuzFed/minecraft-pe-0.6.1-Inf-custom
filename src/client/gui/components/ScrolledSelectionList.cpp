@@ -35,6 +35,26 @@ void ScrolledSelectionList::setRenderSelection( bool _renderSelection )
 	renderSelection = _renderSelection;
 }
 
+void ScrolledSelectionList::setSize( int _width, int _height, int _y0, int _y1 )
+{
+	width = _width;
+	height = _height;
+	x0 = 0.0f;
+	x1 = (float)_width;
+	y0 = (float)_y0;
+	y1 = (float)_y1;
+}
+
+void ScrolledSelectionList::setSize( int _width, int _height, float _x0, float _x1, float _y0, float _y1 )
+{
+	width = _width;
+	height = _height;
+	x0 = _x0;
+	x1 = _x1;
+	y0 = _y0;
+	y1 = _y1;
+}
+
 void ScrolledSelectionList::setRenderHeader( bool _renderHeader, int _headerHeight )
 {
 	doRenderHeader = _renderHeader;

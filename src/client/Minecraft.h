@@ -122,6 +122,9 @@ public:
 
 	void handleMouseDown(int button, bool down);
 	
+	void takeScreenshot();
+	void takeIsometricScreenshot();
+
     void audioEngineOn();
     void audioEngineOff();
     

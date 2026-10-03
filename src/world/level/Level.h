@@ -148,6 +148,15 @@ public:
 	void updateLight(const LightLayer& layer, int x0, int y0, int z0, int x1, int y1, int z1);
 	void updateLight(const LightLayer& layer, int x0, int y0, int z0, int x1, int y1, int z1, bool join);
 
+	void updateDynamicLight(int x, int y, int z, int lightLevel);
+	void clearDynamicLight();
+	bool isDynamicLight(int x, int y, int z) const {
+		return _dynLightActive && x == _dynLightX && y == _dynLightY && z == _dynLightZ;
+	}
+	int getDynamicLightEmission(int x, int y, int z) const {
+		return isDynamicLight(x, y, z) ? _dynLightLevel : 0;
+	}
+
     //HitResult clip(const Vec3& a, const Vec3& b);
     HitResult clip(const Vec3& a, const Vec3& b, bool liquid = false, bool solidOnly = false);
 
@@ -345,6 +354,12 @@ private:
 	bool _isNew;
 	bool _nightMode;
 	PathFinder* _pathFinder;
+
+	bool _dynLightActive;
+	int _dynLightX;
+	int _dynLightY;
+	int _dynLightZ;
+	int _dynLightLevel;
 
 	float _lastSavedPlayerTime;
 	PendingList _pendingPlayerRemovals;
