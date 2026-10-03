@@ -21,10 +21,17 @@ void UsernameScreen::init()
 {
     _input = "";
     tUsername.setMaxChars(16);
-    _btnDone.active = false; // disabled until name typed
+    std::string cur = minecraft->options.getStringValue(OPTIONS_USERNAME);
+    if (!cur.empty() && cur != "Steve" && cur != "StevePi") {
+        tUsername.text = cur;
+        _btnDone.active = true;
+    } else {
+        _btnDone.active = false; // disabled until name typed
+    }
     buttons.push_back(&_btnDone);
     tabButtons.push_back(&_btnDone);
     textBoxes.push_back(&tUsername);
+    tUsername.setFocus(minecraft);
     setupPositions();
 }
 
@@ -61,8 +68,26 @@ void UsernameScreen::keyPressed(int eventKey)
     // deliberately do NOT call super::keyPressed — that would close the screen on Escape
     Screen::keyPressed(eventKey);
 
-    // enable the Done button only when there is some text (and ensure it updates after backspace)
     _btnDone.active = !tUsername.text.empty();
+}
+
+void UsernameScreen::charPressed(char inputChar)
+{
+    super::charPressed(inputChar);
+    _btnDone.active = !tUsername.text.empty();
+}
+
+void UsernameScreen::mouseClicked(int xm, int ym, int button)
+{
+    minecraft->platform()->requestFullscreen();
+    super::mouseClicked(xm, ym, button);
+    if (button == MouseAction::ACTION_LEFT) {
+        if (!tUsername.focused) {
+            tUsername.setFocus(minecraft);
+        } else {
+            minecraft->platform()->showKeyboard();
+        }
+    }
 }
 
 void UsernameScreen::removed()
@@ -73,6 +98,7 @@ void UsernameScreen::removed()
 void UsernameScreen::buttonClicked(Button* button)
 {
     if (button == &_btnDone && !tUsername.text.empty()) {
+        minecraft->platform()->requestFullscreen();
         minecraft->options.set(OPTIONS_USERNAME, tUsername.text);
         minecraft->options.save();
         minecraft->setScreen(NULL); // goes to StartMenuScreen

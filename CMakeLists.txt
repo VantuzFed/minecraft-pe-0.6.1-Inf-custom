@@ -377,7 +377,7 @@ if(${PLATFORM} MATCHES "Web")
         "-sEMULATE_FUNCTION_POINTER_CASTS=1"
         "-sALLOW_TABLE_GROWTH=1"
         "-sEXPORTED_RUNTIME_METHODS=['FS','stringToUTF8','UTF8ToString','cwrap','ccall','HEAP8','HEAPU8','HEAP32','HEAPU32']"
-        "-sEXPORTED_FUNCTIONS=['_main']"
+        "-sEXPORTED_FUNCTIONS=['_main','_web_feed_char','_web_feed_key']"
     )
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")

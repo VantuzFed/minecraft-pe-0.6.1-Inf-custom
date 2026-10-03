@@ -15,6 +15,92 @@
 #include "AppPlatform_glfw.h"
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
+#include <emscripten/html5.h>
+
+extern "C" {
+EMSCRIPTEN_KEEPALIVE void web_feed_char(int codepoint) {
+	if (codepoint < 128) {
+		Keyboard::feedText((char)codepoint);
+	} else if (codepoint >= 0x400 && codepoint <= 0x45F) {
+		Keyboard::feedText((char)(0xC0 | (codepoint >> 6)));
+		Keyboard::feedText((char)(0x80 | (codepoint & 0x3F)));
+	}
+}
+
+EMSCRIPTEN_KEEPALIVE void web_feed_key(int key, int action) {
+	Keyboard::feed(key, action);
+}
+}
+
+static long touchSlotMap[Multitouch::MAX_POINTERS] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+
+static int getTouchSlot(long id, bool allocate) {
+	for (int i = 0; i < Multitouch::MAX_POINTERS; ++i) {
+		if (touchSlotMap[i] == id) return i;
+	}
+	if (!allocate) return -1;
+	for (int i = 0; i < Multitouch::MAX_POINTERS; ++i) {
+		if (touchSlotMap[i] == -1) {
+			touchSlotMap[i] = id;
+			return i;
+		}
+	}
+	return -1;
+}
+
+static EM_BOOL emscripten_touch_callback(int eventType, const EmscriptenTouchEvent *e, void *userData) {
+	if (!e) return EM_FALSE;
+
+	GLFWwindow* win = NULL;
+	if (g_app && g_app->platform) {
+		AppPlatform_glfw* plt = (AppPlatform_glfw*)g_app->platform;
+		win = plt->window;
+	}
+
+	int winW = 0, winH = 0, fbW = 0, fbH = 0;
+	if (win) {
+		glfwGetWindowSize(win, &winW, &winH);
+		glfwGetFramebufferSize(win, &fbW, &fbH);
+	}
+	float scaleX = (winW > 0) ? ((float)fbW / winW) : 1.0f;
+	float scaleY = (winH > 0) ? ((float)fbH / winH) : 1.0f;
+
+	for (int i = 0; i < e->numTouches; ++i) {
+		const EmscriptenTouchPoint& tp = e->touches[i];
+		if (!tp.isChanged && eventType != EMSCRIPTEN_EVENT_TOUCHSTART) continue;
+
+		short x = (short)(tp.targetX * scaleX);
+		short y = (short)(tp.targetY * scaleY);
+
+		if (eventType == EMSCRIPTEN_EVENT_TOUCHSTART) {
+			int slot = getTouchSlot(tp.identifier, true);
+			if (slot != -1) {
+				Multitouch::feed(1, MouseAction::DATA_DOWN, x, y, slot);
+				if (slot == 0) {
+					Mouse::feed(MouseAction::ACTION_LEFT, 1, x, y);
+				}
+			}
+		} else if (eventType == EMSCRIPTEN_EVENT_TOUCHMOVE) {
+			int slot = getTouchSlot(tp.identifier, false);
+			if (slot != -1) {
+				Multitouch::feed(0, 0, x, y, slot);
+				if (slot == 0) {
+					Mouse::feed(MouseAction::ACTION_MOVE, 0, x, y);
+				}
+			}
+		} else if (eventType == EMSCRIPTEN_EVENT_TOUCHEND || eventType == EMSCRIPTEN_EVENT_TOUCHCANCEL) {
+			int slot = getTouchSlot(tp.identifier, false);
+			if (slot != -1) {
+				Multitouch::feed(1, MouseAction::DATA_UP, x, y, slot);
+				if (slot == 0) {
+					Mouse::feed(MouseAction::ACTION_LEFT, 0, x, y);
+				}
+				touchSlotMap[slot] = -1;
+			}
+		}
+	}
+	return EM_TRUE;
+}
 #endif
 static App* g_app = 0;
 
@@ -208,6 +294,12 @@ int main(void) {
 	glfwSetScrollCallback(platform->window, scroll_callback);
 	glfwSetWindowSizeCallback(platform->window, window_size_callback);
 	glfwSetFramebufferSizeCallback(platform->window, framebuffer_size_callback);
+#ifdef __EMSCRIPTEN__
+	emscripten_set_touchstart_callback("#canvas", 0, EM_TRUE, emscripten_touch_callback);
+	emscripten_set_touchmove_callback("#canvas", 0, EM_TRUE, emscripten_touch_callback);
+	emscripten_set_touchend_callback("#canvas", 0, EM_TRUE, emscripten_touch_callback);
+	emscripten_set_touchcancel_callback("#canvas", 0, EM_TRUE, emscripten_touch_callback);
+#endif
 
 	glfwMakeContextCurrent(platform->window);
 	#ifndef __EMSCRIPTEN__

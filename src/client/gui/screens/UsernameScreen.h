@@ -22,6 +22,8 @@ public:
     virtual bool isPauseScreen() override { return false; }
 
     virtual void keyPressed(int eventKey) override;
+    virtual void charPressed(char inputChar) override;
+    virtual void mouseClicked(int xm, int ym, int button) override;
     virtual bool handleBackEvent(bool isDown) override { return true; } // block back/escape
     virtual void removed() override;
 

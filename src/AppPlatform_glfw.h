@@ -132,7 +132,50 @@ public:
 
 	virtual float getPixelsPerMillimeter() override;
 
+#ifdef __EMSCRIPTEN__
+	void requestFullscreen() override {
+		EM_ASM({
+			if (window.requestWebFullscreen) {
+				window.requestWebFullscreen();
+			} else {
+				var elem = document.documentElement;
+				if (elem.requestFullscreen) {
+					elem.requestFullscreen().catch(function(e) {});
+				} else if (elem.webkitRequestFullscreen) {
+					elem.webkitRequestFullscreen();
+				}
+			}
+		});
+	}
+
+	void showKeyboard() override {
+		keyboardVisible = true;
+		EM_ASM({
+			if (window.showVirtualKeyboard) {
+				window.showVirtualKeyboard();
+			}
+		});
+	}
+
+	void hideKeyboard() override {
+		keyboardVisible = false;
+		EM_ASM({
+			if (window.hideVirtualKeyboard) {
+				window.hideVirtualKeyboard();
+			}
+		});
+	}
+
+	virtual bool supportsTouchscreen() override {
+		static int hasTouch = -1;
+		if (hasTouch == -1) {
+			hasTouch = emscripten_run_script_int("('ontouchstart' in window) || (navigator.maxTouchPoints > 0) ? 1 : 0");
+		}
+		return hasTouch != 0;
+	}
+#else
 	virtual bool supportsTouchscreen() override { return false; /* glfw supports only mouse and keyboard */ }
+#endif
 
 	virtual void hideCursor(bool hide) override {
 		int isHide = hide ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_HIDDEN;

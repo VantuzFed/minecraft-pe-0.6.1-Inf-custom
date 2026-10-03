@@ -139,6 +139,7 @@ public:
 		keyboardVisible = false;
 	}
 	virtual bool isKeyboardVisible() {return keyboardVisible;}
+	virtual void requestFullscreen() {}
 protected:
 	bool keyboardVisible;
 };
