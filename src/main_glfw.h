@@ -13,6 +13,9 @@
 #include "platform/input/Mouse.h"
 #include "platform/input/Multitouch.h"
 #include "AppPlatform_glfw.h"
+
+static App* g_app = 0;
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #include <emscripten/html5.h>
@@ -102,7 +105,6 @@ static EM_BOOL emscripten_touch_callback(int eventType, const EmscriptenTouchEve
 	return EM_TRUE;
 }
 #endif
-static App* g_app = 0;
 
 int transformKey(int glfwkey) {
 	if (glfwkey >= GLFW_KEY_F1 && glfwkey <= GLFW_KEY_F12) {
