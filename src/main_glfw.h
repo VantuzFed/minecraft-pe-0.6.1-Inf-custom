@@ -55,8 +55,8 @@ static EM_BOOL emscripten_touch_callback(int eventType, const EmscriptenTouchEve
 	if (!e) return EM_FALSE;
 
 	GLFWwindow* win = NULL;
-	if (g_app && g_app->platform) {
-		AppPlatform_glfw* plt = (AppPlatform_glfw*)g_app->platform;
+	if (g_app && g_app->platform()) {
+		AppPlatform_glfw* plt = (AppPlatform_glfw*)g_app->platform();
 		win = plt->window;
 	}
 
