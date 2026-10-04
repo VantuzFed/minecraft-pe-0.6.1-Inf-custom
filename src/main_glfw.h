@@ -277,7 +277,7 @@ int main(void) {
 		try {
 			try { FS.mkdir('/games'); } catch(e) {}
 			try { FS.mount(IDBFS, {}, '/games'); } catch(e) {}
-			FS.syncfs(true, function (err) {});
+			try { FS.syncfs(true, function (err) {}); } catch(e) {}
 			try { FS.mkdir('/games/com.mojang'); } catch(e) {}
 			try { FS.mkdir('/games/com.mojang/minecraftWorlds'); } catch(e) {}
 		} catch(e) {
