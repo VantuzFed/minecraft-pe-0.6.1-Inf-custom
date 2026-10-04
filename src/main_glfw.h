@@ -243,14 +243,17 @@ void loop() {
 	if (!firstFrameReported) {
 		firstFrameReported = true;
 		EM_ASM({
-			if (window.onFirstGameFrame) {
-				window.onFirstGameFrame();
-			}
+			try {
+				if (typeof window !== 'undefined' && window.onFirstGameFrame) {
+					window.onFirstGameFrame();
+				}
+			} catch(e) {}
 		});
 	}
 #endif
 
 	glfwSwapInterval(((MAIN_CLASS*)g_app)->options.getBooleanValue(OPTIONS_VSYNC) ? 1 : 0);
+#ifndef __EMSCRIPTEN__
 	if(((MAIN_CLASS*)g_app)->options.getBooleanValue(OPTIONS_LIMIT_FRAMERATE)) {
 		auto frameEnd = clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(frameEnd - frameStart);
@@ -258,6 +261,7 @@ void loop() {
 		if(elapsed < target)
 			std::this_thread::sleep_for(target - elapsed);
 	}
+#endif
 }
 
 int main(void) {
@@ -269,13 +273,17 @@ int main(void) {
 	// Platform init.
 	appContext.platform = new AppPlatform_glfw();
 #if defined(__EMSCRIPTEN__)
-	EM_ASM(
-		FS.mkdir('/games');
-		FS.mkdir('/games/com.mojang');
-        FS.mkdir('/games/com.mojang/minecraftWorlds');
-        FS.mount(IDBFS, {}, '/games');
-        FS.syncfs(true, function (err) {});
-    );
+	EM_ASM({
+		try {
+			try { FS.mkdir('/games'); } catch(e) {}
+			try { FS.mount(IDBFS, {}, '/games'); } catch(e) {}
+			FS.syncfs(true, function (err) {});
+			try { FS.mkdir('/games/com.mojang'); } catch(e) {}
+			try { FS.mkdir('/games/com.mojang/minecraftWorlds'); } catch(e) {}
+		} catch(e) {
+			console.warn('IDBFS mount warning:', e);
+		}
+	});
 #endif
 
 	glfwSetErrorCallback(error_callback);
@@ -297,7 +305,11 @@ int main(void) {
 
 	AppPlatform_glfw* platform = (AppPlatform_glfw*)appContext.platform;
 
-	platform->window = glfwCreateWindow(appContext.platform->getScreenWidth(), appContext.platform->getScreenHeight(), "Minecraft PE 0.6.1", NULL, NULL);
+	int initW = appContext.platform->getScreenWidth();
+	int initH = appContext.platform->getScreenHeight();
+	if (initW <= 0) initW = 854;
+	if (initH <= 0) initH = 480;
+	platform->window = glfwCreateWindow(initW, initH, "Minecraft PE 0.6.1", NULL, NULL);
 	
 	if (platform->window == NULL) {
 		return 1;

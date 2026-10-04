@@ -31,7 +31,6 @@ void UsernameScreen::init()
     buttons.push_back(&_btnDone);
     tabButtons.push_back(&_btnDone);
     textBoxes.push_back(&tUsername);
-    tUsername.setFocus(minecraft);
     setupPositions();
 }
 

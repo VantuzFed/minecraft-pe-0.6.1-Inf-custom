@@ -137,41 +137,54 @@ public:
 #ifdef __EMSCRIPTEN__
 	void requestFullscreen() override {
 		EM_ASM({
-			if (window.requestWebFullscreen) {
-				window.requestWebFullscreen();
-			} else {
-				var elem = document.documentElement;
-				if (elem.requestFullscreen) {
-					elem.requestFullscreen().catch(function(e) {});
-				} else if (elem.webkitRequestFullscreen) {
-					elem.webkitRequestFullscreen();
+			try {
+				if (typeof window !== 'undefined' && window.requestWebFullscreen) {
+					window.requestWebFullscreen();
+				} else if (typeof document !== 'undefined') {
+					var elem = document.documentElement;
+					if (elem && elem.requestFullscreen) {
+						elem.requestFullscreen().catch(function(e) {});
+					} else if (elem && elem.webkitRequestFullscreen) {
+						elem.webkitRequestFullscreen();
+					}
 				}
-			}
+			} catch(e) {}
 		});
 	}
 
 	void showKeyboard() override {
 		keyboardVisible = true;
 		EM_ASM({
-			if (window.showVirtualKeyboard) {
-				window.showVirtualKeyboard();
-			}
+			try {
+				if (typeof window !== 'undefined' && window.showVirtualKeyboard) {
+					window.showVirtualKeyboard();
+				}
+			} catch(e) {}
 		});
 	}
 
 	void hideKeyboard() override {
 		keyboardVisible = false;
 		EM_ASM({
-			if (window.hideVirtualKeyboard) {
-				window.hideVirtualKeyboard();
-			}
+			try {
+				if (typeof window !== 'undefined' && window.hideVirtualKeyboard) {
+					window.hideVirtualKeyboard();
+				}
+			} catch(e) {}
 		});
 	}
 
 	virtual bool supportsTouchscreen() override {
 		static int hasTouch = -1;
 		if (hasTouch == -1) {
-			hasTouch = emscripten_run_script_int("('ontouchstart' in window) || (navigator.maxTouchPoints > 0) ? 1 : 0");
+			hasTouch = EM_ASM_INT({
+				try {
+					if (typeof window !== 'undefined') {
+						return (('ontouchstart' in window) || (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0)) ? 1 : 0;
+					}
+				} catch(e) {}
+				return 0;
+			});
 		}
 		return hasTouch != 0;
 	}

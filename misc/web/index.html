@@ -21,7 +21,6 @@
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
 
     #canvas {
@@ -31,97 +30,21 @@
       touch-action: none;
     }
 
-    #loading-overlay {
+    #error-banner {
+      display: none;
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: #151515;
-      background: radial-gradient(circle at center, #2b2b2b 0%, #111111 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      padding: 12px 16px;
+      background: rgba(180, 0, 0, 0.9);
       color: #fff;
-      transition: opacity 0.4s ease-out;
-    }
-
-    #loading-overlay.fade-out {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .loading-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      max-width: 90vw;
-      width: 360px;
-    }
-
-    .mc-title {
-      font-size: 34px;
-      font-weight: 900;
-      letter-spacing: 4px;
-      color: #dfdfdf;
-      text-shadow: 2px 2px 0px #000, 4px 4px 0px #383838;
-      margin-bottom: 2px;
-      text-transform: uppercase;
-    }
-
-    .mc-subtitle {
+      font-family: monospace;
       font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      color: #55ff55;
-      text-shadow: 1px 1px 0px #000;
-      margin-bottom: 28px;
-      text-transform: uppercase;
-    }
-
-    .progress-box {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-    }
-
-    #loading-bar-track {
-      width: 100%;
-      height: 20px;
-      background: #181818;
-      border: 2px solid #5a5a5a;
-      box-shadow: inset 0 0 6px #000;
-      box-sizing: border-box;
-      position: relative;
-      overflow: hidden;
-      border-radius: 2px;
-    }
-
-    #loading-bar-fill {
-      width: 0%;
-      height: 100%;
-      background: #4ba236;
-      background: linear-gradient(180deg, #6dd454 0%, #3a8528 100%);
-      transition: width 0.15s ease-out;
-    }
-
-    #loading-status-text {
-      font-size: 13px;
-      color: #cccccc;
-      text-shadow: 1px 1px 0px #000;
-      min-height: 18px;
-    }
-
-    .loading-tip {
-      margin-top: 24px;
-      font-size: 11px;
-      color: #777777;
-      line-height: 1.4;
+      border-radius: 6px;
+      z-index: 10000;
+      white-space: pre-wrap;
+      word-break: break-all;
     }
 
     #mobile-text-input {
@@ -142,83 +65,34 @@
 </head>
 <body>
 
-<div id="loading-overlay">
-  <div class="loading-container">
-    <div class="mc-title">Minecraft</div>
-    <div class="mc-subtitle">Pocket Edition</div>
-    <div class="progress-box">
-      <div id="loading-bar-track">
-        <div id="loading-bar-fill"></div>
-      </div>
-      <div id="loading-status-text">Инициализация...</div>
-    </div>
-    <div class="loading-tip">Первый запуск скачивает компоненты игры. Пожалуйста, подождите...</div>
-  </div>
-</div>
-
+<div id="error-banner"></div>
 <canvas id="canvas"></canvas>
 <input id="mobile-text-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 
 <script>
-  var loadingOverlay = document.getElementById('loading-overlay');
-  var loadingBar = document.getElementById('loading-bar-fill');
-  var loadingStatus = document.getElementById('loading-status-text');
-
-  function updateProgress(percent, text) {
-    if (loadingBar && percent !== null && percent !== undefined) {
-      loadingBar.style.width = Math.min(100, Math.max(0, percent)) + '%';
-    }
-    if (loadingStatus && text) {
-      loadingStatus.textContent = text;
+  function showError(msg) {
+    var b = document.getElementById('error-banner');
+    if (b) {
+      b.style.display = 'block';
+      b.textContent = 'MCPE Error: ' + msg;
     }
   }
 
-  function hideLoadingOverlay() {
-    if (loadingOverlay && !loadingOverlay.classList.contains('fade-out')) {
-      loadingOverlay.classList.add('fade-out');
-      setTimeout(function() {
-        loadingOverlay.style.display = 'none';
-      }, 450);
-    }
-  }
+  window.addEventListener('error', function(e) {
+    showError(e.message || (e.error && e.error.message) || String(e));
+  });
 
-  window.onFirstGameFrame = function() {
-    updateProgress(100, 'Готово!');
-    setTimeout(hideLoadingOverlay, 50);
-  };
+  window.addEventListener('unhandledrejection', function(e) {
+    showError('Unhandled rejection: ' + (e.reason ? (e.reason.message || e.reason) : e));
+  });
 
   var Module = {
     canvas: document.getElementById('canvas'),
-    setStatus: function(text) {
-      if (!text) return;
-      var match = text.match(/([0-9]+)\/([0-9]+)/);
-      if (match) {
-        var cur = parseInt(match[1]);
-        var total = parseInt(match[2]);
-        if (total > 0) {
-          var pct = Math.round((cur / total) * 100);
-          var curMb = (cur / (1024 * 1024)).toFixed(1);
-          var totalMb = (total / (1024 * 1024)).toFixed(1);
-          updateProgress(pct, 'Загрузка ресурсов: ' + pct + '% (' + curMb + ' / ' + totalMb + ' MB)');
-        }
-      } else if (text.indexOf('Preparing') !== -1) {
-        updateProgress(90, 'Компиляция WebAssembly...');
-      } else {
-        updateProgress(null, text);
-      }
-    },
-    totalDependencies: 0,
-    monitorRunDependencies: function(left) {
-      this.totalDependencies = Math.max(this.totalDependencies, left);
-      if (left > 0) {
-        var pct = Math.round(((this.totalDependencies - left) / this.totalDependencies) * 85);
-        updateProgress(pct, 'Загрузка данных (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')...');
-      }
-    },
     onRuntimeInitialized: function () {
       resizeCanvas();
-      updateProgress(96, 'Запуск игры...');
-      setTimeout(hideLoadingOverlay, 2500);
+    },
+    onAbort: function(what) {
+      showError('Runtime aborted: ' + what);
     }
   };
 
@@ -258,7 +132,6 @@
     }
   };
 
-  // Enter fullscreen on first user touch/click gesture (nickname stage)
   var hasTriggeredFullscreen = false;
   function triggerFullscreenOnFirstGesture() {
     if (!hasTriggeredFullscreen) {
@@ -294,7 +167,6 @@
     if (cur === prevInputValue) return;
 
     if (cur.length < prevInputValue.length) {
-      // Backspace
       var diff = prevInputValue.length - cur.length;
       for (var i = 0; i < diff; i++) {
         if (Module._web_feed_key) {
@@ -303,7 +175,6 @@
         }
       }
     } else {
-      // Added characters
       var added = '';
       if (prevInputValue === ' ' && cur.startsWith(' ')) {
         added = cur.substring(1);
@@ -347,22 +218,8 @@
       }
     });
   }
-
-  // Load MinecraftPE script safely (avoid double download during Service Worker reload)
-  function loadGameScript() {
-    var script = document.createElement('script');
-    script.src = 'MinecraftPE.js';
-    script.async = true;
-    document.body.appendChild(script);
-  }
-
-  if (window.crossOriginIsolated === false && window.isSecureContext && ('serviceWorker' in navigator)) {
-    updateProgress(10, 'Настройка защищенного окружения...');
-  } else {
-    updateProgress(15, 'Подготовка к загрузке...');
-    loadGameScript();
-  }
 </script>
 
+<script src="MinecraftPE.js"></script>
 </body>
 </html>
