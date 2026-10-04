@@ -238,6 +238,18 @@ void loop() {
 	glfwSwapBuffers(((AppPlatform_glfw*)g_app->platform())->window);
 	glfwPollEvents();
 
+#ifdef __EMSCRIPTEN__
+	static bool firstFrameReported = false;
+	if (!firstFrameReported) {
+		firstFrameReported = true;
+		EM_ASM({
+			if (window.onFirstGameFrame) {
+				window.onFirstGameFrame();
+			}
+		});
+	}
+#endif
+
 	glfwSwapInterval(((MAIN_CLASS*)g_app)->options.getBooleanValue(OPTIONS_VSYNC) ? 1 : 0);
 	if(((MAIN_CLASS*)g_app)->options.getBooleanValue(OPTIONS_LIMIT_FRAMERATE)) {
 		auto frameEnd = clock::now();
@@ -250,6 +262,8 @@ void loop() {
 
 int main(void) {
 	AppContext appContext;
+	memset(&appContext, 0, sizeof(appContext));
+	appContext.doRender = true;
 
 #ifndef STANDALONE_SERVER
 	// Platform init.
@@ -313,8 +327,13 @@ int main(void) {
 	App* app = new MAIN_CLASS();
 
 	g_app = app;
+#ifdef __EMSCRIPTEN__
+	((MAIN_CLASS*)g_app)->externalStoragePath = "/games/com.mojang";
+	((MAIN_CLASS*)g_app)->externalCacheStoragePath = "/games/com.mojang";
+#else
 	((MAIN_CLASS*)g_app)->externalStoragePath = ".";
 	((MAIN_CLASS*)g_app)->externalCacheStoragePath = ".";
+#endif
 	g_app->init(appContext);
 	int initFbW = 0, initFbH = 0;
 	glfwGetFramebufferSize(platform->window, &initFbW, &initFbH);

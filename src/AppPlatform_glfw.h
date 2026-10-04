@@ -110,9 +110,10 @@ public:
 
 	virtual int getScreenWidth() override { 
 		#ifdef __EMSCRIPTEN__
-			int w, h;
-			emscripten_get_canvas_element_size("canvas", &w, &h);
-
+			int w = 854, h = 480;
+			if (emscripten_get_canvas_element_size("#canvas", &w, &h) != EMSCRIPTEN_RESULT_SUCCESS || w <= 0) {
+				w = 854;
+			}
 			return w;
 		#endif
 
@@ -121,9 +122,10 @@ public:
 
 	virtual int getScreenHeight() override { 
 		#ifdef __EMSCRIPTEN__
-			int w, h;
-			emscripten_get_canvas_element_size("canvas", &w, &h);
-
+			int w = 854, h = 480;
+			if (emscripten_get_canvas_element_size("#canvas", &w, &h) != EMSCRIPTEN_RESULT_SUCCESS || h <= 0) {
+				h = 480;
+			}
 			return h;
 		#endif
 
