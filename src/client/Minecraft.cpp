@@ -65,6 +65,9 @@
 #ifdef _WIN32
 #include <direct.h>
 #endif
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
 #include "sound/SoundEngine.h"
 #endif // STANDALONE_SERVER
 
@@ -1785,6 +1788,26 @@ void Minecraft::takeScreenshot() {
 
 	if (saved) {
 		gui.addMessage("Saved screenshot as " + filename);
+#ifdef __EMSCRIPTEN__
+		EM_ASM({
+			try {
+				var path = UTF8ToString($0);
+				if (typeof FS !== 'undefined') {
+					var data = FS.readFile(path);
+					var blob = new Blob([data], { type: 'image/png' });
+					var a = document.createElement('a');
+					a.href = URL.createObjectURL(blob);
+					a.download = path.split('/').pop();
+					document.body.appendChild(a);
+					a.click();
+					document.body.removeChild(a);
+					setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+				}
+			} catch(e) {
+				console.error("Failed to download screenshot:", e);
+			}
+		}, filename.c_str());
+#endif
 	} else {
 		gui.addMessage("Failed to save screenshot!");
 	}
@@ -1797,17 +1820,50 @@ void Minecraft::takeIsometricScreenshot() {
 
 	int sw = width;
 	int sh = height;
-	double targetX = player->x;
-	double targetY = player->y;
-	double targetZ = player->z;
 
+	// Save and setup renderer context
+	Mob* oldCameraTarget = cameraTargetPlayer;
+	cameraTargetPlayer = (Mob*)player;
+
+	bool oldThirdPerson = options.getBooleanValue(OPTIONS_THIRD_PERSON_VIEW);
+	options.set(OPTIONS_THIRD_PERSON_VIEW, true);
+
+	bool oldOcclusion = levelRenderer->occlusionCheck;
+	levelRenderer->occlusionCheck = false;
+
+	// Force all loaded chunks visible and rebuild any dirty chunks
+	for (int i = 0; i < levelRenderer->chunksLength; i++) {
+		if (levelRenderer->chunks[i]) {
+			levelRenderer->chunks[i]->visible = true;
+			levelRenderer->chunks[i]->occlusion_visible = true;
+		}
+	}
+	levelRenderer->updateDirtyChunks((Mob*)player, true);
+
+	// Setup Projection and Modelview matrices
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix2();
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix2();
 
 	glViewport(0, 0, sw, sh);
-	glClearColor(0.5f, 0.7f, 1.0f, 1.0f);
+
+	// Ensure depth and color masks are writable before clearing
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glDepthMask(GL_TRUE);
+	glEnable2(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
+
+	float skyR = 0.5f, skyG = 0.7f, skyB = 1.0f;
+	if (level) {
+		Vec3 sc = level->getSkyColor((Mob*)player, 1.0f);
+		if (sc.x > 0.01f || sc.y > 0.01f || sc.z > 0.01f) {
+			skyR = (float)sc.x;
+			skyG = (float)sc.y;
+			skyB = (float)sc.z;
+		}
+	}
+	glClearColor(skyR, skyG, skyB, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	// Setup Orthographic Projection
@@ -1819,13 +1875,18 @@ void Minecraft::takeIsometricScreenshot() {
 	glOrthof(-orthoWidth, orthoWidth, -orthoHeight, orthoHeight, -1000.0f, 1000.0f);
 
 	// Setup Isometric Camera (classic Indev angles: pitch 30 deg, yaw 45 deg)
+	// Note: Chunk and entity positions are already rendered relative to player,
+	// so the player position is at (0, 0, 0). Do NOT translate by -targetX, -targetY, -targetZ!
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity2();
 	glRotatef2(30.0f, 1.0f, 0.0f, 0.0f);
 	glRotatef2(45.0f, 0.0f, 1.0f, 0.0f);
-	glTranslatef2((float)-targetX, (float)-targetY, (float)-targetZ);
+	glTranslatef2(0.0f, -1.0f, 0.0f);
 
+	glEnable2(GL_TEXTURE_2D);
+	glColor4f2(1.0f, 1.0f, 1.0f, 1.0f);
 	glEnable2(GL_DEPTH_TEST);
+	glDepthMask(GL_TRUE);
 	glDepthFunc(GL_LEQUAL);
 	glEnable2(GL_CULL_FACE);
 	glEnable2(GL_ALPHA_TEST);
@@ -1836,26 +1897,29 @@ void Minecraft::takeIsometricScreenshot() {
 	Lighting::turnOff();
 
 	AllowAllCuller culler;
-	levelRenderer->cull(&culler, 0.0f);
 
 	// Pass 0: Opaque blocks
-	levelRenderer->render((Mob*)player, 0, 0.0f);
+	levelRenderer->render((Mob*)player, 0, 1.0f);
 
 	// Pass 1: Cutout blocks (foliage, saplings, flowers)
 	glEnable2(GL_ALPHA_TEST);
-	levelRenderer->render((Mob*)player, 1, 0.0f);
+	textures->loadAndBindTexture("terrain.png");
+	glColor4f2(1.0f, 1.0f, 1.0f, 1.0f);
+	levelRenderer->render((Mob*)player, 1, 1.0f);
 
 	// Render Entities (mobs, items, player)
 	Lighting::turnOn(this);
-	levelRenderer->renderEntities(player->getPos(0.0f), &culler, 0.0f);
+	levelRenderer->renderEntities(player->getPos(1.0f), &culler, 1.0f);
 	Lighting::turnOff();
 
 	// Pass 2: Translucent blocks (water, ice)
 	glEnable2(GL_BLEND);
 	glBlendFunc2(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	textures->loadAndBindTexture("terrain.png");
-	levelRenderer->render((Mob*)player, 2, 0.0f);
+	glColor4f2(1.0f, 1.0f, 1.0f, 1.0f);
+	levelRenderer->render((Mob*)player, 2, 1.0f);
 	glDisable2(GL_BLEND);
+	glDepthMask(GL_TRUE);
 
 	// Read pixels from framebuffer
 	std::vector<unsigned char> pixels(sw * sh * 4);
@@ -1866,6 +1930,12 @@ void Minecraft::takeIsometricScreenshot() {
 	glPopMatrix2();
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix2();
+	glMatrixMode(GL_MODELVIEW);
+
+	// Restore renderer and option state
+	levelRenderer->occlusionCheck = oldOcclusion;
+	options.set(OPTIONS_THIRD_PERSON_VIEW, oldThirdPerson);
+	cameraTargetPlayer = oldCameraTarget;
 
 #ifdef _WIN32
 	_mkdir("screenshots");
@@ -1885,6 +1955,26 @@ void Minecraft::takeIsometricScreenshot() {
 
 	if (saved) {
 		gui.addMessage("Saved screenshot as " + filename);
+#ifdef __EMSCRIPTEN__
+		EM_ASM({
+			try {
+				var path = UTF8ToString($0);
+				if (typeof FS !== 'undefined') {
+					var data = FS.readFile(path);
+					var blob = new Blob([data], { type: 'image/png' });
+					var a = document.createElement('a');
+					a.href = URL.createObjectURL(blob);
+					a.download = path.split('/').pop();
+					document.body.appendChild(a);
+					a.click();
+					document.body.removeChild(a);
+					setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+				}
+			} catch(e) {
+				console.error("Failed to download screenshot:", e);
+			}
+		}, filename.c_str());
+#endif
 	} else {
 		gui.addMessage("Failed to save screenshot!");
 	}

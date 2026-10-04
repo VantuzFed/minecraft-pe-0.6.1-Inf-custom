@@ -23,6 +23,7 @@ class TripodCamera;
 
 class LevelRenderer: public LevelListener
 {
+	friend class Minecraft;
 public:
     static const int CHUNK_SIZE;
     static const int MAX_VISIBLE_REBUILDS_PER_FRAME = 3;
