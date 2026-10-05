@@ -345,7 +345,7 @@ write_stub_file "com/mojang/android/preferences/SliderPreference.java" "package 
 
 write_stub_file "com/mojang/minecraftpe/MainMenuOptionsActivity.java" "package com.mojang.minecraftpe;\nimport android.app.Activity;\npublic class MainMenuOptionsActivity extends Activity {\n    public static final String Internal_Game_DifficultyPeaceful=\"internal_game_difficulty_peaceful\";\n    public static final String Game_DifficultyLevel=\"game_difficulty\";\n    public static final String Controls_Sensitivity=\"controls_sensitivity\";\n}\n"
 
-write_stub_file "com/mojang/minecraftpe/Minecraft_Market.java" "package com.mojang.minecraftpe;\nimport android.app.Activity; import android.content.Intent; import android.os.Bundle;\npublic class Minecraft_Market extends Activity {\n    @Override protected void onCreate(Bundle s){super.onCreate(s);startActivity(new Intent(this,MainActivity.class));finish();}\n}\n"
+write_stub_file "com/mojang/minecraftpe/Minecraft_Market.java" "package com.mojang.minecraftpe;\npublic class Minecraft_Market extends MainActivity {}\n"
 
 write_stub_file "com/mojang/minecraftpe/Minecraft_Market_Demo.java" "package com.mojang.minecraftpe;\nimport android.content.Intent; import android.net.Uri;\npublic class Minecraft_Market_Demo extends MainActivity {\n    @Override public void buyGame(){startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(\"market://details?id=com.mojang.minecraftpe\")));}\n    @Override protected boolean isDemo(){return true;}\n}\n"
 
@@ -429,14 +429,14 @@ rm -f "$APK_UNSIGNED" "$APK_ALIGNED" "$APK_SIGNED"
 pushd "$BUILD_DIR" >/dev/null
 zip -q "$APK_UNSIGNED" "classes.dex"
 if [[ "$TARGET_ABI" == "all" ]]; then
-  zip -q "$APK_UNSIGNED" "lib/arm64-v8a/libminecraftpe.so"
-  zip -q "$APK_UNSIGNED" "lib/armeabi-v7a/libminecraftpe.so"
+  zip -0 -q "$APK_UNSIGNED" "lib/arm64-v8a/libminecraftpe.so"
+  zip -0 -q "$APK_UNSIGNED" "lib/armeabi-v7a/libminecraftpe.so"
 else
-  zip -q "$APK_UNSIGNED" "lib/$TARGET_ABI/libminecraftpe.so"
+  zip -0 -q "$APK_UNSIGNED" "lib/$TARGET_ABI/libminecraftpe.so"
 fi
 popd >/dev/null
 
-# add assets into the apk under assets/
+# add assets into the apk under assets/ (must be uncompressed for AAsset_getBuffer)
 TMP_ASSETS_DIR="$(mktemp -d)"
 mkdir -p "$TMP_ASSETS_DIR/assets"
 if [[ -d "$DATA_DIR" ]]; then
@@ -446,7 +446,7 @@ if [[ -d "$REPO_ROOT/project/android_java/assets" ]]; then
   cp -r "$REPO_ROOT/project/android_java/assets/." "$TMP_ASSETS_DIR/assets/"
 fi
 pushd "$TMP_ASSETS_DIR" >/dev/null
-zip -q -r "$APK_UNSIGNED" assets
+zip -0 -q -r "$APK_UNSIGNED" assets
 popd >/dev/null
 rm -rf "$TMP_ASSETS_DIR"
 

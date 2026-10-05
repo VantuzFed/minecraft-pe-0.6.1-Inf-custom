@@ -176,10 +176,7 @@ public class MainMenuOptionsActivity extends Activity {
 
 Write-Stub "com\mojang\minecraftpe\Minecraft_Market.java" @"
 package com.mojang.minecraftpe;
-import android.app.Activity; import android.content.Intent; import android.os.Bundle;
-public class Minecraft_Market extends Activity {
-    @Override protected void onCreate(Bundle s){super.onCreate(s);startActivity(new Intent(this,MainActivity.class));finish();}
-}
+public class Minecraft_Market extends MainActivity {}
 "@
 
 Write-Stub "com\mojang\minecraftpe\Minecraft_Market_Demo.java" @"

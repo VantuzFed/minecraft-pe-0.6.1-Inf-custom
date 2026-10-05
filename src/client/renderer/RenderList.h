@@ -7,8 +7,6 @@ class RenderChunk;
 
 class RenderList
 {
-	static const int MAX_NUM_OBJECTS = 1024 * 3;
-
 public:
 	RenderList();
 	~RenderList();
@@ -18,7 +16,7 @@ public:
 	void add(int list);
 	void addR(const RenderChunk& chunk);
 
-	__inline void next() { ++listIndex; }
+	void next();
 
     void render();
 	void renderChunks();
@@ -35,6 +33,9 @@ public:
 	bool rendered;
 
 private:
+	void ensureCapacity(int needed);
+
+	int capacity;
 	int bufferLimit;
 };
 

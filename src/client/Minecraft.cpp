@@ -1862,8 +1862,12 @@ void Minecraft::takeIsometricScreenshot() {
 	levelRenderer->occlusionCheck = false;
 
 	// Force all loaded chunks visible and rebuild any dirty chunks
+	std::vector<bool> oldVisible(levelRenderer->chunksLength, false);
+	std::vector<bool> oldOcclusionVisible(levelRenderer->chunksLength, false);
 	for (int i = 0; i < levelRenderer->chunksLength; i++) {
 		if (levelRenderer->chunks[i]) {
+			oldVisible[i] = levelRenderer->chunks[i]->visible;
+			oldOcclusionVisible[i] = levelRenderer->chunks[i]->occlusion_visible;
 			levelRenderer->chunks[i]->visible = true;
 			levelRenderer->chunks[i]->occlusion_visible = true;
 		}
@@ -2004,6 +2008,13 @@ void Minecraft::takeIsometricScreenshot() {
 	levelRenderer->occlusionCheck = oldOcclusion;
 	options.set(OPTIONS_THIRD_PERSON_VIEW, oldThirdPerson);
 	cameraTargetPlayer = oldCameraTarget;
+
+	for (int i = 0; i < levelRenderer->chunksLength; i++) {
+		if (levelRenderer->chunks[i]) {
+			levelRenderer->chunks[i]->visible = oldVisible[i];
+			levelRenderer->chunks[i]->occlusion_visible = oldOcclusionVisible[i];
+		}
+	}
 
 	// Apply lighting & contrast enhancement
 	enhanceScreenshotLighting(outPixels.data(), totalW, totalH);

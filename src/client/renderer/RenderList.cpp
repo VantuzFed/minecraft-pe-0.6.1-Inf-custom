@@ -5,20 +5,49 @@
 #include "Tesselator.h"
 
 
+#include <cstring>
+
+
 RenderList::RenderList()
 	:	inited(false),
-	rendered(false)
+	rendered(false),
+	listIndex(0),
+	bufferLimit(0),
+	capacity(1024 * 4)
 {
-	lists = new int[MAX_NUM_OBJECTS];
-	rlists = new RenderChunk[MAX_NUM_OBJECTS];
+	lists = new int[capacity];
+	rlists = new RenderChunk[capacity];
 
-	for (int i = 0; i < MAX_NUM_OBJECTS; ++i)
+	for (int i = 0; i < capacity; ++i)
 		rlists[i].vboId = -1;
 }
 
 RenderList::~RenderList() {
 	delete[] lists;
 	delete[] rlists;
+}
+
+void RenderList::ensureCapacity(int needed) {
+	if (needed > capacity) {
+		int newCap = capacity * 2;
+		if (newCap < needed) newCap = needed;
+		int* newLists = new int[newCap];
+		RenderChunk* newRlists = new RenderChunk[newCap];
+		if (listIndex > 0) {
+			memcpy(newLists, lists, listIndex * sizeof(int));
+			for (int i = 0; i < listIndex; ++i) {
+				newRlists[i] = rlists[i];
+			}
+		}
+		for (int i = listIndex; i < newCap; ++i) {
+			newRlists[i].vboId = -1;
+		}
+		delete[] lists;
+		delete[] rlists;
+		lists = newLists;
+		rlists = newRlists;
+		capacity = newCap;
+	}
 }
 
 void RenderList::init(double xOff, double yOff, double zOff) {
@@ -31,12 +60,18 @@ void RenderList::init(double xOff, double yOff, double zOff) {
 }
 
 void RenderList::add(int list) {
+	ensureCapacity(listIndex + 1);
 	lists[listIndex] = list;
-	if (listIndex == MAX_NUM_OBJECTS) /*lists.remaining() == 0)*/ render();
 }
 
 void RenderList::addR(const RenderChunk& chunk) {
+	ensureCapacity(listIndex + 1);
 	rlists[listIndex] = chunk;
+}
+
+void RenderList::next() {
+	ensureCapacity(listIndex + 1);
+	++listIndex;
 }
 
 void RenderList::render() {
@@ -96,4 +131,6 @@ void RenderList::renderChunks() {
 void RenderList::clear() {
 	inited = false;
 	rendered = false;
+	listIndex = 0;
+	bufferLimit = 0;
 }
