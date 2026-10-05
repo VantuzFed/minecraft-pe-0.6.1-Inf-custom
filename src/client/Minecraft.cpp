@@ -1764,12 +1764,39 @@ void Minecraft::optionUpdated(OptionId option, int value ) {
 	}
 }
 
+static void enhanceScreenshotLighting(unsigned char* pixels, int width, int height) {
+	if (!pixels || width <= 0 || height <= 0) return;
+
+	// High-quality tone mapping LUT:
+	// A subtle Hermite S-curve enhances depth in ambient occlusion shadows and gives crisp daylight pop
+	unsigned char lut[256];
+	for (int i = 0; i < 256; i++) {
+		float x = (float)i / 255.0f;
+		float s = x * x * (3.0f - 2.0f * x); // Hermite smoothstep
+		float blended = x * 0.75f + s * 0.25f; // Gentle 25% blend for natural vibrant contrast
+		int val = (int)(blended * 255.0f + 0.5f);
+		if (val < 0) val = 0;
+		if (val > 255) val = 255;
+		lut[i] = (unsigned char)val;
+	}
+
+	int totalPixels = width * height;
+	for (int i = 0; i < totalPixels; i++) {
+		unsigned char* p = &pixels[i * 4];
+		p[0] = lut[p[0]]; // R
+		p[1] = lut[p[1]]; // G
+		p[2] = lut[p[2]]; // B
+	}
+}
+
 void Minecraft::takeScreenshot() {
 #ifndef STANDALONE_SERVER
 	if (!level) return;
 
 	std::vector<unsigned char> pixels(width * height * 4);
 	glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+	enhanceScreenshotLighting(pixels.data(), width, height);
 
 #ifdef _WIN32
 	_mkdir("screenshots");
@@ -1786,8 +1813,11 @@ void Minecraft::takeScreenshot() {
 	std::string filename = "screenshots/" + std::string(timeStr) + ".png";
 	bool saved = savePngToFile(filename, width, height, pixels.data(), true);
 
+	char resBuf[64];
+	snprintf(resBuf, sizeof(resBuf), " (%dx%d)", width, height);
+
 	if (saved) {
-		gui.addMessage("Saved screenshot as " + filename);
+		gui.addMessage("Saved screenshot" + std::string(resBuf) + " as " + filename);
 #ifdef __EMSCRIPTEN__
 		EM_ASM({
 			try {
@@ -1840,90 +1870,128 @@ void Minecraft::takeIsometricScreenshot() {
 	}
 	levelRenderer->updateDirtyChunks((Mob*)player, true);
 
-	// Setup Projection and Modelview matrices
-	glMatrixMode(GL_PROJECTION);
-	glPushMatrix2();
-	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix2();
-
-	glViewport(0, 0, sw, sh);
-
-	// Ensure depth and color masks are writable before clearing
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-	glDepthMask(GL_TRUE);
-	glEnable2(GL_DEPTH_TEST);
-	glDepthFunc(GL_LEQUAL);
-
-	float skyR = 0.5f, skyG = 0.7f, skyB = 1.0f;
+	// Setup sky color based on time of day and biome
+	float skyR = 0.53f, skyG = 0.73f, skyB = 0.98f;
 	if (level) {
+		float td = level->getTimeOfDay(1.0f);
+		float sunBr = Mth::cos(td * Mth::PI * 2.0f) * 2.0f + 0.5f;
+		if (sunBr < 0.0f) sunBr = 0.0f;
+		if (sunBr > 1.0f) sunBr = 1.0f;
+
 		Vec3 sc = level->getSkyColor((Mob*)player, 1.0f);
 		if (sc.x > 0.01f || sc.y > 0.01f || sc.z > 0.01f) {
-			skyR = (float)sc.x;
-			skyG = (float)sc.y;
-			skyB = (float)sc.z;
+			skyR = (float)sc.x * 0.35f + 0.53f * 0.65f * sunBr;
+			skyG = (float)sc.y * 0.35f + 0.73f * 0.65f * sunBr;
+			skyB = (float)sc.z * 0.35f + 0.98f * 0.65f * sunBr;
+		} else {
+			skyR *= sunBr;
+			skyG *= sunBr;
+			skyB *= sunBr;
 		}
 	}
 	glClearColor(skyR, skyG, skyB, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// Setup Orthographic Projection
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity2();
+	// Tiled high-resolution rendering:
+	// Renders sub-frustums into the framebuffer to produce a high-resolution composite image (up to 4K)
+	int scale = 2;
+	if (sw * scale < 1800 && sh * scale < 1200) {
+		scale = 3;
+	}
+
+	int totalW = sw * scale;
+	int totalH = sh * scale;
+	std::vector<unsigned char> outPixels(totalW * totalH * 4);
+	std::vector<unsigned char> tilePixels(sw * sh * 4);
+
 	float aspect = (float)sw / (float)sh;
 	float orthoHeight = 48.0f; // Shows ~48 blocks vertically
 	float orthoWidth = orthoHeight * aspect;
-	glOrthof(-orthoWidth, orthoWidth, -orthoHeight, orthoHeight, -1000.0f, 1000.0f);
 
-	// Setup Isometric Camera (classic Indev angles: pitch 30 deg, yaw 45 deg)
-	// Note: Chunk and entity positions are already rendered relative to player,
-	// so the player position is at (0, 0, 0). Do NOT translate by -targetX, -targetY, -targetZ!
+	glMatrixMode(GL_PROJECTION);
+	glPushMatrix2();
 	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity2();
-	glRotatef2(30.0f, 1.0f, 0.0f, 0.0f);
-	glRotatef2(45.0f, 0.0f, 1.0f, 0.0f);
-	glTranslatef2(0.0f, -1.0f, 0.0f);
+	glPushMatrix2();
 
-	glEnable2(GL_TEXTURE_2D);
-	glColor4f2(1.0f, 1.0f, 1.0f, 1.0f);
-	glEnable2(GL_DEPTH_TEST);
-	glDepthMask(GL_TRUE);
-	glDepthFunc(GL_LEQUAL);
-	glEnable2(GL_CULL_FACE);
-	glEnable2(GL_ALPHA_TEST);
-	glAlphaFunc(GL_GREATER, 0.1f);
-	glDisable2(GL_FOG);
+	for (int ty = 0; ty < scale; ty++) {
+		for (int tx = 0; tx < scale; tx++) {
+			glViewport(0, 0, sw, sh);
 
-	textures->loadAndBindTexture("terrain.png");
-	Lighting::turnOff();
+			// Ensure depth and color masks are writable before clearing
+			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+			glDepthMask(GL_TRUE);
+			glEnable2(GL_DEPTH_TEST);
+			glDepthFunc(GL_LEQUAL);
 
-	AllowAllCuller culler;
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// Pass 0: Opaque blocks
-	levelRenderer->render((Mob*)player, 0, 1.0f);
+			// Setup sub-tile orthographic projection
+			glMatrixMode(GL_PROJECTION);
+			glLoadIdentity2();
+			float tileLeft   = -orthoWidth  + (2.0f * orthoWidth)  * ((float)tx / (float)scale);
+			float tileRight  = -orthoWidth  + (2.0f * orthoWidth)  * ((float)(tx + 1) / (float)scale);
+			float tileBottom = -orthoHeight + (2.0f * orthoHeight) * ((float)ty / (float)scale);
+			float tileTop    = -orthoHeight + (2.0f * orthoHeight) * ((float)(ty + 1) / (float)scale);
+			glOrthof(tileLeft, tileRight, tileBottom, tileTop, -1000.0f, 1000.0f);
 
-	// Pass 1: Cutout blocks (foliage, saplings, flowers)
-	glEnable2(GL_ALPHA_TEST);
-	textures->loadAndBindTexture("terrain.png");
-	glColor4f2(1.0f, 1.0f, 1.0f, 1.0f);
-	levelRenderer->render((Mob*)player, 1, 1.0f);
+			// Setup Isometric Camera (classic Indev angles: pitch 30 deg, yaw 45 deg)
+			glMatrixMode(GL_MODELVIEW);
+			glLoadIdentity2();
+			glRotatef2(30.0f, 1.0f, 0.0f, 0.0f);
+			glRotatef2(45.0f, 0.0f, 1.0f, 0.0f);
+			glTranslatef2(0.0f, -1.0f, 0.0f);
 
-	// Render Entities (mobs, items, player)
-	Lighting::turnOn(this);
-	levelRenderer->renderEntities(player->getPos(1.0f), &culler, 1.0f);
-	Lighting::turnOff();
+			// Set smooth shading for beautiful ambient occlusion gradients
+			glShadeModel2(GL_SMOOTH);
+			glEnable2(GL_TEXTURE_2D);
+			glColor4f2(1.0f, 1.0f, 1.0f, 1.0f);
+			glEnable2(GL_DEPTH_TEST);
+			glDepthMask(GL_TRUE);
+			glDepthFunc(GL_LEQUAL);
+			glEnable2(GL_CULL_FACE);
+			glEnable2(GL_ALPHA_TEST);
+			glAlphaFunc(GL_GREATER, 0.1f);
+			glDisable2(GL_FOG);
 
-	// Pass 2: Translucent blocks (water, ice)
-	glEnable2(GL_BLEND);
-	glBlendFunc2(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	textures->loadAndBindTexture("terrain.png");
-	glColor4f2(1.0f, 1.0f, 1.0f, 1.0f);
-	levelRenderer->render((Mob*)player, 2, 1.0f);
-	glDisable2(GL_BLEND);
-	glDepthMask(GL_TRUE);
+			textures->loadAndBindTexture("terrain.png");
+			Lighting::turnOff();
 
-	// Read pixels from framebuffer
-	std::vector<unsigned char> pixels(sw * sh * 4);
-	glReadPixels(0, 0, sw, sh, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+			AllowAllCuller culler;
+
+			// Pass 0: Opaque blocks
+			levelRenderer->render((Mob*)player, 0, 1.0f);
+
+			// Pass 1: Cutout blocks (foliage, saplings, flowers)
+			glEnable2(GL_ALPHA_TEST);
+			textures->loadAndBindTexture("terrain.png");
+			glColor4f2(1.0f, 1.0f, 1.0f, 1.0f);
+			levelRenderer->render((Mob*)player, 1, 1.0f);
+
+			// Render Entities (mobs, items, player)
+			Lighting::turnOn(this);
+			levelRenderer->renderEntities(player->getPos(1.0f), &culler, 1.0f);
+			Lighting::turnOff();
+			glShadeModel2(GL_SMOOTH);
+
+			// Pass 2: Translucent blocks (water, ice)
+			glEnable2(GL_BLEND);
+			glBlendFunc2(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			textures->loadAndBindTexture("terrain.png");
+			glColor4f2(1.0f, 1.0f, 1.0f, 1.0f);
+			levelRenderer->render((Mob*)player, 2, 1.0f);
+			glDisable2(GL_BLEND);
+			glDepthMask(GL_TRUE);
+
+			// Read sub-tile pixels
+			glReadPixels(0, 0, sw, sh, GL_RGBA, GL_UNSIGNED_BYTE, tilePixels.data());
+
+			// Copy into composite high-resolution image buffer
+			for (int y = 0; y < sh; y++) {
+				int dstY = ty * sh + y;
+				int dstX = tx * sw;
+				memcpy(&outPixels[(dstY * totalW + dstX) * 4], &tilePixels[y * sw * 4], sw * 4);
+			}
+		}
+	}
 
 	// Restore GL state
 	glMatrixMode(GL_MODELVIEW);
@@ -1936,6 +2004,9 @@ void Minecraft::takeIsometricScreenshot() {
 	levelRenderer->occlusionCheck = oldOcclusion;
 	options.set(OPTIONS_THIRD_PERSON_VIEW, oldThirdPerson);
 	cameraTargetPlayer = oldCameraTarget;
+
+	// Apply lighting & contrast enhancement
+	enhanceScreenshotLighting(outPixels.data(), totalW, totalH);
 
 #ifdef _WIN32
 	_mkdir("screenshots");
@@ -1950,11 +2021,14 @@ void Minecraft::takeIsometricScreenshot() {
 	strftime(timeStr, sizeof(timeStr), "%Y-%m-%d_%H.%M.%S", timeinfo);
 
 	std::string filename = "screenshots/mc_map_" + std::string(timeStr) + ".png";
-	bool saved = savePngToFile(filename, sw, sh, pixels.data(), true);
-	savePngToFile("screenshots/mc_map.png", sw, sh, pixels.data(), true);
+	bool saved = savePngToFile(filename, totalW, totalH, outPixels.data(), true);
+	savePngToFile("screenshots/mc_map.png", totalW, totalH, outPixels.data(), true);
+
+	char resBuf[64];
+	snprintf(resBuf, sizeof(resBuf), " (%dx%d)", totalW, totalH);
 
 	if (saved) {
-		gui.addMessage("Saved screenshot as " + filename);
+		gui.addMessage("Saved screenshot" + std::string(resBuf) + " as " + filename);
 #ifdef __EMSCRIPTEN__
 		EM_ASM({
 			try {
