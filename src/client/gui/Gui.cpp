@@ -1059,41 +1059,41 @@ void Gui::renderScreenshotOverlay( const int screenWidth, const int screenHeight
 	float cy = (float)(screenHeight / 2) - 10.0f;
 	float time = getTimeS();
 
-	// Smooth animated rotation (80 degrees / second)
-	float angle = fmodf(time * 80.0f, 360.0f);
-	// Gentle breathing pulse
-	float pulse = 1.0f + 0.05f * sinf(time * 6.0f);
+	// LCE-style segmented pixel spinner ("ромашка" - circular segmented loading wheel)
+	// 12 radial pixel dots with a rotating trailing brightness decay
+	const int numDots = 12;
+	const float radius = 18.0f;
+	const float dotSize = 2.0f; // 4x4 pixels total
 
-	glPushMatrix2();
-	glTranslatef2(cx, cy, 0.0f);
-	glRotatef2(angle, 0.0f, 0.0f, 1.0f);
-	glScalef2(pulse, pulse, 1.0f);
+	// Current active head step (advances clockwise at 12 steps per second)
+	int activeStep = ((int)(time * 12.0f)) % numDots;
 
-	// Draw 8 pixel daisy petals
-	for (int i = 0; i < 8; ++i) {
-		glPushMatrix2();
-		glRotatef2((float)(i * 45), 0.0f, 0.0f, 1.0f);
+	for (int i = 0; i < numDots; ++i) {
+		// Angles starting from top (-PI/2) and moving clockwise
+		float angle = (float)i * (Mth::TWO_PI / (float)numDots) - (Mth::PI / 2.0f);
+		float dx = cosf(angle) * radius;
+		float dy = sinf(angle) * radius;
 
-		// Outer petal shadow / outline
-		fill(-4.0f, 7.0f, 4.0f, 21.0f, 0xFF90A4AE);
-		// White petal body
-		fill(-3.0f, 7.0f, 3.0f, 20.0f, 0xFFECEFF1);
-		// Pure white inner highlight
-		fill(-2.0f, 8.0f, 2.0f, 18.0f, 0xFFFFFFFF);
-		// Rounded tip
-		fill(-1.5f, 20.0f, 1.5f, 22.0f, 0xFFFFFFFF);
+		// Distance behind the active leading dot (0 = head, 11 = tail)
+		int diff = (activeStep - i + numDots) % numDots;
 
-		glPopMatrix2();
+		// Smooth quadratic brightness falloff along the tail
+		float brightness = 1.0f - (float)diff / (float)numDots;
+		brightness = brightness * brightness;
+
+		int alpha = (int)(30.0f + 225.0f * brightness);
+		int val = (int)(180.0f + 75.0f * brightness);
+		unsigned int dotColor = (alpha << 24) | (val << 16) | (val << 8) | val;
+		unsigned int shadowColor = ((alpha / 3) << 24);
+
+		float x = cx + dx;
+		float y = cy + dy;
+
+		// 1px drop shadow
+		fill(x - dotSize + 1.0f, y - dotSize + 1.0f, x + dotSize + 1.0f, y + dotSize + 1.0f, shadowColor);
+		// Crisp pixel dot
+		fill(x - dotSize, y - dotSize, x + dotSize, y + dotSize, dotColor);
 	}
-
-	// Golden daisy center (heart of the flower)
-	fill(-7.0f, -7.0f, 7.0f, 7.0f, 0xFFE67E00); // deep amber border
-	fill(-6.0f, -6.0f, 6.0f, 6.0f, 0xFFFFA000); // warm gold
-	fill(-5.0f, -5.0f, 5.0f, 5.0f, 0xFFFFC107); // bright daisy yellow
-	fill(-3.0f, -3.0f, 3.0f, 3.0f, 0xFFFFD54F); // inner bright core
-	fill(-2.0f, 1.0f, 1.0f, 4.0f, 0xFFFFF9C4);  // subtle light glint
-
-	glPopMatrix2();
 
 	// Animated dots for "Saving map..."
 	int dots = ((int)(time * 3.5f)) % 4;
