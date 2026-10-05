@@ -135,18 +135,20 @@ DEX_OUTPUT="$BUILD_DIR/classes.dex"
 NO_CPP=false
 NO_JAVA=false
 NO_BUILD=false
+NO_INSTALL=false
 
 ########################################
 # helpers
 ########################################
 function usage() {
   cat <<EOF
-Usage: $0 [--no-cpp] [--no-java] [--no-build] [--abi <abi>]
+Usage: $0 [--no-cpp] [--no-java] [--no-build] [--no-install] [--abi <abi>]
 
 Options:
   --no-cpp         Skip the NDK (C++) build step
   --no-java        Skip the Java build step
   --no-build       Skip the compile steps; just package + install
+  --no-install     Skip the ADB install step (useful for CI or packaging only)
   --abi <abi>      Target ABI: arm64-v8a (default), armeabi-v7a, or all
                    Can also be set via MATRIX_ABI env var for CI matrix builds.
 EOF
@@ -221,8 +223,11 @@ function build_ndk_abi() {
     extra_flags+=( "APP_ARM_MODE=arm" "APP_ARM_NEON=true" )
   fi
 
-  echo "  ndk-build for $abi..."
+  local jobs
+  jobs="$(nproc 2>/dev/null || echo 4)"
+  echo "  ndk-build for $abi (jobs: $jobs)..."
   if ! "$ANDROID_NDK_PATH/ndk-build" \
+      -j"$jobs" \
       NDK_PROJECT_PATH="$REPO_ROOT/project/android" \
       APP_BUILD_SCRIPT="$JNI_DIR/Android.mk" \
       "${extra_flags[@]}" \
@@ -244,6 +249,7 @@ while [[ $# -gt 0 ]]; do
     --no-cpp) NO_CPP=true ;;
     --no-java) NO_JAVA=true ;;
     --no-build) NO_BUILD=true ;;
+    --no-install) NO_INSTALL=true ;;
     --abi)
       shift
       [[ $# -gt 0 ]] || fail "--abi requires a value (arm64-v8a, armeabi-v7a, all)"
@@ -300,7 +306,7 @@ if [[ ! -x "$DEX_TOOL" ]]; then
   fail "d8 not found at $DEX_TOOL"
 fi
 
-if [[ ! -x "$ADB" ]]; then
+if [[ "$NO_INSTALL" == false && ! -x "$ADB" ]]; then
   fail "adb not found at $ADB"
 fi
 
@@ -356,7 +362,7 @@ if [[ "$NO_CPP" == false && "$NO_BUILD" == false ]]; then
   # on linux, path lengths are *usually* fine, but we still keep things simple
   pushd "$JNI_DIR" >/dev/null
 
-  export NDK_MODULE_PATH="$REPO_ROOT/project/lib_projects"
+  export NDK_MODULE_PATH="$REPO_ROOT/project/lib_projects:$ANDROID_NDK_PATH/sources"
 
   # build each requested ABI by delegating to build_ndk_abi()
   if [[ "$TARGET_ABI" == "all" ]]; then
@@ -385,7 +391,7 @@ if [[ "$NO_JAVA" == false && "$NO_BUILD" == false ]]; then
   JAVA_SOURCES=(
     $(find "$JAVA_SRC_DIR" -name "*.java" -print)
     $(find "$BUILD_DIR/stubs" -name "*.java" -print)
-    "$BUILD_DIR/gen/R.java"
+    $(find "$BUILD_DIR/gen" -name "*.java" -print)
   )
 
   rm -rf "$BUILD_DIR/classes"
@@ -402,7 +408,7 @@ if [[ "$NO_JAVA" == false && "$NO_BUILD" == false ]]; then
 
   # convert class files into dex
   JAVA_CLASS_FILES=( $(find "$BUILD_DIR/classes" -name "*.class" -print) )
-  "$DEX_TOOL" --min-api 21 --output "$BUILD_DIR" "${JAVA_CLASS_FILES[@]}"
+  "$DEX_TOOL" --min-api 21 --lib "$ANDROID_PLATFORM_DIR/android.jar" --output "$BUILD_DIR" "${JAVA_CLASS_FILES[@]}"
   echo "  d8 -> $DEX_OUTPUT"
 fi
 
@@ -429,10 +435,15 @@ else
 fi
 popd >/dev/null
 
-# add assets from data/ directory into the apk under assets/
+# add assets into the apk under assets/
 TMP_ASSETS_DIR="$(mktemp -d)"
 mkdir -p "$TMP_ASSETS_DIR/assets"
-cp -r "$DATA_DIR/." "$TMP_ASSETS_DIR/assets/"
+if [[ -d "$DATA_DIR" ]]; then
+  cp -r "$DATA_DIR/." "$TMP_ASSETS_DIR/assets/"
+fi
+if [[ -d "$REPO_ROOT/project/android_java/assets" ]]; then
+  cp -r "$REPO_ROOT/project/android_java/assets/." "$TMP_ASSETS_DIR/assets/"
+fi
 pushd "$TMP_ASSETS_DIR" >/dev/null
 zip -q -r "$APK_UNSIGNED" assets
 popd >/dev/null
@@ -446,10 +457,14 @@ echo "  signed -> $APK_SIGNED"
 ########################################
 # install
 ########################################
-log_step "Install"
+if [[ "$NO_INSTALL" == false ]]; then
+  log_step "Install"
 
-"$ADB" shell am force-stop "$PACKAGE_NAME" || true
-"$ADB" uninstall "$PACKAGE_NAME" || true
-"$ADB" install --no-incremental "$APK_SIGNED"
+  "$ADB" shell am force-stop "$PACKAGE_NAME" || true
+  "$ADB" uninstall "$PACKAGE_NAME" || true
+  "$ADB" install --no-incremental "$APK_SIGNED"
 
-echo -e "\nDone. Enjoy MCPE 0.6.1 on your device!"
+  echo -e "\nDone. Enjoy MCPE 0.6.1 on your device!"
+else
+  echo -e "\nBuild complete. APK signed at: $APK_SIGNED"
+fi
