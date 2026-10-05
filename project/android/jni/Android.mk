@@ -15,6 +15,7 @@ LOCAL_SRC_FILES := ../../../src/main.cpp \
                    ../../../src/platform/time.cpp \
                    ../../../src/platform/CThread.cpp \
                    ../../../src/platform/HttpClient.cpp \
+                   ../../../src/platform/PngLoader.cpp \
 ../../../src/NinecraftApp.cpp \
 ../../../src/Performance.cpp \
 ../../../src/SharedConstants.cpp \
@@ -292,7 +293,7 @@ LOCAL_C_INCLUDES := $(LOCAL_PATH)/../../../src
 #LOCAL_CFLAGS := -DDEMO_MODE -DGLDEBUG $(LOCAL_CFLAGS)
 #LOCAL_CFLAGS := -DGLDEBUG $(LOCAL_CFLAGS)
 
-LOCAL_LDLIBS    := -llog -landroid -lEGL -lGLESv1_CM -lOpenSLES
+LOCAL_LDLIBS    := -llog -landroid -lEGL -lGLESv1_CM -lOpenSLES -lz
 LOCAL_STATIC_LIBRARIES := android_native_app_glue RakNet
 
 #LOCAL_CPP_FEATURES := exceptions

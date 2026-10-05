@@ -1,7 +1,81 @@
 #include "PngLoader.h"
 
-#include <png.h>
 #include <cstring>
+#include <vector>
+
+#if defined(PLATFORM_ANDROID) || defined(ANDROID)
+
+#include <zlib.h>
+#include <arpa/inet.h>
+
+TextureData loadPngFromMemory(const unsigned char* data, size_t size) {
+    return TextureData();
+}
+
+static void writeChunk(FILE* fp, const char* type, const unsigned char* data, uint32_t len) {
+    uint32_t netLen = htonl(len);
+    fwrite(&netLen, 1, 4, fp);
+    fwrite(type, 1, 4, fp);
+    uint32_t crc = crc32(0, (const Bytef*)type, 4);
+    if (len > 0 && data) {
+        fwrite(data, 1, len, fp);
+        crc = crc32(crc, data, len);
+    }
+    uint32_t netCrc = htonl(crc);
+    fwrite(&netCrc, 1, 4, fp);
+}
+
+bool savePngToFile(const std::string& filename, int width, int height, const unsigned char* rgbaPixels, bool flipY) {
+#ifndef STANDALONE_SERVER
+    if (!rgbaPixels || width <= 0 || height <= 0) return false;
+    FILE* fp = fopen(filename.c_str(), "wb");
+    if (!fp) return false;
+
+    const unsigned char sig[8] = { 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a };
+    fwrite(sig, 1, 8, fp);
+
+    unsigned char ihdr[13];
+    uint32_t nw = htonl(width);
+    uint32_t nh = htonl(height);
+    memcpy(&ihdr[0], &nw, 4);
+    memcpy(&ihdr[4], &nh, 4);
+    ihdr[8] = 8;
+    ihdr[9] = 6; // RGBA
+    ihdr[10] = 0;
+    ihdr[11] = 0;
+    ihdr[12] = 0;
+    writeChunk(fp, "IHDR", ihdr, 13);
+
+    int stride = width * 4;
+    size_t rawSize = (stride + 1) * height;
+    std::vector<unsigned char> rawData(rawSize);
+    for (int y = 0; y < height; ++y) {
+        int srcY = flipY ? (height - 1 - y) : y;
+        unsigned char* row = &rawData[y * (stride + 1)];
+        row[0] = 0;
+        memcpy(row + 1, rgbaPixels + srcY * stride, stride);
+    }
+
+    uLongf destLen = compressBound(rawSize);
+    std::vector<unsigned char> compressedData(destLen);
+    if (compress(compressedData.data(), &destLen, rawData.data(), rawSize) != Z_OK) {
+        fclose(fp);
+        return false;
+    }
+
+    writeChunk(fp, "IDAT", compressedData.data(), destLen);
+    writeChunk(fp, "IEND", nullptr, 0);
+
+    fclose(fp);
+    return true;
+#else
+    return false;
+#endif
+}
+
+#else
+
+#include <png.h>
 
 struct MemoryReader {
     const unsigned char* data;
@@ -147,3 +221,5 @@ bool savePngToFile(const std::string& filename, int width, int height, const uns
     return false;
 #endif
 }
+
+#endif

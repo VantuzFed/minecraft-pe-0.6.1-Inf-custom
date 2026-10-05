@@ -232,7 +232,8 @@ function build_ndk_abi() {
       APP_BUILD_SCRIPT="$JNI_DIR/Android.mk" \
       "${extra_flags[@]}" \
       2>&1 | tee "$BUILD_DIR/ndk-build-${abi}.log"; then
-    echo "NDK build failed for $abi. See $BUILD_DIR/ndk-build-${abi}.log" >&2
+    echo "NDK build failed for $abi. Last 80 lines of log:" >&2
+    tail -n 80 "$BUILD_DIR/ndk-build-${abi}.log" >&2
     exit 1
   fi
 
