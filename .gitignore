@@ -4,6 +4,8 @@ out/
 bin/
 lib/
 build-apk/
+android-ndk-*/
+ndk.zip
 cmake-build-*/
 CMakeFiles/
 CMakeCache.txt
