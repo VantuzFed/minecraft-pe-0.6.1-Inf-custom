@@ -60,6 +60,7 @@ public:
 	void renderOnSelectItemNameText( const int screenWidth, Font* font, int ySlot );
 
 	void renderSleepAnimation( const int screenWidth, const int screenHeight );
+	void renderScreenshotOverlay( const int screenWidth, const int screenHeight );
 
 	void renderBubbles();
 	void renderHearts();

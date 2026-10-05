@@ -161,6 +161,10 @@ void Gui::render(float a, bool mouseFree, int xMouse, int yMouse) {
 			renderDebugInfo();
 	}
 
+	if (minecraft->isSavingScreenshot) {
+		renderScreenshotOverlay(screenWidth, screenHeight);
+	}
+
 	glDisable(GL_BLEND);
 	glEnable2(GL_ALPHA_TEST);
 }
@@ -1045,6 +1049,64 @@ void Gui::renderSleepAnimation( const int screenWidth, const int screenHeight ) 
 
 	int color = (int) (220.0f * amount) << 24 | (0x101020);
 	fill(0, 0, screenWidth, screenHeight, color);
+}
+
+void Gui::renderScreenshotOverlay( const int screenWidth, const int screenHeight ) {
+	// Darkened overlay over the game
+	fill(0, 0, screenWidth, screenHeight, 0xAA000000);
+
+	float cx = (float)(screenWidth / 2);
+	float cy = (float)(screenHeight / 2) - 10.0f;
+	float time = getTimeS();
+
+	// Smooth animated rotation (80 degrees / second)
+	float angle = fmodf(time * 80.0f, 360.0f);
+	// Gentle breathing pulse
+	float pulse = 1.0f + 0.05f * sinf(time * 6.0f);
+
+	glPushMatrix2();
+	glTranslatef2(cx, cy, 0.0f);
+	glRotatef2(angle, 0.0f, 0.0f, 1.0f);
+	glScalef2(pulse, pulse, 1.0f);
+
+	// Draw 8 pixel daisy petals
+	for (int i = 0; i < 8; ++i) {
+		glPushMatrix2();
+		glRotatef2((float)(i * 45), 0.0f, 0.0f, 1.0f);
+
+		// Outer petal shadow / outline
+		fill(-4.0f, 7.0f, 4.0f, 21.0f, 0xFF90A4AE);
+		// White petal body
+		fill(-3.0f, 7.0f, 3.0f, 20.0f, 0xFFECEFF1);
+		// Pure white inner highlight
+		fill(-2.0f, 8.0f, 2.0f, 18.0f, 0xFFFFFFFF);
+		// Rounded tip
+		fill(-1.5f, 20.0f, 1.5f, 22.0f, 0xFFFFFFFF);
+
+		glPopMatrix2();
+	}
+
+	// Golden daisy center (heart of the flower)
+	fill(-7.0f, -7.0f, 7.0f, 7.0f, 0xFFE67E00); // deep amber border
+	fill(-6.0f, -6.0f, 6.0f, 6.0f, 0xFFFFA000); // warm gold
+	fill(-5.0f, -5.0f, 5.0f, 5.0f, 0xFFFFC107); // bright daisy yellow
+	fill(-3.0f, -3.0f, 3.0f, 3.0f, 0xFFFFD54F); // inner bright core
+	fill(-2.0f, 1.0f, 1.0f, 4.0f, 0xFFFFF9C4);  // subtle light glint
+
+	glPopMatrix2();
+
+	// Animated dots for "Saving map..."
+	int dots = ((int)(time * 3.5f)) % 4;
+	std::string statusText = "Saving map" + std::string(dots, '.');
+	int tw = minecraft->font->width("Saving map...");
+	minecraft->font->drawShadow(statusText, cx - tw / 2.0f, cy + 32.0f, 0xFFFFFFFF);
+
+	// If manual zoom was used, show slot & zoom info
+	if (minecraft->screenshotSlot > 0) {
+		std::string zoomText = "Zoom: Slot " + std::to_string(minecraft->screenshotSlot) + " (" + std::to_string((int)minecraft->screenshotPendingZoom) + " blocks)";
+		int zw = minecraft->font->width(zoomText);
+		minecraft->font->drawShadow(zoomText, cx - zw / 2.0f, cy + 45.0f, 0xFFFFCC00);
+	}
 }
 
 void Gui::renderOnSelectItemNameText( const int screenWidth, Font* font, int ySlot ) {

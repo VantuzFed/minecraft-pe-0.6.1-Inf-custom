@@ -68,6 +68,10 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #endif
+#if !defined(__EMSCRIPTEN__)
+#include <thread>
+static std::thread s_screenshotThread;
+#endif
 #include "sound/SoundEngine.h"
 #endif // STANDALONE_SERVER
 
@@ -194,7 +198,14 @@ Minecraft::Minecraft() :
 	_powerVr(false),
 	commandPort(4711),
 	reserved_d1(0),reserved_d2(0),
-	reserved_f1(0),reserved_f2(0), options(this)
+	reserved_f1(0),reserved_f2(0), options(this),
+	isSavingScreenshot(false),
+	screenshotPendingCapture(false),
+	screenshotSaveDone(false),
+	screenshotSaveSuccess(false),
+	screenshotSaveStartTime(0.0f),
+	screenshotPendingZoom(48.0f),
+	screenshotSlot(0)
 {
 	//#ifdef ANDROID
 
@@ -212,6 +223,11 @@ Minecraft::Minecraft() :
 
 Minecraft::~Minecraft()
 {
+#if !defined(__EMSCRIPTEN__)
+	if (s_screenshotThread.joinable()) {
+		s_screenshotThread.join();
+	}
+#endif
 	delete netCallback;
 	delete raknetInstance;
 #ifndef STANDALONE_SERVER
@@ -512,6 +528,13 @@ void Minecraft::update() {
 	TIMER_POP();
 
 #ifndef STANDALONE_SERVER
+	updateScreenshotState();
+
+	if (screenshotPendingCapture) {
+		screenshotPendingCapture = false;
+		executeIsometricScreenshotCapture(screenshotPendingZoom);
+	}
+
 	if (gameMode != NULL) gameMode->render(timer.a);
 	TIMER_PUSH("sound");
 	soundEngine->update(player, timer.a);
@@ -716,6 +739,13 @@ void Minecraft::tickInput() {
 		return;
 	}
 
+	if (isSavingScreenshot) {
+		player->releaseAllKeys();
+		while (Mouse::next()) {}
+		while (Keyboard::next()) {}
+		return;
+	}
+
 #ifdef RPI
 	bool mouseDiggable = true;
 	bool allowGuiClicks = !mouseGrabbed;
@@ -837,8 +867,24 @@ void Minecraft::tickInput() {
 				takeScreenshot();
 			}
 
-			if (key == Keyboard::KEY_F7) {
-				takeIsometricScreenshot();
+			if (key == Keyboard::KEY_F7 && !isSavingScreenshot) {
+				startIsometricScreenshot(48.0f, 0);
+			}
+
+			if (key == Keyboard::KEY_F8 && !isSavingScreenshot) {
+				int selectedSlot = 0;
+				if (player && player->inventory) {
+					selectedSlot = player->inventory->selected;
+				}
+				if (selectedSlot < 0) selectedSlot = 0;
+				if (selectedSlot > 8) selectedSlot = 8;
+				// Hotbar slots 1-9 (indices 0-8) map to zoom levels (orthographic height in blocks):
+				// Slot 1: extreme close-up (8 blocks)
+				// Slot 5: default standard view (48 blocks)
+				// Slot 9: wide panorama (200 blocks)
+				static const float zoomLevels[9] = { 8.0f, 16.0f, 24.0f, 36.0f, 48.0f, 64.0f, 96.0f, 140.0f, 200.0f };
+				float customZoom = zoomLevels[selectedSlot];
+				startIsometricScreenshot(customZoom, selectedSlot + 1);
 			}
 
 			if (key == Keyboard::KEY_F3) {
@@ -1844,9 +1890,30 @@ void Minecraft::takeScreenshot() {
 #endif
 }
 
-void Minecraft::takeIsometricScreenshot() {
+void Minecraft::takeIsometricScreenshot(float customOrthoHeight) {
+	startIsometricScreenshot(customOrthoHeight, 0);
+}
+
+void Minecraft::startIsometricScreenshot(float customOrthoHeight, int slot) {
+	if (isSavingScreenshot) return;
+	if (!level || !player) return;
+
+	isSavingScreenshot = true;
+	screenshotPendingCapture = true;
+	screenshotSaveDone = false;
+	screenshotSaveSuccess = false;
+	screenshotSaveStartTime = getTimeS();
+	screenshotPendingZoom = (customOrthoHeight > 0.0f) ? customOrthoHeight : 48.0f;
+	screenshotSlot = slot;
+}
+
+void Minecraft::executeIsometricScreenshotCapture(float orthoHeight) {
 #ifndef STANDALONE_SERVER
 	if (!level || !player) return;
+
+	if (orthoHeight <= 0.0f) {
+		orthoHeight = 48.0f;
+	}
 
 	int sw = width;
 	int sh = height;
@@ -1908,7 +1975,6 @@ void Minecraft::takeIsometricScreenshot() {
 	std::vector<unsigned char> tilePixels(sw * sh * 4);
 
 	float aspect = (float)sw / (float)sh;
-	float orthoHeight = 48.0f; // Shows ~48 blocks vertically
 	float orthoWidth = orthoHeight * aspect;
 
 	glMatrixMode(GL_PROJECTION);
@@ -2016,9 +2082,6 @@ void Minecraft::takeIsometricScreenshot() {
 		}
 	}
 
-	// Apply lighting & contrast enhancement
-	enhanceScreenshotLighting(outPixels.data(), totalW, totalH);
-
 #ifdef _WIN32
 	_mkdir("screenshots");
 #else
@@ -2032,36 +2095,75 @@ void Minecraft::takeIsometricScreenshot() {
 	strftime(timeStr, sizeof(timeStr), "%Y-%m-%d_%H.%M.%S", timeinfo);
 
 	std::string filename = "screenshots/mc_map_" + std::string(timeStr) + ".png";
-	bool saved = savePngToFile(filename, totalW, totalH, outPixels.data(), true);
-	savePngToFile("screenshots/mc_map.png", totalW, totalH, outPixels.data(), true);
-
 	char resBuf[64];
 	snprintf(resBuf, sizeof(resBuf), " (%dx%d)", totalW, totalH);
 
-	if (saved) {
-		gui.addMessage("Saved screenshot" + std::string(resBuf) + " as " + filename);
-#ifdef __EMSCRIPTEN__
-		EM_ASM({
-			try {
-				var path = UTF8ToString($0);
-				if (typeof FS !== 'undefined') {
-					var data = FS.readFile(path);
-					var blob = new Blob([data], { type: 'image/png' });
-					var a = document.createElement('a');
-					a.href = URL.createObjectURL(blob);
-					a.download = path.split('/').pop();
-					document.body.appendChild(a);
-					a.click();
-					document.body.removeChild(a);
-					setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
-				}
-			} catch(e) {
-				console.error("Failed to download screenshot:", e);
-			}
-		}, filename.c_str());
+	screenshotResultFilename = filename;
+	screenshotResultRes = resBuf;
+
+#if !defined(__EMSCRIPTEN__)
+	if (s_screenshotThread.joinable()) {
+		s_screenshotThread.join();
+	}
+	s_screenshotThread = std::thread([this, pixels = std::move(outPixels), totalW, totalH, filename]() mutable {
+		enhanceScreenshotLighting(pixels.data(), totalW, totalH);
+		bool saved = savePngToFile(filename, totalW, totalH, pixels.data(), true);
+		savePngToFile("screenshots/mc_map.png", totalW, totalH, pixels.data(), true);
+		screenshotSaveSuccess = saved;
+		screenshotSaveDone = true;
+	});
+#else
+	enhanceScreenshotLighting(outPixels.data(), totalW, totalH);
+	bool saved = savePngToFile(filename, totalW, totalH, outPixels.data(), true);
+	savePngToFile("screenshots/mc_map.png", totalW, totalH, outPixels.data(), true);
+	screenshotSaveSuccess = saved;
+	screenshotSaveDone = true;
 #endif
-	} else {
-		gui.addMessage("Failed to save screenshot!");
+#endif
+}
+
+void Minecraft::updateScreenshotState() {
+#ifndef STANDALONE_SERVER
+	if (!isSavingScreenshot) return;
+
+	if (screenshotSaveDone && (getTimeS() - screenshotSaveStartTime >= 1.2f)) {
+#if !defined(__EMSCRIPTEN__)
+		if (s_screenshotThread.joinable()) {
+			s_screenshotThread.join();
+		}
+#endif
+		if (screenshotSaveSuccess) {
+			std::string zoomInfo = "";
+			if (screenshotSlot > 0) {
+				zoomInfo = " [Slot " + std::to_string(screenshotSlot) + ", " + std::to_string((int)screenshotPendingZoom) + " blocks]";
+			}
+			gui.addMessage("Saved screenshot" + screenshotResultRes + zoomInfo + " as " + screenshotResultFilename);
+#ifdef __EMSCRIPTEN__
+			EM_ASM({
+				try {
+					var path = UTF8ToString($0);
+					if (typeof FS !== 'undefined') {
+						var data = FS.readFile(path);
+						var blob = new Blob([data], { type: 'image/png' });
+						var a = document.createElement('a');
+						a.href = URL.createObjectURL(blob);
+						a.download = path.split('/').pop();
+						document.body.appendChild(a);
+						a.click();
+						document.body.removeChild(a);
+						setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+					}
+				} catch(e) {
+					console.error("Failed to download screenshot:", e);
+				}
+			}, screenshotResultFilename.c_str());
+#endif
+		} else {
+			gui.addMessage("Failed to save screenshot!");
+		}
+
+		isSavingScreenshot = false;
+		screenshotSaveDone = false;
 	}
 #endif
 }

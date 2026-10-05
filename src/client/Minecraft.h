@@ -1,6 +1,7 @@
 #ifndef NET_MINECRAFT_CLIENT__Minecraft_H__
 #define NET_MINECRAFT_CLIENT__Minecraft_H__
 
+#include <atomic>
 #include "Options.h"
 #ifndef STANDALONE_SERVER
 #include "MouseHandler.h"
@@ -123,7 +124,20 @@ public:
 	void handleMouseDown(int button, bool down);
 	
 	void takeScreenshot();
-	void takeIsometricScreenshot();
+	void takeIsometricScreenshot(float customOrthoHeight = 0.0f);
+	void startIsometricScreenshot(float customOrthoHeight = 0.0f, int slot = 0);
+	void executeIsometricScreenshotCapture(float orthoHeight);
+	void updateScreenshotState();
+
+	bool isSavingScreenshot;
+	bool screenshotPendingCapture;
+	std::atomic<bool> screenshotSaveDone;
+	std::atomic<bool> screenshotSaveSuccess;
+	float screenshotSaveStartTime;
+	float screenshotPendingZoom;
+	int screenshotSlot;
+	std::string screenshotResultFilename;
+	std::string screenshotResultRes;
 
     void audioEngineOn();
     void audioEngineOff();
