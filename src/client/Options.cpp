@@ -54,7 +54,7 @@ OptionBool invertYMouse("invertMouse", false);
 OptionInt viewDistance("renderDistance", 2, 0, 4);
 
 OptionBool anaglyph3d("anaglyph3d", false);
-OptionBool limitFramerate("limitFramerate", false);
+OptionInt limitFramerate("limitFramerate", 0, 0, 2);
 OptionBool vsync("vsync", true);
 OptionBool fancyGraphics("fancyGraphics", true);
 OptionBool viewBobbing("viewBobbing", true);
@@ -126,6 +126,7 @@ static int detectSystemLanguage() {
 }
 
 OptionInt languageOpt("language", 1, 0, 1);
+OptionInt fovOpt("fov", 70, 70, 110);
 
 void Options::initTable() {
     m_options[OPTIONS_DIFFICULTY] = &difficulty;
@@ -197,6 +198,7 @@ void Options::initTable() {
 	m_options[OPTIONS_MENU_STYLE] = &menuStyle;
 
 	m_options[OPTIONS_LANGUAGE] = &languageOpt;
+	m_options[OPTIONS_FOV] = &fovOpt;
 
     m_options[OPTIONS_KEY_FORWARD] = &keyForward;
     m_options[OPTIONS_KEY_LEFT] = &keyLeft;

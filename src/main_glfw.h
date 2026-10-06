@@ -261,11 +261,18 @@ void loop() {
 
 	glfwSwapInterval(((MAIN_CLASS*)g_app)->options.getBooleanValue(OPTIONS_VSYNC) ? 1 : 0);
 #ifndef __EMSCRIPTEN__
-	if(((MAIN_CLASS*)g_app)->options.getBooleanValue(OPTIONS_LIMIT_FRAMERATE)) {
+	int perfLimit = ((MAIN_CLASS*)g_app)->options.getIntValue(OPTIONS_LIMIT_FRAMERATE);
+	if (perfLimit == 1) { // Balanced (60 FPS)
 		auto frameEnd = clock::now();
 		auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(frameEnd - frameStart);
-		auto target = std::chrono::microseconds(33333); // ~30 fps
-		if(elapsed < target)
+		auto target = std::chrono::microseconds(16666);
+		if (elapsed < target)
+			std::this_thread::sleep_for(target - elapsed);
+	} else if (perfLimit == 2) { // Power saver (30 FPS)
+		auto frameEnd = clock::now();
+		auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(frameEnd - frameStart);
+		auto target = std::chrono::microseconds(33333);
+		if (elapsed < target)
 			std::this_thread::sleep_for(target - elapsed);
 	}
 #endif
