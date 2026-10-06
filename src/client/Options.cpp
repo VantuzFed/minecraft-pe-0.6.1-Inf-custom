@@ -149,11 +149,11 @@ void Options::initTable() {
 	m_options[OPTIONS_MUSIC_VOLUME] = &musicVolume;
 	m_options[OPTIONS_SOUND_VOLUME] = &soundVolume;
 
-	#if defined(PLATFORM_DESKTOP) || defined(RPI)
+	if (minecraft && minecraft->platform() && !minecraft->platform()->supportsTouchscreen()) {
 		float sensitivity = sensitivityOpt.get();
 		sensitivity *= 0.4f;
 		sensitivityOpt.set(sensitivity);
-	#endif
+	}
 
 
     m_options[OPTIONS_GUI_SCALE] = &guiScale;

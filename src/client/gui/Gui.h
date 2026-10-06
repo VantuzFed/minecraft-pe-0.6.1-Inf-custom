@@ -39,6 +39,7 @@ public:
 	RectangleArea getRectangleArea(int extendSide);
 	void getSlotPos(int slot, int& posX, int& posY);
 	int getNumSlots();
+	bool hasOpenInventorySlot() const;
 
 	void handleClick(int button, int x, int y);
 	void handleKeyPressed( int key );

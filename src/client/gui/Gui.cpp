@@ -54,13 +54,7 @@ Gui::Gui(Minecraft* minecraft)
 	_currentDropSlot(-1),
 	MAX_MESSAGE_WIDTH(240),
 	itemNameOverlayTime(2),
-	// On desktop the touch flow (and its "..." hotbar button) is never
-	// used, whatever the option says: all 9 link slots are real items.
-#if defined(PLATFORM_DESKTOP)
-	_openInventorySlot(false)
-#else
 	_openInventorySlot(minecraft->useTouchscreen())
-#endif
 {
 	glGenBuffers2(1, &_inventoryRc.vboId);
 	glGenBuffers2(1, &rcFeedbackInner.vboId);
@@ -193,6 +187,10 @@ bool Gui::isInside(int x, int y) {
 
 int Gui::getNumSlots() {
 	return _numSlots;
+}
+
+bool Gui::hasOpenInventorySlot() const {
+	return _openInventorySlot;
 }
 
 void Gui::flashSlot(int slotId) {
@@ -569,12 +567,7 @@ void Gui::onConfigChanged( const Config& c ) {
 #if defined(__APPLE__)
 		_numSlots = Mth::Min(7, _numSlots);
 #endif
-#if defined(PLATFORM_DESKTOP)
-		// No "..." button on desktop: the 9th link slot stays an item.
-		_openInventorySlot = false;
-#else
 		_openInventorySlot = c.minecraft->useTouchscreen();
-#endif
 	} else {
 		_numSlots = Inventory::MAX_SELECTION_SIZE; // Xperia Play
 	}
