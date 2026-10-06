@@ -9,12 +9,19 @@
 #include <cstdio>
 #include <chrono>
 #include <thread>
+#include <csignal>
 #include "platform/input/Keyboard.h"
 #include "platform/input/Mouse.h"
 #include "platform/input/Multitouch.h"
 #include "AppPlatform_glfw.h"
 
 static App* g_app = 0;
+
+static void platformSignalHandler(int sig) {
+	if (g_app) {
+		g_app->quit();
+	}
+}
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -358,6 +365,9 @@ int main(void) {
 #ifdef __EMSCRIPTEN__
 	emscripten_set_main_loop(loop, 0, 1);
 #else
+	signal(SIGINT, platformSignalHandler);
+	signal(SIGTERM, platformSignalHandler);
+
 	// Main event loop
 	while(!glfwWindowShouldClose(platform->window) && !app->wantToQuit()) {
 		loop();

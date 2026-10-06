@@ -240,13 +240,19 @@ void Level::tick() {
 	}
 	else {
 		long time = levelData.getTime() + 1;
-		//if (time % (saveInterval) == 0) {
-		//    save(false, NULL);
-		//}
 		levelData.setTime(time);
 		if ((time & 255) == 0) {
 			SetTimePacket packet(time);
 			raknetInstance->send(packet);
+		}
+	}
+
+	// Periodic auto-save every 600 ticks (30 seconds)
+	long curLevelTime = levelData.getTime();
+	if (curLevelTime > 0 && (curLevelTime % 600) == 0) {
+		saveGame();
+		if (_chunkSource) {
+			_chunkSource->saveAll(true);
 		}
 	}
 	TIMER_POP_PUSH("tickPending");

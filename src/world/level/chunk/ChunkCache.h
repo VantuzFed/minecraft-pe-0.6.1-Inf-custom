@@ -97,9 +97,9 @@ public:
                 x, z, chunks[pos] ? chunks[pos]->terrainPopulated : -1, chunks[pos] ? chunks[pos]->createdFromSave : -1);
 
             if (!chunks[pos]->terrainPopulated && hasChunk(x + 1, z + 1) && hasChunk(x, z + 1) && hasChunk(x + 1, z)) postProcess(this, x, z);
-            if (hasChunk(x - 1, z) && !getChunk(x - 1, z)->terrainPopulated && hasChunk(x - 1, z + 1) && hasChunk(x, z + 1) && hasChunk(x - 1, z)) postProcess(this, x - 1, z);
-            if (hasChunk(x, z - 1) && !getChunk(x, z - 1)->terrainPopulated && hasChunk(x + 1, z - 1) && hasChunk(x, z - 1) && hasChunk(x + 1, z)) postProcess(this, x, z - 1);
-            if (hasChunk(x - 1, z - 1) && !getChunk(x - 1, z - 1)->terrainPopulated && hasChunk(x - 1, z - 1) && hasChunk(x, z - 1) && hasChunk(x - 1, z)) postProcess(this, x - 1, z - 1);
+            if (hasChunk(x - 1, z) && !getChunk(x - 1, z)->terrainPopulated && hasChunk(x - 1, z + 1) && hasChunk(x, z + 1)) postProcess(this, x - 1, z);
+            if (hasChunk(x, z - 1) && !getChunk(x, z - 1)->terrainPopulated && hasChunk(x + 1, z - 1) && hasChunk(x + 1, z)) postProcess(this, x, z - 1);
+            if (hasChunk(x - 1, z - 1) && !getChunk(x - 1, z - 1)->terrainPopulated && hasChunk(x, z - 1) && hasChunk(x - 1, z)) postProcess(this, x - 1, z - 1);
         }
         xLast = x;
         zLast = z;
@@ -123,10 +123,29 @@ public:
             if (source != NULL) {
                 source->postProcess(parent, x, z);
 				chunk->clearUpdateMap();
+				saveCluster(x, z);
             }
             MCPE_CRASH_TRACE("[IW] ChunkCache::postProcess end (%d,%d)\n", x, z);
         }
     }
+
+	void saveCluster(int x, int z) {
+		if (storage == NULL) return;
+		static const int dx[4] = {0, 1, 0, 1};
+		static const int dz[4] = {0, 0, 1, 1};
+		for (int i = 0; i < 4; ++i) {
+			int cx = x + dx[i];
+			int cz = z + dz[i];
+			ChunkMap::iterator it = chunks.find(ChunkPos(cx, cz));
+			if (it != chunks.end()) {
+				LevelChunk* c = it->second;
+				if (c && c != emptyChunk && c->unsaved) {
+					save(c);
+					c->unsaved = false;
+				}
+			}
+		}
+	}
 
     //bool save(bool force, ProgressListener progressListener) {
     //    int saves = 0;
@@ -197,6 +216,7 @@ public:
                 {
                     MCPE_CRASH_TRACE("[IW] ChunkCache::saveAll queue (%d,%d), onlyUnsaved=%d\n", chunk->x, chunk->z, onlyUnsaved);
 					chunksToSave.push_back(chunk);
+					chunk->unsaved = false;
                 }
 			}
 			storage->saveAll(level, chunksToSave);

@@ -236,7 +236,7 @@ bool RegionFile::writeChunk(int x, int z, RakNet::BitStream& chunkData)
 		fwrite(&offsets[x + z * SECTOR_COLS], sizeof(int), 1, file);
 	}
 
-
+	if (file) fflush(file);
 	return true;
 }
 
@@ -247,6 +247,7 @@ bool RegionFile::write(int sector, RakNet::BitStream& chunkData)
 	int size = chunkData.GetNumberOfBytesUsed() + sizeof(int);
 	logAssert(fwrite(&size, sizeof(int), 1, file), 1);
 	logAssert(fwrite(chunkData.GetData(), 1, chunkData.GetNumberOfBytesUsed(), file), chunkData.GetNumberOfBytesUsed());
+	if (file) fflush(file);
 
 	return true;
 }

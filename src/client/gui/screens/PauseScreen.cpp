@@ -8,6 +8,8 @@
 #include "client/Options.h"
 #include "client/gui/components/Button.h"
 #include "client/gui/screens/OptionsScreen.h"
+#include "../../../world/level/Level.h"
+#include "../../../world/level/chunk/ChunkSource.h"
 
 PauseScreen::PauseScreen(bool wasBackPaused)
 	:	saveStep(0),
@@ -106,6 +108,11 @@ void PauseScreen::init() {
 		if (buttons[i] == &bThirdPerson) continue;
 		if (buttons[i] == &bHideGui) continue;
 		tabButtons.push_back(buttons[i]);
+	}
+
+	if (minecraft && minecraft->level && minecraft->level->getChunkSource()) {
+		minecraft->level->saveGame();
+		minecraft->level->getChunkSource()->saveAll(true);
 	}
 }
 
