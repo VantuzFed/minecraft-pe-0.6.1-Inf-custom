@@ -104,6 +104,7 @@ enum OptionId {
 	// UI language: 0 = English, 1 = Russian. Only these two ship.
 	OPTIONS_LANGUAGE,
 	OPTIONS_FOV,
+	OPTIONS_SHADERS,
 	// Should be last!
 	OPTIONS_COUNT
 };

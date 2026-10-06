@@ -4,6 +4,7 @@
 #include "DistanceChunkSorter.h"
 #include "Chunk.h"
 #include "TileRenderer.h"
+#include "TerrainShader.h"
 #include "../Minecraft.h"
 #include "../../util/Mth.h"
 #include "../../world/entity/player/Player.h"
@@ -664,7 +665,21 @@ int LevelRenderer::renderChunks( int from, int to, int layer, float alpha )
 
 void LevelRenderer::renderSameAsLast( int layer, float alpha )
 {
+	bool useShaders = mc->options.getBooleanValue(OPTIONS_SHADERS);
+	if (useShaders) {
+		Mob* player = mc->cameraTargetPlayer;
+		float time = (float)ticks + alpha;
+		double xOff = player ? (player->xOld + (player->x - player->xOld) * alpha) : 0.0;
+		double yOff = player ? (player->yOld + (player->y - player->yOld) * alpha) : 0.0;
+		double zOff = player ? (player->zOld + (player->z - player->zOld) * alpha) : 0.0;
+		g_terrainShader.bind(layer, time * 0.05f, (float)xOff, (float)yOff, (float)zOff);
+	}
+
 	renderList.render();
+
+	if (useShaders) {
+		g_terrainShader.unbind();
+	}
 }
 
 void LevelRenderer::tick()

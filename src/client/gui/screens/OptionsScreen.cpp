@@ -73,6 +73,7 @@ OptionsScreen::OptionsScreen()
 	bDifficulty(109, ""),
 	bGraphics(110, ""),
 	bSmoothLighting(111, ""),
+	bShaders(116, ""),
 	bMenuStyle(112, ""),
 	bControls(113, ""),
 	bCreditsBeta(114, ""),
@@ -152,6 +153,7 @@ void OptionsScreen::updateBetaButtonTexts() {
 
 	bGraphics.msg = I18n::get("options.graphics") + ": " + (o.getIntValue(OPTIONS_FANCY_GRAPHICS) ? I18n::get("options.graphics.fancy") : I18n::get("options.graphics.fast"));
 	bSmoothLighting.msg = I18n::get("options.ao") + ": " + (o.getIntValue(OPTIONS_AMBIENT_OCCLUSION) ? I18n::get("options.on") : I18n::get("options.off"));
+	bShaders.msg = I18n::get("options.shaders") + ": " + (o.getBooleanValue(OPTIONS_SHADERS) ? I18n::get("options.on") : I18n::get("options.off"));
 
 	int style = o.getIntValue(OPTIONS_MENU_STYLE);
 	bMenuStyle.msg = I18n::get("options.menuStyle") + ": " + (style == 2 ? I18n::get("options.menuStyle.java") : I18n::get("options.menuStyle.pocket"));
@@ -212,7 +214,7 @@ void OptionsScreen::init() {
 		buttons.push_back(&bDifficulty);
 		buttons.push_back(&bGraphics);
 		buttons.push_back(&bSmoothLighting);
-		buttons.push_back(&b3DAnaglyph);
+		buttons.push_back(&bShaders);
 		buttons.push_back(&bControls);
 		buttons.push_back(&bMenuStyle);
 		buttons.push_back(&bDone);
@@ -306,9 +308,9 @@ void OptionsScreen::setupPositions() {
 		bDifficulty.x = leftX; bDifficulty.y = startY + 4 * 24; bDifficulty.width = btnW; bDifficulty.height = btnH;
 		bGraphics.x = rightX; bGraphics.y = startY + 4 * 24; bGraphics.width = btnW; bGraphics.height = btnH;
 
-		// Row 5: Smooth Lighting / 3D Anaglyph
+		// Row 5: Smooth Lighting / Shaders
 		bSmoothLighting.x = leftX; bSmoothLighting.y = startY + 5 * 24; bSmoothLighting.width = btnW; bSmoothLighting.height = btnH;
-		b3DAnaglyph.x = rightX; b3DAnaglyph.y = startY + 5 * 24; b3DAnaglyph.width = btnW; b3DAnaglyph.height = btnH;
+		bShaders.x = rightX; bShaders.y = startY + 5 * 24; bShaders.width = btnW; bShaders.height = btnH;
 
 		// Row 6: Controls / UI Style
 		bControls.x = leftX; bControls.y = startY + 6 * 24; bControls.width = btnW; bControls.height = btnH;
@@ -470,6 +472,11 @@ void OptionsScreen::buttonClicked(Button* button) {
 			minecraft->options.set(OPTIONS_LIMIT_FRAMERATE, perf);
 			minecraft->options.save();
 		}
+		else if (button->id == bShaders.id) {
+			bool val = minecraft->options.getBooleanValue(OPTIONS_SHADERS);
+			minecraft->options.set(OPTIONS_SHADERS, !val);
+			minecraft->options.save();
+		}
 		else if (button->id == b3DAnaglyph.id) {
 			bool val = minecraft->options.getIntValue(OPTIONS_ANAGLYPH_3D) != 0;
 			minecraft->options.set(OPTIONS_ANAGLYPH_3D, !val);
@@ -608,6 +615,7 @@ void OptionsScreen::generateOptionScreens() {
 	optionPanes[3]->addOptionItem(OPTIONS_FOV, minecraft)
 		.addOptionItem(OPTIONS_FANCY_GRAPHICS, minecraft)
 		.addOptionItem(OPTIONS_BLOCK_OUTLINE, minecraft)
+		.addOptionItem(OPTIONS_SHADERS, minecraft)
 		// .addOptionItem(&Option::VIEW_BOBBING, minecraft)
 		// .addOptionItem(&Option::AMBIENT_OCCLUSION, minecraft)
 		// .addOptionItem(&Option::ANAGLYPH, minecraft)

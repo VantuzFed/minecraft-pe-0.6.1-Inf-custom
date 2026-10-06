@@ -1779,7 +1779,8 @@ void Minecraft::optionUpdated(OptionId option, bool value ) {
 		_reloadInput();
 	} else if (option == OPTIONS_FANCY_GRAPHICS || option == OPTIONS_AMBIENT_OCCLUSION ||
 	           option == OPTIONS_FOLIAGE_TINT || option == OPTIONS_TINTED_SIDE ||
-	           option == OPTIONS_BETA_SKY || option == OPTIONS_BEAUTIFUL_SKY) {
+	           option == OPTIONS_BETA_SKY || option == OPTIONS_BEAUTIFUL_SKY ||
+	           option == OPTIONS_SHADERS) {
 		if (levelRenderer) levelRenderer->allChanged();
 	}
 }

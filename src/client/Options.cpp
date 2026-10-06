@@ -127,6 +127,7 @@ static int detectSystemLanguage() {
 
 OptionInt languageOpt("language", 1, 0, 1);
 OptionInt fovOpt("fov", 70, 70, 110);
+OptionBool shadersOpt("shaders", false);
 
 void Options::initTable() {
     m_options[OPTIONS_DIFFICULTY] = &difficulty;
@@ -199,6 +200,7 @@ void Options::initTable() {
 
 	m_options[OPTIONS_LANGUAGE] = &languageOpt;
 	m_options[OPTIONS_FOV] = &fovOpt;
+	m_options[OPTIONS_SHADERS] = &shadersOpt;
 
     m_options[OPTIONS_KEY_FORWARD] = &keyForward;
     m_options[OPTIONS_KEY_LEFT] = &keyLeft;
@@ -293,10 +295,11 @@ void Options::load() {
 	for (auto i = 0; i < optionStrings.size(); i += 2) {
 		const std::string& key = optionStrings[i];
 		const std::string& value = optionStrings[i+1];
+		std::string strippedKey = (key.rfind("options.", 0) == 0) ? key.substr(8) : key;
 
 		// FIXME: woah this is so slow 
 		auto opt = std::find_if(m_options.begin(), m_options.end(), [&](auto& it) {
-			return it != nullptr && it->getStringId() == key;
+			return it != nullptr && (it->getStringId() == key || it->getStringId() == strippedKey);
 		});
 
 		if (opt == m_options.end()) continue;

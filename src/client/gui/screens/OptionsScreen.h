@@ -69,6 +69,7 @@ private:
 	Button bDifficulty;
 	Button bGraphics;
 	Button bSmoothLighting;
+	Button bShaders;
 	Button bMenuStyle;
 	Button bControls;
 	Button bCreditsBeta;
