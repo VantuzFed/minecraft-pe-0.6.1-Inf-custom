@@ -1,20 +1,21 @@
 #include "MouseHandler.h"
 #include "player/input/ITurnInput.h"
-
-#ifdef RPI
-#include <SDL/SDL.h>
-#endif
-
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
-#include <GLFW/glfw3.h>
-#endif
+#include "../AppPlatform.h"
 
 MouseHandler::MouseHandler( ITurnInput* turnInput )
-:	_turnInput(turnInput)
+:	xd(0.0f),
+	yd(0.0f),
+	toSkip(0),
+	_turnInput(turnInput),
+	_platform(NULL)
 {}
 
 MouseHandler::MouseHandler()
-:	_turnInput(0)
+:	xd(0.0f),
+	yd(0.0f),
+	toSkip(0),
+	_turnInput(0),
+	_platform(NULL)
 {}
 
 MouseHandler::~MouseHandler() {
@@ -24,31 +25,22 @@ void MouseHandler::setTurnInput( ITurnInput* turnInput ) {
 	_turnInput = turnInput;
 }
 
+void MouseHandler::setPlatform( AppPlatform* platform ) {
+	_platform = platform;
+}
+
 void MouseHandler::grab() {
 	xd = 0;
 	yd = 0;
-
-#if defined(RPI)
-	//LOGI("Grabbing input!\n");
-	SDL_WM_GrabInput(SDL_GRAB_ON);
-	SDL_ShowCursor(0);
-#endif
-
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
-	glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-#endif
+	if (_platform) {
+		_platform->setMouseGrabbed(true);
+	}
 }
 
 void MouseHandler::release() {
-#if defined(RPI)
-	//LOGI("Releasing input!\n");
-	SDL_WM_GrabInput(SDL_GRAB_OFF);
-	SDL_ShowCursor(1);
-#endif
-
-#if defined(PLATFORM_DESKTOP) || defined(PLATFORM_WEB)
-	glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-#endif
+	if (_platform) {
+		_platform->setMouseGrabbed(false);
+	}
 }
 
 void MouseHandler::poll() {

@@ -782,11 +782,9 @@ void Minecraft::tickInput() {
 				Inventory* v = player->inventory;
 
 				int numSlots = gui.getNumSlots();
-#if defined(PLATFORM_DESKTOP)
-				// Desktop has no "..." button: all link slots scroll.
-#else
-				if (!useTouchscreen()) numSlots--;
-#endif
+				if (gui.hasOpenInventorySlot()) {
+					numSlots--;
+				}
 
 				int slot = (v->selected - e.dy + numSlots) % numSlots;
 				v->selectSlot(slot);
@@ -1303,6 +1301,7 @@ void Minecraft::init()
 	checkGlError("Init enter");
 
 	_supportsNonTouchscreen = !platform()->supportsTouchscreen();
+	mouseHandler.setPlatform(platform());
 
 	LOGI("IS TOUCHSCREEN? %d\n", options.getBooleanValue(OPTIONS_USE_TOUCHSCREEN));
 

@@ -76,6 +76,7 @@ public:
     virtual void playSound(const std::string& fn, float volume, float pitch) {}
 	
 	virtual void hideCursor(bool hide) {}
+	virtual void setMouseGrabbed(bool grabbed) { (void)grabbed; }
 
 	virtual void showDialog(int dialogId) {}
     virtual void createUserInput() {}

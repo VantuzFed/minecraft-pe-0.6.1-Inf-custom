@@ -197,6 +197,12 @@ public:
 		glfwSetInputMode(window, GLFW_CURSOR, isHide);
 	}
 
+	virtual void setMouseGrabbed(bool grabbed) override {
+		if (window) {
+			glfwSetInputMode(window, GLFW_CURSOR, grabbed ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+		}
+	}
+
 	virtual void setWindowTitle(const std::string& title) override {
 		if (window)
 			glfwSetWindowTitle(window, title.c_str());
