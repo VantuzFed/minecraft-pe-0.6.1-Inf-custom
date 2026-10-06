@@ -626,7 +626,11 @@ std::string CommandServer::handleSetSetting( const std::string& setting, int val
 {
 	bool status = value != 0;
 
-	if (setting == "autojump") mc->player->autoJumpEnabled = status;
+	if (setting == "autojump") {
+		if (mc->player) mc->player->autoJumpEnabled = status;
+		mc->options.set(OPTIONS_AUTOJUMP, status);
+		mc->options.save();
+	}
 
 	AdventureSettingsPacket::Flags flag = (AdventureSettingsPacket::Flags)0;
 	if (setting == "nametags_visible") flag = AdventureSettingsPacket::ShowNameTags;

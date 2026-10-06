@@ -73,6 +73,7 @@ private:
 	Button bShaders;
 	Button bMenuStyle;
 	Button bControls;
+	Button bAutoJump;
 	Button bCreditsBeta;
 	Button bDone;
 

@@ -76,6 +76,7 @@ OptionsScreen::OptionsScreen()
 	bShaders(116, ""),
 	bMenuStyle(112, ""),
 	bControls(113, ""),
+	bAutoJump(115, ""),
 	bCreditsBeta(114, ""),
 	bDone(200, ""),
 	m_dragActive(false),
@@ -140,6 +141,7 @@ void OptionsScreen::updateBetaButtonTexts() {
 	bMenuStyle.msg = I18n::get("options.menuStyle") + ": " + (style == 2 ? I18n::get("options.menuStyle.java") : I18n::get("options.menuStyle.pocket"));
 
 	bControls.msg = I18n::get("options.controls") + "...";
+	bAutoJump.msg = I18n::get("options.autoJump") + ": " + (o.getBooleanValue(OPTIONS_AUTOJUMP) ? I18n::get("options.on") : I18n::get("options.off"));
 	bCreditsBeta.msg = "Credits";
 	bDone.msg = I18n::get("gui.done");
 }
@@ -197,6 +199,7 @@ void OptionsScreen::init() {
 		buttons.push_back(&bSmoothLighting);
 		buttons.push_back(&bShaders);
 		buttons.push_back(&bControls);
+		buttons.push_back(&bAutoJump);
 		buttons.push_back(&bMenuStyle);
 		buttons.push_back(&bDone);
 
@@ -293,19 +296,17 @@ void OptionsScreen::setupPositions() {
 		bSmoothLighting.x = leftX; bSmoothLighting.y = startY + 5 * 24; bSmoothLighting.width = btnW; bSmoothLighting.height = btnH;
 		bShaders.x = rightX; bShaders.y = startY + 5 * 24; bShaders.width = btnW; bShaders.height = btnH;
 
-		// Row 6: Controls / UI Style
+		// Row 6: Controls / Auto Jump
 		bControls.x = leftX; bControls.y = startY + 6 * 24; bControls.width = btnW; bControls.height = btnH;
-		bMenuStyle.x = rightX; bMenuStyle.y = startY + 6 * 24; bMenuStyle.width = btnW; bMenuStyle.height = btnH;
+		bAutoJump.x = rightX; bAutoJump.y = startY + 6 * 24; bAutoJump.width = btnW; bAutoJump.height = btnH;
 
-		// Done button
-		int doneW = Mth::Min(200, width - 20);
-		bDone.width = doneW;
-		bDone.height = 20;
-		bDone.x = (width - doneW) / 2;
+		// Bottom row: UI Style / Done button
 		int doneY = height - 26;
 		int minDoneY = startY + totalRows * 24 + 4;
 		if (doneY < minDoneY) doneY = minDoneY;
-		bDone.y = doneY;
+
+		bMenuStyle.x = leftX; bMenuStyle.y = doneY; bMenuStyle.width = btnW; bMenuStyle.height = 20;
+		bDone.x = rightX; bDone.y = doneY; bDone.width = btnW; bDone.height = 20;
 
 		return;
 	}
@@ -452,6 +453,11 @@ void OptionsScreen::buttonClicked(Button* button) {
 			minecraft->options.save();
 			refreshOptions();
 			return;
+		}
+		else if (button->id == bAutoJump.id) {
+			bool val = minecraft->options.getBooleanValue(OPTIONS_AUTOJUMP);
+			minecraft->options.set(OPTIONS_AUTOJUMP, !val);
+			minecraft->options.save();
 		}
 		updateBetaButtonTexts();
 		return;

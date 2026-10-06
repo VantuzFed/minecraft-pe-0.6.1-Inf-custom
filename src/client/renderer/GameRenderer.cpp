@@ -532,14 +532,16 @@ void GameRenderer::moveCameraToPlayer(double a) {
 				yo *= 0.1;
 				zo *= 0.1;
 
-				HitResult hr = mc->level->clip(Vec3(x + xo, y + yo, z + zo), Vec3(x - xd + xo + zo, y - yd + yo, z - zd + zo)); // newTemp
+				HitResult hr = mc->level->clip(Vec3(x + xo, y + yo, z + zo), Vec3(x - xd + xo, y - yd + yo, z - zd + zo)); // newTemp
 				if (hr.type != NO_HIT) {
 					float dist = hr.pos.distanceTo(Vec3(x, y, z)); // newTemp
 					if (dist < cameraDist) cameraDist = dist;
 				}
 			}
 
-			//glRotatef2(180, 0, 1, 0);
+			if (thirdPerson == 2) {
+				glRotatef2(180, 0, 1, 0);
+			}
 
 			glRotatef2(player->xRot - xRot, 1, 0, 0);
 			glRotatef2(player->yRot - yRot, 0, 1, 0);
@@ -552,14 +554,8 @@ void GameRenderer::moveCameraToPlayer(double a) {
 	}
 
 	if (!mc->options.getBooleanValue(OPTIONS_FIXED_CAMERA)) {
-		int thirdPerson = mc->options.getIntValue(OPTIONS_THIRD_PERSON_VIEW);
-		if (thirdPerson == 2) {
-			glRotatef2(-(player->xRotO + (player->xRot - player->xRotO) * a), 1.0, 0.0, 0.0);
-			glRotatef2(player->yRotO + (player->yRot - player->yRotO) * a, 0, 1, 0);
-		} else {
-			glRotatef2(player->xRotO + (player->xRot - player->xRotO) * a, 1.0, 0.0, 0.0);
-			glRotatef2(player->yRotO + (player->yRot - player->yRotO) * a + 180, 0, 1, 0);
-		}
+		glRotatef2(player->xRotO + (player->xRot - player->xRotO) * a, 1.0, 0.0, 0.0);
+		glRotatef2(player->yRotO + (player->yRot - player->yRotO) * a + 180, 0, 1, 0);
 		//if (_t_keepPic > 0)
 	}
 	glTranslatef2(0, heightOffset, 0);
