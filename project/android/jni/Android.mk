@@ -61,6 +61,7 @@ LOCAL_SRC_FILES := ../../../src/main.cpp \
 ../../../src/client/gui/screens/ChooseLevelScreen.cpp \
 ../../../src/client/gui/screens/SimpleChooseLevelScreen.cpp \
 ../../../src/client/gui/screens/ConsoleScreen.cpp \
+../../../src/client/gui/screens/ControlsScreen.cpp \
 ../../../src/client/gui/screens/UsernameScreen.cpp \
 ../../../src/client/gui/screens/ConfirmScreen.cpp \
 ../../../src/client/gui/screens/ChestScreen.cpp \

@@ -456,6 +456,9 @@ void GameRenderer::tickFov() {
 double GameRenderer::getFov(double a, bool applyEffects) {
 	Mob* player = mc->cameraTargetPlayer;
 	double fov = 70;
+	if (mc && mc->options.getIntValue(OPTIONS_FOV) >= 30) {
+		fov = mc->options.getIntValue(OPTIONS_FOV);
+	}
 
 	if (applyEffects)
 		fov *= this->oFov + (this->fov - this->oFov) * a;

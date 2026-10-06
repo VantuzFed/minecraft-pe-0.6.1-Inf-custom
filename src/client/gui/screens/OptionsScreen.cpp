@@ -6,6 +6,7 @@
 #include "../../Minecraft.h"
 #include "../../../AppPlatform.h"
 #include "CreditsScreen.h"
+#include "ControlsScreen.h"
 
 #include "../components/ImageButton.h"
 #include "../components/OptionsGroup.h"
@@ -64,6 +65,7 @@ OptionsScreen::OptionsScreen()
 	bSound(102, ""),
 	bInvertMouse(103, ""),
 	bSensitivity(104, ""),
+	bFOV(115, ""),
 	bRenderDistance(105, ""),
 	bViewBobbing(106, ""),
 	bFramerate(107, ""),
@@ -88,8 +90,14 @@ bool OptionsScreen::isBetaStyle() const {
 void OptionsScreen::updateBetaButtonTexts() {
 	Options& o = minecraft->options;
 
-	bMusic.msg = I18n::get("options.music") + ": " + (o.music > 0.05f ? I18n::get("options.on") : I18n::get("options.off"));
-	bSound.msg = I18n::get("options.sound") + ": " + (o.sound > 0.05f ? I18n::get("options.on") : I18n::get("options.off"));
+	float musicVol = o.getProgressValue(OPTIONS_MUSIC_VOLUME);
+	int musicPct = (int)(musicVol * 100.0f + 0.5f);
+	bMusic.msg = I18n::get("options.music") + ": " + (musicPct > 0 ? std::to_string(musicPct) + "%" : I18n::get("options.off"));
+
+	float soundVol = o.getProgressValue(OPTIONS_SOUND_VOLUME);
+	int soundPct = (int)(soundVol * 100.0f + 0.5f);
+	bSound.msg = I18n::get("options.sound") + ": " + (soundPct > 0 ? std::to_string(soundPct) + "%" : I18n::get("options.off"));
+
 	bInvertMouse.msg = I18n::get("options.invertMouse") + ": " + (o.getIntValue(OPTIONS_INVERT_Y_MOUSE) ? I18n::get("options.on") : I18n::get("options.off"));
 
 	int sens = o.getIntValue(OPTIONS_SENSITIVITY);
@@ -97,6 +105,16 @@ void OptionsScreen::updateBetaButtonTexts() {
 		std::stringstream ss;
 		ss << I18n::get("options.sensitivity") << ": " << (sens * 20) << "%";
 		bSensitivity.msg = ss.str();
+	}
+
+	int fovVal = o.getIntValue(OPTIONS_FOV);
+	if (fovVal < 30 || fovVal > 130) fovVal = 70;
+	if (fovVal == 70) {
+		bFOV.msg = I18n::get("options.fov") + ": " + I18n::get("options.fov.min");
+	} else if (fovVal >= 110) {
+		bFOV.msg = I18n::get("options.fov") + ": " + I18n::get("options.fov.max");
+	} else {
+		bFOV.msg = I18n::get("options.fov") + ": " + std::to_string(fovVal);
 	}
 
 	int rd = o.getIntValue(OPTIONS_VIEW_DISTANCE);
@@ -110,7 +128,16 @@ void OptionsScreen::updateBetaButtonTexts() {
 	bRenderDistance.msg = I18n::get("options.renderDistance") + ": " + rdStr;
 
 	bViewBobbing.msg = I18n::get("options.viewBobbing") + ": " + (o.getIntValue(OPTIONS_VIEW_BOBBING) ? I18n::get("options.on") : I18n::get("options.off"));
-	bFramerate.msg = I18n::get("options.framerateLimit") + ": " + (o.getIntValue(OPTIONS_LIMIT_FRAMERATE) ? I18n::get("options.on") : I18n::get("options.off"));
+
+	int perf = o.getIntValue(OPTIONS_LIMIT_FRAMERATE);
+	std::string perfStr;
+	switch (perf) {
+		case 1: perfStr = I18n::get("performance.balanced"); break;
+		case 2: perfStr = I18n::get("performance.powersaver"); break;
+		default: perfStr = I18n::get("performance.max"); break;
+	}
+	bFramerate.msg = I18n::get("options.framerateLimit") + ": " + perfStr;
+
 	b3DAnaglyph.msg = I18n::get("options.anaglyph") + ": " + (o.getIntValue(OPTIONS_ANAGLYPH_3D) ? I18n::get("options.on") : I18n::get("options.off"));
 
 	int diff = o.getIntValue(OPTIONS_DIFFICULTY);
@@ -129,7 +156,7 @@ void OptionsScreen::updateBetaButtonTexts() {
 	int style = o.getIntValue(OPTIONS_MENU_STYLE);
 	bMenuStyle.msg = I18n::get("options.menuStyle") + ": " + (style == 2 ? I18n::get("options.menuStyle.java") : I18n::get("options.menuStyle.pocket"));
 
-	bControls.msg = I18n::get("options.controls");
+	bControls.msg = I18n::get("options.controls") + "...";
 	bCreditsBeta.msg = "Credits";
 	bDone.msg = I18n::get("gui.done");
 }
@@ -178,13 +205,15 @@ void OptionsScreen::init() {
 		buttons.push_back(&bSound);
 		buttons.push_back(&bInvertMouse);
 		buttons.push_back(&bSensitivity);
+		buttons.push_back(&bFOV);
 		buttons.push_back(&bRenderDistance);
 		buttons.push_back(&bViewBobbing);
 		buttons.push_back(&bFramerate);
-		buttons.push_back(&b3DAnaglyph);
 		buttons.push_back(&bDifficulty);
 		buttons.push_back(&bGraphics);
 		buttons.push_back(&bSmoothLighting);
+		buttons.push_back(&b3DAnaglyph);
+		buttons.push_back(&bControls);
 		buttons.push_back(&bMenuStyle);
 		buttons.push_back(&bDone);
 
@@ -242,10 +271,10 @@ void OptionsScreen::init() {
 
 void OptionsScreen::setupPositions() {
 	if (isBetaStyle()) {
-		int totalRows = 6;
+		int totalRows = 7;
 		int totalH = totalRows * 24 + 32;
 		int startY = (height - totalH) / 2;
-		if (startY < 26) startY = 26;
+		if (startY < 24) startY = 24;
 
 		int btnW = 150;
 		int btnH = 20;
@@ -265,28 +294,32 @@ void OptionsScreen::setupPositions() {
 		bInvertMouse.x = leftX; bInvertMouse.y = startY + 1 * 24; bInvertMouse.width = btnW; bInvertMouse.height = btnH;
 		bSensitivity.x = rightX; bSensitivity.y = startY + 1 * 24; bSensitivity.width = btnW; bSensitivity.height = btnH;
 
-		// Row 2: Render Distance / View Bobbing
-		bRenderDistance.x = leftX; bRenderDistance.y = startY + 2 * 24; bRenderDistance.width = btnW; bRenderDistance.height = btnH;
-		bViewBobbing.x = rightX; bViewBobbing.y = startY + 2 * 24; bViewBobbing.width = btnW; bViewBobbing.height = btnH;
+		// Row 2: FOV / Render Distance
+		bFOV.x = leftX; bFOV.y = startY + 2 * 24; bFOV.width = btnW; bFOV.height = btnH;
+		bRenderDistance.x = rightX; bRenderDistance.y = startY + 2 * 24; bRenderDistance.width = btnW; bRenderDistance.height = btnH;
 
-		// Row 3: Performance (Framerate) / 3D Anaglyph
-		bFramerate.x = leftX; bFramerate.y = startY + 3 * 24; bFramerate.width = btnW; bFramerate.height = btnH;
-		b3DAnaglyph.x = rightX; b3DAnaglyph.y = startY + 3 * 24; b3DAnaglyph.width = btnW; b3DAnaglyph.height = btnH;
+		// Row 3: View Bobbing / Performance
+		bViewBobbing.x = leftX; bViewBobbing.y = startY + 3 * 24; bViewBobbing.width = btnW; bViewBobbing.height = btnH;
+		bFramerate.x = rightX; bFramerate.y = startY + 3 * 24; bFramerate.width = btnW; bFramerate.height = btnH;
 
 		// Row 4: Difficulty / Graphics
 		bDifficulty.x = leftX; bDifficulty.y = startY + 4 * 24; bDifficulty.width = btnW; bDifficulty.height = btnH;
 		bGraphics.x = rightX; bGraphics.y = startY + 4 * 24; bGraphics.width = btnW; bGraphics.height = btnH;
 
-		// Row 5: Smooth Lighting / UI Style
+		// Row 5: Smooth Lighting / 3D Anaglyph
 		bSmoothLighting.x = leftX; bSmoothLighting.y = startY + 5 * 24; bSmoothLighting.width = btnW; bSmoothLighting.height = btnH;
-		bMenuStyle.x = rightX; bMenuStyle.y = startY + 5 * 24; bMenuStyle.width = btnW; bMenuStyle.height = btnH;
+		b3DAnaglyph.x = rightX; b3DAnaglyph.y = startY + 5 * 24; b3DAnaglyph.width = btnW; b3DAnaglyph.height = btnH;
+
+		// Row 6: Controls / UI Style
+		bControls.x = leftX; bControls.y = startY + 6 * 24; bControls.width = btnW; bControls.height = btnH;
+		bMenuStyle.x = rightX; bMenuStyle.y = startY + 6 * 24; bMenuStyle.width = btnW; bMenuStyle.height = btnH;
 
 		// Done button
 		int doneW = Mth::Min(200, width - 20);
 		bDone.width = doneW;
 		bDone.height = 20;
 		bDone.x = (width - doneW) / 2;
-		int doneY = height - 28;
+		int doneY = height - 26;
 		int minDoneY = startY + totalRows * 24 + 4;
 		if (doneY < minDoneY) doneY = minDoneY;
 		bDone.y = doneY;
@@ -372,6 +405,7 @@ void OptionsScreen::buttonClicked(Button* button) {
 	if (isBetaStyle()) {
 		if (button->id == bDone.id) {
 			minecraft->options.save();
+			minecraft->reloadOptions();
 			if (minecraft->screen != NULL) {
 				minecraft->setScreen(NULL);
 			} else {
@@ -380,11 +414,21 @@ void OptionsScreen::buttonClicked(Button* button) {
 			return;
 		}
 		if (button->id == bMusic.id) {
-			minecraft->options.music = (minecraft->options.music > 0.05f) ? 0.0f : 1.0f;
+			float vol = minecraft->options.getProgressValue(OPTIONS_MUSIC_VOLUME);
+			int step = (int)(vol * 5.0f + 0.5f);
+			step = (step + 1) % 6;
+			float nextVol = step * 0.2f;
+			minecraft->options.set(OPTIONS_MUSIC_VOLUME, nextVol);
+			minecraft->options.music = nextVol;
 			minecraft->options.save();
 		}
 		else if (button->id == bSound.id) {
-			minecraft->options.sound = (minecraft->options.sound > 0.05f) ? 0.0f : 1.0f;
+			float vol = minecraft->options.getProgressValue(OPTIONS_SOUND_VOLUME);
+			int step = (int)(vol * 5.0f + 0.5f);
+			step = (step + 1) % 6;
+			float nextVol = step * 0.2f;
+			minecraft->options.set(OPTIONS_SOUND_VOLUME, nextVol);
+			minecraft->options.sound = nextVol;
 			minecraft->options.save();
 		}
 		else if (button->id == bInvertMouse.id) {
@@ -399,6 +443,18 @@ void OptionsScreen::buttonClicked(Button* button) {
 			minecraft->options.set(OPTIONS_SENSITIVITY, sens);
 			minecraft->options.save();
 		}
+		else if (button->id == bFOV.id) {
+			int fovVal = minecraft->options.getIntValue(OPTIONS_FOV);
+			if (fovVal < 70) fovVal = 70;
+			fovVal += 10;
+			if (fovVal > 110) fovVal = 70;
+			minecraft->options.set(OPTIONS_FOV, fovVal);
+			minecraft->options.save();
+		}
+		else if (button->id == bControls.id) {
+			minecraft->setScreen(new ControlsScreen(this));
+			return;
+		}
 		else if (button->id == bRenderDistance.id) {
 			int rd = (minecraft->options.getIntValue(OPTIONS_VIEW_DISTANCE) + 1) % 4;
 			minecraft->options.set(OPTIONS_VIEW_DISTANCE, rd);
@@ -410,8 +466,8 @@ void OptionsScreen::buttonClicked(Button* button) {
 			minecraft->options.save();
 		}
 		else if (button->id == bFramerate.id) {
-			bool val = minecraft->options.getIntValue(OPTIONS_LIMIT_FRAMERATE) != 0;
-			minecraft->options.set(OPTIONS_LIMIT_FRAMERATE, !val);
+			int perf = (minecraft->options.getIntValue(OPTIONS_LIMIT_FRAMERATE) + 1) % 3;
+			minecraft->options.set(OPTIONS_LIMIT_FRAMERATE, perf);
 			minecraft->options.save();
 		}
 		else if (button->id == b3DAnaglyph.id) {
@@ -448,6 +504,7 @@ void OptionsScreen::buttonClicked(Button* button) {
 
 	if (button == btnClose) {
 		minecraft->options.save();
+		minecraft->reloadOptions();
 		if (minecraft->screen != NULL) {
 			minecraft->setScreen(NULL);
 		} else {
@@ -548,7 +605,8 @@ void OptionsScreen::generateOptionScreens() {
 	}
 
 	// // Graphics Pane
-	optionPanes[3]->addOptionItem(OPTIONS_FANCY_GRAPHICS, minecraft)
+	optionPanes[3]->addOptionItem(OPTIONS_FOV, minecraft)
+		.addOptionItem(OPTIONS_FANCY_GRAPHICS, minecraft)
 		.addOptionItem(OPTIONS_BLOCK_OUTLINE, minecraft)
 		// .addOptionItem(&Option::VIEW_BOBBING, minecraft)
 		// .addOptionItem(&Option::AMBIENT_OCCLUSION, minecraft)
@@ -645,6 +703,7 @@ void OptionsScreen::keyPressed(int eventKey) {
 	if (isBetaStyle()) {
 		if (eventKey == Keyboard::KEY_ESCAPE) {
 			minecraft->options.save();
+			minecraft->reloadOptions();
 			if (minecraft->screen != NULL) {
 				minecraft->setScreen(NULL);
 			} else {
@@ -658,8 +717,10 @@ void OptionsScreen::keyPressed(int eventKey) {
 
 	if (currentOptionsGroup != NULL)
 		currentOptionsGroup->keyPressed(minecraft, eventKey);
-	if (eventKey == Keyboard::KEY_ESCAPE) 
+	if (eventKey == Keyboard::KEY_ESCAPE) {
 		minecraft->options.save();
+		minecraft->reloadOptions();
+	}
 
 	super::keyPressed(eventKey);
 }

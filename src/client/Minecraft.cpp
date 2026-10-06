@@ -1777,25 +1777,31 @@ void Minecraft::optionUpdated(OptionId option, bool value ) {
 		ss->allowIncomingConnections(value);
 	} else if (option == OPTIONS_USE_TOUCHSCREEN) {
 		_reloadInput();
+	} else if (option == OPTIONS_FANCY_GRAPHICS || option == OPTIONS_AMBIENT_OCCLUSION ||
+	           option == OPTIONS_FOLIAGE_TINT || option == OPTIONS_TINTED_SIDE ||
+	           option == OPTIONS_BETA_SKY || option == OPTIONS_BEAUTIFUL_SKY) {
+		if (levelRenderer) levelRenderer->allChanged();
 	}
 }
 
 void Minecraft::optionUpdated(OptionId option, float value ) {
-	// #ifndef STANDALONE_SERVER
-	// 	if(option == OPTIONS_PIXELS_PER_MILLIMETER) {
-	// 		pixelCalcUi.setPixelsPerMillimeter(value * Gui::InvGuiScale);
-	// 		pixelCalc.setPixelsPerMillimeter(value);
-	// 	}
-	// #endif
+	if (option == OPTIONS_MUSIC_VOLUME) {
+		options.music = value;
+	} else if (option == OPTIONS_SOUND_VOLUME) {
+		options.sound = value;
+	}
 }
 
 void Minecraft::optionUpdated(OptionId option, int value ) {
-	if(option == OPTIONS_GUI_SCALE) {
+	if(option == OPTIONS_GUI_SCALE || option == OPTIONS_WINDOW_SCALE) {
 		// reapply screen scaling using current window size
 		setSize(width, height);
 	}
 	else if (option == OPTIONS_LOG_LEVEL) {
 		g_mcpeLogLevel = value;
+	}
+	else if (option == OPTIONS_VIEW_DISTANCE || option == OPTIONS_FOG_TYPE) {
+		if (levelRenderer) levelRenderer->allChanged();
 	}
 }
 

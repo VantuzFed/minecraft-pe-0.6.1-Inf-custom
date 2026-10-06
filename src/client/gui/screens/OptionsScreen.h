@@ -61,6 +61,7 @@ private:
 	Button bSound;
 	Button bInvertMouse;
 	Button bSensitivity;
+	Button bFOV;
 	Button bRenderDistance;
 	Button bViewBobbing;
 	Button bFramerate;
