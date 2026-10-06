@@ -659,6 +659,7 @@ float Gui::cubeSmoothStep(float percentage, float min, float max) {
 }
 
 void Gui::renderProgressIndicator( const bool isTouchInterface, const int screenWidth, const int screenHeight, float a ) {
+	if (minecraft->options.getIntValue(OPTIONS_THIRD_PERSON_VIEW) != 0) return;
 	ItemInstance* currentItem = minecraft->player->inventory->getSelected();
 	bool bowEquipped = currentItem != NULL ? currentItem->getItem() == Item::bow : false;
 	bool itemInUse = currentItem != NULL ? currentItem->getItem() == minecraft->player->getUseItem()->getItem() : false;

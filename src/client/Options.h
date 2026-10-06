@@ -148,7 +148,10 @@ public:
 
     bool getBooleanValue(OptionId key) {
         auto option = opt<OptionBool>(key);
-        return (option)? option->get() : false;
+        if (option) return option->get();
+        auto optionInt = opt<OptionInt>(key);
+        if (optionInt) return optionInt->get() != 0;
+        return false;
     }
 
     float getProgrssMin(OptionId key) {

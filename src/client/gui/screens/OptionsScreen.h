@@ -4,6 +4,7 @@
 #include "../Screen.h"
 #include "../components/Button.h"
 #include "../components/OptionsGroup.h"
+#include "../components/BetaSlider.h"
 
 class ImageButton;
 class OptionsPane;
@@ -57,11 +58,11 @@ private:
 	void updateBetaButtonTexts();
 
 	// Beta style buttons
-	Button bMusic;
-	Button bSound;
+	BetaSlider sMusic;
+	BetaSlider sSound;
 	Button bInvertMouse;
-	Button bSensitivity;
-	Button bFOV;
+	BetaSlider sSensitivity;
+	BetaSlider sFOV;
 	Button bRenderDistance;
 	Button bViewBobbing;
 	Button bFramerate;

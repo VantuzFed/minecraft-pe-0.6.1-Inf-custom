@@ -61,11 +61,11 @@ OptionsScreen::OptionsScreen()
 	currentOptionsGroup(NULL),
 	selectedCategory(0),
 	m_pendingOptionsRefresh(false),
-	bMusic(101, ""),
-	bSound(102, ""),
+	sMusic(101, OPTIONS_MUSIC_VOLUME),
+	sSound(102, OPTIONS_SOUND_VOLUME),
 	bInvertMouse(103, ""),
-	bSensitivity(104, ""),
-	bFOV(115, ""),
+	sSensitivity(104, OPTIONS_SENSITIVITY),
+	sFOV(115, OPTIONS_FOV),
 	bRenderDistance(105, ""),
 	bViewBobbing(106, ""),
 	bFramerate(107, ""),
@@ -91,32 +91,13 @@ bool OptionsScreen::isBetaStyle() const {
 void OptionsScreen::updateBetaButtonTexts() {
 	Options& o = minecraft->options;
 
-	float musicVol = o.getProgressValue(OPTIONS_MUSIC_VOLUME);
-	int musicPct = (int)(musicVol * 100.0f + 0.5f);
-	bMusic.msg = I18n::get("options.music") + ": " + (musicPct > 0 ? std::to_string(musicPct) + "%" : I18n::get("options.off"));
-
-	float soundVol = o.getProgressValue(OPTIONS_SOUND_VOLUME);
-	int soundPct = (int)(soundVol * 100.0f + 0.5f);
-	bSound.msg = I18n::get("options.sound") + ": " + (soundPct > 0 ? std::to_string(soundPct) + "%" : I18n::get("options.off"));
+	sMusic.updateFromOption(o);
+	sSound.updateFromOption(o);
 
 	bInvertMouse.msg = I18n::get("options.invertMouse") + ": " + (o.getIntValue(OPTIONS_INVERT_Y_MOUSE) ? I18n::get("options.on") : I18n::get("options.off"));
 
-	int sens = o.getIntValue(OPTIONS_SENSITIVITY);
-	{
-		std::stringstream ss;
-		ss << I18n::get("options.sensitivity") << ": " << (sens * 20) << "%";
-		bSensitivity.msg = ss.str();
-	}
-
-	int fovVal = o.getIntValue(OPTIONS_FOV);
-	if (fovVal < 30 || fovVal > 130) fovVal = 70;
-	if (fovVal == 70) {
-		bFOV.msg = I18n::get("options.fov") + ": " + I18n::get("options.fov.min");
-	} else if (fovVal >= 110) {
-		bFOV.msg = I18n::get("options.fov") + ": " + I18n::get("options.fov.max");
-	} else {
-		bFOV.msg = I18n::get("options.fov") + ": " + std::to_string(fovVal);
-	}
+	sSensitivity.updateFromOption(o);
+	sFOV.updateFromOption(o);
 
 	int rd = o.getIntValue(OPTIONS_VIEW_DISTANCE);
 	std::string rdStr;
@@ -203,11 +184,11 @@ void OptionsScreen::init() {
 	if (isBetaStyle()) {
 		updateBetaButtonTexts();
 
-		buttons.push_back(&bMusic);
-		buttons.push_back(&bSound);
+		buttons.push_back(&sMusic);
+		buttons.push_back(&sSound);
 		buttons.push_back(&bInvertMouse);
-		buttons.push_back(&bSensitivity);
-		buttons.push_back(&bFOV);
+		buttons.push_back(&sSensitivity);
+		buttons.push_back(&sFOV);
 		buttons.push_back(&bRenderDistance);
 		buttons.push_back(&bViewBobbing);
 		buttons.push_back(&bFramerate);
@@ -289,15 +270,15 @@ void OptionsScreen::setupPositions() {
 		}
 
 		// Row 0: Music / Sound
-		bMusic.x = leftX; bMusic.y = startY + 0 * 24; bMusic.width = btnW; bMusic.height = btnH;
-		bSound.x = rightX; bSound.y = startY + 0 * 24; bSound.width = btnW; bSound.height = btnH;
+		sMusic.x = leftX; sMusic.y = startY + 0 * 24; sMusic.width = btnW; sMusic.height = btnH;
+		sSound.x = rightX; sSound.y = startY + 0 * 24; sSound.width = btnW; sSound.height = btnH;
 
 		// Row 1: Invert Mouse / Sensitivity
 		bInvertMouse.x = leftX; bInvertMouse.y = startY + 1 * 24; bInvertMouse.width = btnW; bInvertMouse.height = btnH;
-		bSensitivity.x = rightX; bSensitivity.y = startY + 1 * 24; bSensitivity.width = btnW; bSensitivity.height = btnH;
+		sSensitivity.x = rightX; sSensitivity.y = startY + 1 * 24; sSensitivity.width = btnW; sSensitivity.height = btnH;
 
 		// Row 2: FOV / Render Distance
-		bFOV.x = leftX; bFOV.y = startY + 2 * 24; bFOV.width = btnW; bFOV.height = btnH;
+		sFOV.x = leftX; sFOV.y = startY + 2 * 24; sFOV.width = btnW; sFOV.height = btnH;
 		bRenderDistance.x = rightX; bRenderDistance.y = startY + 2 * 24; bRenderDistance.width = btnW; bRenderDistance.height = btnH;
 
 		// Row 3: View Bobbing / Performance
@@ -415,42 +396,9 @@ void OptionsScreen::buttonClicked(Button* button) {
 			}
 			return;
 		}
-		if (button->id == bMusic.id) {
-			float vol = minecraft->options.getProgressValue(OPTIONS_MUSIC_VOLUME);
-			int step = (int)(vol * 5.0f + 0.5f);
-			step = (step + 1) % 6;
-			float nextVol = step * 0.2f;
-			minecraft->options.set(OPTIONS_MUSIC_VOLUME, nextVol);
-			minecraft->options.music = nextVol;
-			minecraft->options.save();
-		}
-		else if (button->id == bSound.id) {
-			float vol = minecraft->options.getProgressValue(OPTIONS_SOUND_VOLUME);
-			int step = (int)(vol * 5.0f + 0.5f);
-			step = (step + 1) % 6;
-			float nextVol = step * 0.2f;
-			minecraft->options.set(OPTIONS_SOUND_VOLUME, nextVol);
-			minecraft->options.sound = nextVol;
-			minecraft->options.save();
-		}
-		else if (button->id == bInvertMouse.id) {
+		if (button->id == bInvertMouse.id) {
 			bool val = minecraft->options.getIntValue(OPTIONS_INVERT_Y_MOUSE) != 0;
 			minecraft->options.set(OPTIONS_INVERT_Y_MOUSE, !val);
-			minecraft->options.save();
-		}
-		else if (button->id == bSensitivity.id) {
-			int sens = minecraft->options.getIntValue(OPTIONS_SENSITIVITY);
-			sens = (sens + 1) % 6;
-			if (sens == 0) sens = 1;
-			minecraft->options.set(OPTIONS_SENSITIVITY, sens);
-			minecraft->options.save();
-		}
-		else if (button->id == bFOV.id) {
-			int fovVal = minecraft->options.getIntValue(OPTIONS_FOV);
-			if (fovVal < 70) fovVal = 70;
-			fovVal += 10;
-			if (fovVal > 110) fovVal = 70;
-			minecraft->options.set(OPTIONS_FOV, fovVal);
 			minecraft->options.save();
 		}
 		else if (button->id == bControls.id) {
@@ -657,6 +605,12 @@ void OptionsScreen::generateOptionScreens() {
 
 void OptionsScreen::mouseClicked(int x, int y, int buttonNum) {
 	if (isBetaStyle()) {
+		if (buttonNum == MouseAction::ACTION_LEFT && minecraft) {
+			if (sMusic.clicked(minecraft, x, y)) sMusic.startDrag(x, minecraft->options, minecraft);
+			else if (sSound.clicked(minecraft, x, y)) sSound.startDrag(x, minecraft->options, minecraft);
+			else if (sSensitivity.clicked(minecraft, x, y)) sSensitivity.startDrag(x, minecraft->options, minecraft);
+			else if (sFOV.clicked(minecraft, x, y)) sFOV.startDrag(x, minecraft->options, minecraft);
+		}
 		super::mouseClicked(x, y, buttonNum);
 		return;
 	}
@@ -684,6 +638,11 @@ void OptionsScreen::mouseClicked(int x, int y, int buttonNum) {
 
 void OptionsScreen::mouseReleased(int x, int y, int buttonNum) {
 	if (isBetaStyle()) {
+		sMusic.stopDrag();
+		sSound.stopDrag();
+		sSensitivity.stopDrag();
+		sFOV.stopDrag();
+		minecraft->options.save();
 		super::mouseReleased(x, y, buttonNum);
 		return;
 	}
@@ -746,6 +705,20 @@ void OptionsScreen::tick() {
 		refreshOptions();
 
 	if (isBetaStyle()) {
+		if (Mouse::isButtonDown(MouseAction::ACTION_LEFT) && minecraft) {
+			int mx = Mouse::getX();
+			int my = Mouse::getY();
+			toGUICoordinate(mx, my);
+			if (sMusic.dragging) sMusic.drag(mx, minecraft->options, minecraft);
+			if (sSound.dragging) sSound.drag(mx, minecraft->options, minecraft);
+			if (sSensitivity.dragging) sSensitivity.drag(mx, minecraft->options, minecraft);
+			if (sFOV.dragging) sFOV.drag(mx, minecraft->options, minecraft);
+		} else {
+			sMusic.stopDrag();
+			sSound.stopDrag();
+			sSensitivity.stopDrag();
+			sFOV.stopDrag();
+		}
 		super::tick();
 		return;
 	}

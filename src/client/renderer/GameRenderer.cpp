@@ -501,7 +501,8 @@ void GameRenderer::moveCameraToPlayer(double a) {
 			glRotatef(player->yRotO + (player->yRot - player->yRotO) * a + 180, 0, -1, 0);
 			glRotatef(player->xRotO + (player->xRot - player->xRotO) * a, -1, 0, 0);
 		}
-	} else if (mc->options.getBooleanValue(OPTIONS_THIRD_PERSON_VIEW)/* || (player->isPlayer() && !player->isAlive())*/) {
+	} else if (mc->options.getIntValue(OPTIONS_THIRD_PERSON_VIEW) > 0/* || (player->isPlayer() && !player->isAlive())*/) {
+		int thirdPerson = mc->options.getIntValue(OPTIONS_THIRD_PERSON_VIEW);
 		double cameraDist = thirdDistanceO + (thirdDistance - thirdDistanceO) * a;
 
 		if (mc->options.getBooleanValue(OPTIONS_FIXED_CAMERA)) {
@@ -514,7 +515,10 @@ void GameRenderer::moveCameraToPlayer(double a) {
 			glRotatef2(rotationY, 0, 1, 0);
 		} else {
 			double yRot = player->yRot;
-			double xRot = player->xRot/* + 180.0f*/;
+			double xRot = player->xRot;
+			if (thirdPerson == 2) {
+				xRot += 180.0;
+			}
 			double xd = -Mth::sin(yRot / 180 * Mth::PI) * Mth::cos(xRot / 180 * Mth::PI) * cameraDist;
 			double zd = Mth::cos(yRot / 180 * Mth::PI) * Mth::cos(xRot / 180 * Mth::PI) * cameraDist;
 			double yd = -Mth::sin(xRot / 180 * Mth::PI) * cameraDist;
@@ -548,8 +552,14 @@ void GameRenderer::moveCameraToPlayer(double a) {
 	}
 
 	if (!mc->options.getBooleanValue(OPTIONS_FIXED_CAMERA)) {
-		glRotatef2(player->xRotO + (player->xRot - player->xRotO) * a, 1.0, 0.0, 0.0);
-		glRotatef2(player->yRotO + (player->yRot - player->yRotO) * a + 180, 0, 1, 0);
+		int thirdPerson = mc->options.getIntValue(OPTIONS_THIRD_PERSON_VIEW);
+		if (thirdPerson == 2) {
+			glRotatef2(-(player->xRotO + (player->xRot - player->xRotO) * a), 1.0, 0.0, 0.0);
+			glRotatef2(player->yRotO + (player->yRot - player->yRotO) * a, 0, 1, 0);
+		} else {
+			glRotatef2(player->xRotO + (player->xRot - player->xRotO) * a, 1.0, 0.0, 0.0);
+			glRotatef2(player->yRotO + (player->yRot - player->yRotO) * a + 180, 0, 1, 0);
+		}
 		//if (_t_keepPic > 0)
 	}
 	glTranslatef2(0, heightOffset, 0);

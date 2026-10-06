@@ -504,24 +504,28 @@ void LocalPlayer::aiStep() {
 	else
 		input->releaseAllKeys();
 
-	// Sprint: detect W double-tap
+	// Sprint: detect W double-tap or Sprint key
 	{
 		bool forwardHeld = (input->ya > 0);
+		int sprintKey = minecraft->options.getIntValue(OPTIONS_KEY_SPRINT);
+		bool sprintKeyHeld = (sprintKey != 0 && Keyboard::isKeyDown(sprintKey));
+
 		if (forwardHeld && !prevForwardHeld && minecraft->options.getBooleanValue(OPTIONS_ALLOW_SPRINT)) {
-			// leading edge of W press
-			if (sprintDoubleTapTimer > 0)
+			// leading edge of forward press
+			if (sprintDoubleTapTimer > 0 || sprintKeyHeld)
 				sprinting = true;
 			else
 				sprintDoubleTapTimer = 7;
 		}
-		if (!forwardHeld) {
+		if (forwardHeld && sprintKeyHeld && minecraft->options.getBooleanValue(OPTIONS_ALLOW_SPRINT)) {
+			sprinting = true;
+		}
+		if (!forwardHeld || horizontalCollision || input->sneaking) {
 			sprinting = false;
 		}
 		if (sprintDoubleTapTimer > 0) sprintDoubleTapTimer--;
 		prevForwardHeld = forwardHeld;
 	}
-	if (input->sneaking)
-		sprinting = false;
 
     if (input->sneaking) {
         if (ySlideOffset < 0.2f) ySlideOffset = 0.2f;

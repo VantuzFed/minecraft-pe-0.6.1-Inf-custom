@@ -810,8 +810,13 @@ void Minecraft::tickInput() {
 		bool isPressed = (Keyboard::getEventKeyState() == KeyboardAction::KEYDOWN);
 		player->setKey(key, isPressed);
 
-		if (key == options.getIntValue(OPTIONS_KEY_SPRINT)) {
-			player->setSprinting(isPressed);
+		int sprintKey = options.getIntValue(OPTIONS_KEY_SPRINT);
+		if (sprintKey != 0 && key == sprintKey) {
+			if (isPressed && options.getBooleanValue(OPTIONS_ALLOW_SPRINT)) {
+				if (player->input && player->input->ya > 0 && !player->input->sneaking) {
+					player->setSprinting(true);
+				}
+			}
 		}
 
 		if (isPressed) {

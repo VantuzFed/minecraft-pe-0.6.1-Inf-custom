@@ -17,7 +17,7 @@ int g_mcpeLogLevel = 0;
 
 OptionInt difficulty("difficulty", Difficulty::NORMAL, 0, Difficulty::COUNT);
 OptionBool hidegui("hidegui", false);
-OptionBool thirdPersonView("thirdperson", false);
+OptionInt thirdPersonView("thirdperson", 0, 0, 2);
 OptionBool renderDebug("renderDebug", false);
 OptionBool smoothCamera("smoothCamera", false);
 OptionBool fixedCamera("fixedCamera", false);
@@ -286,6 +286,16 @@ void Options::toggle(OptionId key) {
 	if (option) {
 		option->toggle();
 		notifyOptionUpdate(key, option->get());
+		return;
+	}
+
+	auto optionInt = opt<OptionInt>(key);
+	if (optionInt) {
+		int cur = optionInt->get();
+		int next = cur + 1;
+		if (next > optionInt->getMax()) next = optionInt->getMin();
+		optionInt->set(next);
+		notifyOptionUpdate(key, next);
 	}
 }
 
