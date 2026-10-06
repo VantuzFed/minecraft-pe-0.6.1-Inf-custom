@@ -72,6 +72,7 @@ private:
 	Button bSmoothLighting;
 	Button bMenuStyle;
 	Button bControls;
+	Button bAutoJump;
 	Button bCreditsBeta;
 	Button bDone;
 

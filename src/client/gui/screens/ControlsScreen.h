@@ -20,6 +20,8 @@ public:
 private:
 	Screen* m_parent;
 	Button m_btnDone;
+	Button m_btnAutoJump;
+	Button m_btnInvertMouse;
 	int m_selectedKeyOpt;
 
 	struct KeyBindingEntry {

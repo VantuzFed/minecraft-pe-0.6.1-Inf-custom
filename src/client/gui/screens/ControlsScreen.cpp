@@ -6,6 +6,8 @@
 ControlsScreen::ControlsScreen(Screen* parent)
 :	m_parent(parent),
 	m_btnDone(200, ""),
+	m_btnAutoJump(201, ""),
+	m_btnInvertMouse(202, ""),
 	m_selectedKeyOpt(-1)
 {
 }
@@ -53,6 +55,8 @@ void ControlsScreen::init() {
 		buttons.push_back(e.button);
 	}
 
+	buttons.push_back(&m_btnAutoJump);
+	buttons.push_back(&m_btnInvertMouse);
 	buttons.push_back(&m_btnDone);
 	updateButtonTexts();
 }
@@ -69,6 +73,12 @@ void ControlsScreen::updateButtonTexts() {
 			m_bindings[i].button->msg = label + ": " + keyName;
 		}
 	}
+
+	bool aj = minecraft->options.getBooleanValue(OPTIONS_AUTOJUMP);
+	m_btnAutoJump.msg = I18n::get("options.autoJump") + ": " + (aj ? I18n::get("options.on") : I18n::get("options.off"));
+
+	bool inv = minecraft->options.getBooleanValue(OPTIONS_INVERT_Y_MOUSE);
+	m_btnInvertMouse.msg = I18n::get("options.invertMouse") + ": " + (inv ? I18n::get("options.on") : I18n::get("options.off"));
 }
 
 void ControlsScreen::setupPositions() {
@@ -95,12 +105,25 @@ void ControlsScreen::setupPositions() {
 		}
 	}
 
+	int extraRow = (int)(m_bindings.size() / 2);
+	m_btnAutoJump.x = leftX;
+	m_btnAutoJump.y = startY + extraRow * 24;
+	m_btnAutoJump.width = btnW;
+	m_btnAutoJump.height = btnH;
+
+	m_btnInvertMouse.x = rightX;
+	m_btnInvertMouse.y = startY + extraRow * 24;
+	m_btnInvertMouse.width = btnW;
+	m_btnInvertMouse.height = btnH;
+
 	int doneW = 200;
 	if (doneW > width - 20) doneW = width - 20;
 	m_btnDone.width = doneW;
 	m_btnDone.height = 20;
 	m_btnDone.x = (width - doneW) / 2;
-	m_btnDone.y = height - 28;
+	int doneY = height - 28;
+	if (doneY < startY + (extraRow + 1) * 24 + 4) doneY = startY + (extraRow + 1) * 24 + 4;
+	m_btnDone.y = doneY;
 }
 
 void ControlsScreen::render(int xm, int ym, float a) {
@@ -113,6 +136,22 @@ void ControlsScreen::buttonClicked(Button* button) {
 	if (button->id == m_btnDone.id) {
 		minecraft->options.save();
 		minecraft->setScreen(m_parent);
+		return;
+	}
+
+	if (button->id == m_btnAutoJump.id) {
+		bool val = minecraft->options.getBooleanValue(OPTIONS_AUTOJUMP);
+		minecraft->options.set(OPTIONS_AUTOJUMP, !val);
+		minecraft->options.save();
+		updateButtonTexts();
+		return;
+	}
+
+	if (button->id == m_btnInvertMouse.id) {
+		bool val = minecraft->options.getBooleanValue(OPTIONS_INVERT_Y_MOUSE);
+		minecraft->options.set(OPTIONS_INVERT_Y_MOUSE, !val);
+		minecraft->options.save();
+		updateButtonTexts();
 		return;
 	}
 
