@@ -403,7 +403,7 @@ void OptionsScreen::buttonClicked(Button* button) {
 			minecraft->options.save();
 		}
 		else if (button->id == bControls.id) {
-			minecraft->setScreen(new ControlsScreen(this));
+			minecraft->setScreen(new ControlsScreen());
 			return;
 		}
 		else if (button->id == bRenderDistance.id) {

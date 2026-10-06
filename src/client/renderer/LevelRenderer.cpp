@@ -672,7 +672,8 @@ void LevelRenderer::renderSameAsLast( int layer, float alpha )
 		double xOff = player ? (player->xOld + (player->x - player->xOld) * alpha) : 0.0;
 		double yOff = player ? (player->yOld + (player->y - player->yOld) * alpha) : 0.0;
 		double zOff = player ? (player->zOld + (player->z - player->zOld) * alpha) : 0.0;
-		g_terrainShader.bind(layer, time * 0.05f, (float)xOff, (float)yOff, (float)zOff);
+		float timeOfDay = mc->level ? mc->level->getTimeOfDay(alpha) : 0.0f;
+		g_terrainShader.bind(layer, time * 0.05f, (float)xOff, (float)yOff, (float)zOff, timeOfDay);
 	}
 
 	renderList.render();

@@ -7,7 +7,7 @@ public:
 	~TerrainShader();
 
 	bool init();
-	void bind(int layer, float time, float camX, float camY, float camZ);
+	void bind(int layer, float time, float camX, float camY, float camZ, float timeOfDay = 0.0f);
 	void unbind();
 	bool isAvailable() const;
 
@@ -22,6 +22,7 @@ private:
 	int m_uTime;
 	int m_uCamPos;
 	int m_uTexture;
+	int m_uTimeOfDay;
 #endif
 };
 
