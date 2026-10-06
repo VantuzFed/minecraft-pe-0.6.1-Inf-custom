@@ -1287,7 +1287,7 @@ bool Minecraft::useTouchscreen() {
 #elif defined(RPI)
 	return false;
 #endif
-	if (platform()->supportsTouchscreen()) {
+	if (platform() && platform()->supportsTouchscreen()) {
 		return options.getBooleanValue(OPTIONS_USE_TOUCHSCREEN);
 	}
 	return options.getBooleanValue(OPTIONS_USE_TOUCHSCREEN) && !_supportsNonTouchscreen;

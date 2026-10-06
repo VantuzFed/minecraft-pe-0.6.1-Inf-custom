@@ -54,7 +54,7 @@ Gui::Gui(Minecraft* minecraft)
 	_currentDropSlot(-1),
 	MAX_MESSAGE_WIDTH(240),
 	itemNameOverlayTime(2),
-	_openInventorySlot(minecraft->useTouchscreen())
+	_openInventorySlot(false)
 {
 	glGenBuffers2(1, &_inventoryRc.vboId);
 	glGenBuffers2(1, &rcFeedbackInner.vboId);
