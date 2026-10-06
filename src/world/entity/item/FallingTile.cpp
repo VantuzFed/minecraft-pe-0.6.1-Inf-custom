@@ -66,15 +66,6 @@ void FallingTile::tick() {
 		int yt = Mth::floor(y);
 		int zt = Mth::floor(z);
 
-		if (time == 1) {
-			if (level->getTile(xt, yt, zt) == tile) {
-				level->setTile(xt, yt, zt, 0);
-			} else {
-				remove();
-				return;
-			}
-		}
-
 		if (onGround) {
 			xd *= 0.7f;
 			zd *= 0.7f;
@@ -83,10 +74,10 @@ void FallingTile::tick() {
 			remove();
 			if (level->mayPlace(tile, xt, yt, zt, true, 1) && level->setTileAndData(xt, yt, zt, tile, data)) {
 			} else if (!level->isClientSide) {
-				//spawnAtLocation(tile, 1);
+				spawnAtLocation(tile, 1);
 			}
-		} else if (time > SharedConstants::TicksPerSecond * 5 && !level->isClientSide) {
-			//spawnAtLocation(tile, 1);
+		} else if (time > SharedConstants::TicksPerSecond * 20 && !level->isClientSide) {
+			spawnAtLocation(tile, 1);
 			remove();
 		}
 	}

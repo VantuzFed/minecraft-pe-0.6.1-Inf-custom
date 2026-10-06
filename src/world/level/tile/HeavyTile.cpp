@@ -36,10 +36,13 @@ int HeavyTile::getTickDelay( Level* level ) {
 bool HeavyTile::isFree( Level* level, int x, int y, int z ) {
     int t = level->getTile(x, y, z);
     if (t == 0) return true;
+    if (t < 0 || t >= Tile::NUM_BLOCK_TYPES || Tile::tiles[t] == NULL) return true;
     if (t == ((Tile*)Tile::fire)->id) return true;
     const Material* material = Tile::tiles[t]->material;
     if (material == Material::water) return true;
     if (material == Material::lava) return true;
+    if (material->isReplaceable()) return true;
+    if (Tile::tiles[t]->getAABB(level, x, y, z) == NULL) return true;
     return false;
 }
 
@@ -48,17 +51,18 @@ void HeavyTile::checkSlide( Level* level, int x, int y, int z ) {
     int y2 = y;
     int z2 = z;
     if (isFree(level, x2, y2 - 1, z2) && y2 >= 0) {
-        int r = 32;
+        int r = 16;
+        int data = level->getData(x, y, z);
         if (instaFall || !level->hasChunksAt(x - r, y - r, z - r, x + r, y + r, z + r)) {
             level->setTile(x, y, z, 0);
             while (isFree(level, x, y - 1, z) && y > 0)
                 y--;
             if (y > 0) {
-                level->setTile(x, y, z, id);
-                //level->setTileAndUpdate(x, y, z, id);
+                level->setTileAndData(x, y, z, id, data);
             }
         } else if (!level->isClientSide) {
-            FallingTile* e = new FallingTile(level, x + 0.5f, y + 0.5f, z + 0.5f, id, level->getData(x, y, z));
+            level->setTile(x, y, z, 0);
+            FallingTile* e = new FallingTile(level, x + 0.5f, y + 0.5f, z + 0.5f, id, data);
             falling(e);
             level->addEntity(e);
         }

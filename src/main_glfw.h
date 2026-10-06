@@ -309,8 +309,8 @@ int main(void) {
 	glfwWindowHint(GLFW_CONTEXT_CREATION_API, GLFW_NATIVE_CONTEXT_API);
 #ifndef __EMSCRIPTEN__
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 #else
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 1);
@@ -326,7 +326,17 @@ int main(void) {
 	platform->window = glfwCreateWindow(initW, initH, "Minecraft PE 0.6.1", NULL, NULL);
 	
 	if (platform->window == NULL) {
+#ifndef __EMSCRIPTEN__
+		// Fallback to OpenGL 2.1 if OpenGL 3.0 is not available on this system
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+		glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+		platform->window = glfwCreateWindow(initW, initH, "Minecraft PE 0.6.1", NULL, NULL);
+		if (platform->window == NULL) {
+			return 1;
+		}
+#else
 		return 1;
+#endif
 	}
 
 	glfwSetKeyCallback(platform->window, key_callback);
@@ -346,6 +356,8 @@ int main(void) {
 	glfwMakeContextCurrent(platform->window);
 	#ifndef __EMSCRIPTEN__
 	gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+	printf("[GL] Context Version: %s\n", (const char*)glGetString(GL_VERSION));
+	printf("[GL] Context Renderer: %s\n", (const char*)glGetString(GL_RENDERER));
 	glfwSwapInterval(0);
 	#endif
 #endif
