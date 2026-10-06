@@ -843,20 +843,10 @@ void Minecraft::tickInput() {
 			}
 
 			if (key == Keyboard::KEY_E) {
-				// Survival gets the classic Beta-style inventory,
-				// creative keeps the block selection screen. On desktop
-				// the touch flow is never used, whatever the option says.
-#if defined(PLATFORM_DESKTOP)
-				if (!isCreativeMode())
-					setScreen(new BetaInventoryScreen());
-				else
-					screenChooser.setScreen(SCREEN_BLOCKSELECTION);
-#else
 				if (!isCreativeMode() && !useTouchscreen())
 					setScreen(new BetaInventoryScreen());
 				else
 					screenChooser.setScreen(SCREEN_BLOCKSELECTION);
-#endif
 			}
 
 			if (!screen && key == Keyboard::KEY_T && level) {
