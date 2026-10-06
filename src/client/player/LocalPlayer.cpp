@@ -405,13 +405,8 @@ void LocalPlayer::calculateFlight(double xa, double ya, double za) {
         za *= sprintBoost;
     }
 
-#ifdef ANDROID
-    if (Keyboard::isKeyDown(103)) ya = .2f * flySpeed;
-    if (Keyboard::isKeyDown(102)) ya = -.2f * flySpeed;
-#else
-    if (Keyboard::isKeyDown(Keyboard::KEY_E)) ya = .2f * flySpeed;
-    if (Keyboard::isKeyDown(Keyboard::KEY_Q)) ya = -.2f * flySpeed;
-#endif
+    if (Keyboard::isKeyDown(Keyboard::KEY_E) || Keyboard::isKeyDown(Keyboard::KEY_BUTTON_R1)) ya = .2f * flySpeed;
+    if (Keyboard::isKeyDown(Keyboard::KEY_Q) || Keyboard::isKeyDown(Keyboard::KEY_BUTTON_L1)) ya = -.2f * flySpeed;
 
     flyX = 10 * smoothFlyX.getNewDeltaValue(xa, .35f * sensivity);
     flyY = 10 * smoothFlyY.getNewDeltaValue(ya, .35f * sensivity);
@@ -788,19 +783,12 @@ void LocalPlayer::startCrafting(int x, int y, int z, int tableSize) {
 #ifndef STANDALONE_SERVER
 	if (minecraft->isCreativeMode())
 		return;
-	// Desktop gets the classic Beta workbench (3x3) or the inventory's
-	// 2x2 for hand crafting; touch keeps its flow.
-#if defined(PLATFORM_DESKTOP)
-	if (tableSize != Recipe::SIZE_2X2)
-		minecraft->setScreen(new BetaWorkbenchScreen());
-	else
-		minecraft->setScreen(new BetaInventoryScreen());
-#else
 	if (!minecraft->useTouchscreen() && tableSize != Recipe::SIZE_2X2)
 		minecraft->setScreen(new BetaWorkbenchScreen());
+	else if (!minecraft->useTouchscreen())
+		minecraft->setScreen(new BetaInventoryScreen());
 	else
-		minecraft->setScreen( new WorkbenchScreen(tableSize) );
-#endif
+		minecraft->setScreen(new WorkbenchScreen(tableSize));
 #endif
 }
 
@@ -815,15 +803,10 @@ void LocalPlayer::openFurnace( FurnaceTileEntity* e ) {
 #ifndef STANDALONE_SERVER
 	if (minecraft->isCreativeMode())
 		return;
-	// Desktop gets the classic Beta furnace; touch keeps its flow.
-#if defined(PLATFORM_DESKTOP)
-	minecraft->setScreen(new BetaFurnaceScreen(e));
-#else
 	if (!minecraft->useTouchscreen())
 		minecraft->setScreen(new BetaFurnaceScreen(e));
 	else
-		minecraft->setScreen( new FurnaceScreen(this, e) );
-#endif
+		minecraft->setScreen(new FurnaceScreen(this, e));
 #endif
 }
 
@@ -835,19 +818,15 @@ void LocalPlayer::openContainer( Container* container ) {
 #ifndef STANDALONE_SERVER
 	if (minecraft->isCreativeMode() || !container)
 		return;
-#if defined(PLATFORM_DESKTOP)
-	minecraft->setScreen( new BetaChestScreen(container) );
-#else
-	if (minecraft->options.getIntValue(OPTIONS_MENU_STYLE) == 2 || !minecraft->useTouchscreen()) {
-		minecraft->setScreen( new BetaChestScreen(container) );
+	if (!minecraft->useTouchscreen() || minecraft->options.getIntValue(OPTIONS_MENU_STYLE) == 2) {
+		minecraft->setScreen(new BetaChestScreen(container));
 	} else {
 		ChestTileEntity* cte = dynamic_cast<ChestTileEntity*>(container);
 		if (cte)
-			minecraft->setScreen( new ChestScreen(this, cte) );
+			minecraft->setScreen(new ChestScreen(this, cte));
 		else
-			minecraft->setScreen( new BetaChestScreen(container) );
+			minecraft->setScreen(new BetaChestScreen(container));
 	}
-#endif
 #endif
 }
 

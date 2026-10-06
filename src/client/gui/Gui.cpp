@@ -504,11 +504,7 @@ void Gui::onConfigChanged( const Config& c ) {
 	//
 	// Create outer feedback circle
 	//
-#ifdef ANDROID
-	const float mm = 50; //20
-#else
-	const float mm = 50; //20
-#endif
+	const float mm = 50.0f;
 	const float maxRadius = minecraft->pixelCalcUi.millimetersToPixels(mm);
 	const float radius = Mth::Min(80.0f/2, maxRadius);
 	//LOGI("radius, maxradius: %f, %f\n", radius, maxRadius);
