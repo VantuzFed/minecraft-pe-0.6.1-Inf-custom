@@ -13,6 +13,8 @@ public:
 
 	void render(int xm, int ym, float a);
 
+	virtual bool isPauseScreen() { return true; }
+
 	void buttonClicked(Button* button) {};
 
 private:

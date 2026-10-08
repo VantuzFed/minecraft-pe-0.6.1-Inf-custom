@@ -20,6 +20,7 @@ public:
 
 	void _init();
 	virtual void reset();
+	virtual void resetPos(bool clearMore);
 
 	void tick();
 

@@ -566,8 +566,15 @@ void LocalPlayer::aiStep() {
 	//	abilities.flying = false;
 	yBobO = yBob;
 	xBobO = xBob;
-	xBob += (xRot - xBob) * 0.5;
-	yBob += (yRot - yBob) * 0.5;
+	float dx = xRot - xBob;
+	while (dx >= 180.0f) dx -= 360.0f;
+	while (dx < -180.0f) dx += 360.0f;
+	xBob += dx * 0.5f;
+
+	float dy = yRot - yBob;
+	while (dy >= 180.0f) dy -= 360.0f;
+	while (dy < -180.0f) dy += 360.0f;
+	yBob += dy * 0.5f;
 
 	if (interpolateOnly())
 		updateAi();
@@ -770,6 +777,12 @@ void LocalPlayer::reset() {
 	this->_init();
 }
 
+void LocalPlayer::resetPos(bool clearMore) {
+	super::resetPos(clearMore);
+	xBob = xBobO = xRot;
+	yBob = yBobO = yRot;
+}
+
 void LocalPlayer::_init() {
 	autoJumpTime		= 0;
 	jumpTriggerTime		= 0;
@@ -781,6 +794,9 @@ void LocalPlayer::_init() {
 	ItemInstance* item = inventory->getSelected();
 	sentInventoryItemId = item? item->id : 0;
 	sentInventoryItemData = item? item->getAuxValue() : 0;
+
+	xBob = xBobO = xRot;
+	yBob = yBobO = yRot;
 }
 
 void LocalPlayer::startCrafting(int x, int y, int z, int tableSize) {

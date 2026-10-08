@@ -9,7 +9,7 @@ class ConsoleScreen: public Screen
 {
     typedef Screen super;
 public:
-    ConsoleScreen();
+    ConsoleScreen(const std::string& initialInput = "");
     virtual ~ConsoleScreen() {}
 
     void init();
@@ -18,7 +18,7 @@ public:
 
     virtual bool renderGameBehind() { return true; }
     virtual bool isInGameScreen()   { return true; }
-    virtual bool isPauseScreen()    { return false; }
+    virtual bool isPauseScreen()    { return true; }
 
     virtual void keyPressed(int eventKey);
     virtual void charPressed(char inputChar);

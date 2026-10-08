@@ -14,8 +14,8 @@
 #include <cstdlib>
 #include <cctype>
 
-ConsoleScreen::ConsoleScreen()
-:   _input(""),
+ConsoleScreen::ConsoleScreen(const std::string& initialInput /*= ""*/)
+:   _input(initialInput),
     _cursorBlink(0)
 {
 }

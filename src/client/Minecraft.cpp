@@ -223,10 +223,12 @@ Minecraft::Minecraft() :
 
 Minecraft::~Minecraft()
 {
+#ifndef STANDALONE_SERVER
 #if !defined(__EMSCRIPTEN__)
 	if (s_screenshotThread.joinable()) {
 		s_screenshotThread.join();
 	}
+#endif
 #endif
 	delete netCallback;
 	delete raknetInstance;
@@ -362,6 +364,8 @@ void Minecraft::applyWorldPresentation(Level* level) {
 
 void Minecraft::leaveGame(bool renameLevel /*=false*/)
 {
+	options.set(OPTIONS_RENDER_DEBUG, false);
+
 	if (isGeneratingLevel || !_hasSignaledGeneratingLevelFinished)
 		return;
 
@@ -552,7 +556,7 @@ void Minecraft::update() {
 	TIMER_POP();
 	checkGlError("Update finished");
 
-	if (options.getBooleanValue(OPTIONS_RENDER_DEBUG)) {
+	if (!screen && options.getBooleanValue(OPTIONS_RENDER_DEBUG)) {
 		//#ifndef PLATFORM_DESKTOP
 		if (!PerfTimer::enabled) {
 			PerfTimer::reset();
@@ -856,6 +860,11 @@ void Minecraft::tickInput() {
 				setScreen(new ConsoleScreen());
 			}
 
+			if (!screen && (key == Keyboard::KEY_SLASH || key == '/') && level) {
+				Keyboard::reset();
+				setScreen(new ConsoleScreen("/"));
+			}
+
 			if (key == Keyboard::KEY_F2) {
 				takeScreenshot();
 			}
@@ -880,7 +889,7 @@ void Minecraft::tickInput() {
 				startIsometricScreenshot(customZoom, selectedSlot + 1);
 			}
 
-			if (key == Keyboard::KEY_F3) {
+			if (!screen && key == Keyboard::KEY_F3) {
 				options.toggle(OPTIONS_RENDER_DEBUG);
 			}
 
@@ -1180,13 +1189,9 @@ bool Minecraft::isOnline()
 }
 
 void Minecraft::pauseGame(bool isBackPaused) {
-	// Only freeze gameplay when running a local server and it is not accepting
-	// incoming connections (invisible server), which includes typical single-
-	// player/lobby mode. If the server is visible, the game should keep ticking.
 	bool canFreeze = false;
-	if (raknetInstance && raknetInstance->isServer() && netCallback) {
-		ServerSideNetworkHandler* ss = (ServerSideNetworkHandler*) netCallback;
-		if (!ss->allowsIncomingConnections())
+	if (level && !level->isClientSide && (!raknetInstance || raknetInstance->isServer())) {
+		if (level->players.size() <= 1)
 			canFreeze = true;
 	}
 	pause = canFreeze;
@@ -1242,6 +1247,13 @@ void Minecraft::setScreen( Screen* screen )
 		if (screen->isInGameScreen() && level) {
 			level->saveLevelData();
 			level->saveGame();
+		}
+
+		bool isSinglePlayer = level && !level->isClientSide && (!raknetInstance || raknetInstance->isServer()) && (level->players.size() <= 1);
+		if (isSinglePlayer && screen->isPauseScreen()) {
+			pause = true;
+		} else {
+			pause = false;
 		}
 
 		//noRender = false;
@@ -1354,6 +1366,7 @@ void Minecraft::init()
 #endif
 
 	options.load();
+	options.set(OPTIONS_RENDER_DEBUG, false);
 
 	setIsCreativeMode(false); // false means it's Survival Mode
 	reloadOptions();

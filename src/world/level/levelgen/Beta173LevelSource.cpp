@@ -257,13 +257,13 @@ void Beta173LevelSource::postProcess(ChunkSource* parent, int xt, int zt) {
 		int x = xo + m_rand.nextInt(16) + 8;
 		int y = m_rand.nextInt(m_rand.nextInt(120) + 8);
 		int z = zo + m_rand.nextInt(16) + 8;
-		placeSpring(m_level, m_rand, x, y, z, Tile::calmWater->id);
+		placeSpring(m_level, m_rand, x, y, z, Tile::water->id);
 	}
 	for (int k = 0; k < 20; k++) {
 		int x = xo + m_rand.nextInt(16) + 8;
 		int y = m_rand.nextInt(m_rand.nextInt(m_rand.nextInt(112) + 8) + 8);
 		int z = zo + m_rand.nextInt(16) + 8;
-		placeSpring(m_level, m_rand, x, y, z, Tile::calmLava->id);
+		placeSpring(m_level, m_rand, x, y, z, Tile::lava->id);
 	}
 
 	if (m_spawnMobs && !m_level->isClientSide) {
