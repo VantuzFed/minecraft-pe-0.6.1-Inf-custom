@@ -14,7 +14,7 @@ class HumanoidMobRenderer: public MobRenderer
 public:
     HumanoidMobRenderer(HumanoidModel* humanoidModel, float shadow);
 
-	void renderHand();
+	virtual void renderHand();
 	void render(Entity* mob_, double x, double y, double z, float rot, float a);
 protected:
     void additionalRendering(Mob* mob, float a);

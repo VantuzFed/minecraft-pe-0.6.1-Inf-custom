@@ -941,6 +941,11 @@ void GameRenderer::setupGuiScreen( bool clearColorBuffer )
 
 /*private*/
 void GameRenderer::renderItemInHand(float a, int eye) {
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity2();
+	if (mc->options.getBooleanValue(OPTIONS_ANAGLYPH_3D)) glTranslatef2(-(eye * 2 - 1) * 0.07f, 0, 0);
+	gluPerspective(getFov(a, false), mc->width / (float) mc->height, 0.05f, renderDistance * 2.0);
+	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity2();
 	if (mc->options.getBooleanValue(OPTIONS_ANAGLYPH_3D)) glTranslatef2((eye * 2 - 1) * 0.10f, 0, 0);
 
@@ -950,13 +955,6 @@ void GameRenderer::renderItemInHand(float a, int eye) {
 
 	if (!mc->options.getBooleanValue(OPTIONS_THIRD_PERSON_VIEW) && (mc->cameraTargetPlayer->isPlayer() && !((Player*)mc->cameraTargetPlayer)->isSleeping())) {
 		if (!mc->options.getBooleanValue(OPTIONS_HIDEGUI)) {
-			float fov = getFov(a, false);
-			if (fov != _setupCameraFov) {
-				glMatrixMode(GL_PROJECTION);
-				glLoadIdentity();
-				gluPerspective(fov, mc->width / (float) mc->height, 0.05f, renderDistance);
-				glMatrixMode(GL_MODELVIEW);
-			}
 			itemInHandRenderer->render(a);
 		}
 	}

@@ -28,7 +28,7 @@ public:
 	virtual void mouseWheel(int dx, int dy, int xm, int ym);
 	virtual void keyPressed(int eventKey);
 	virtual void removed();
-	virtual bool isPauseScreen() { return true; }
+	virtual bool isPauseScreen() { return false; }
 
 private:
 	static const int PANEL_W = 176;

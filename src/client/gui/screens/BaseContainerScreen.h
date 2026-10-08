@@ -43,6 +43,10 @@ public:
 		return true;
 	}
 
+	virtual bool isPauseScreen() {
+		return false;
+	}
+
 protected:
 	BaseContainerMenu* menu;
 };

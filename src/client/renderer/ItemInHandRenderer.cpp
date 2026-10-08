@@ -291,15 +291,21 @@ void ItemInHandRenderer::render( float a )
 	Lighting::turnOn(mc);
 	glPopMatrix2();
 
-	 if (localPlayer) // shredder added, basically does the hand swaying animation from b1.8
+	if (localPlayer) // shredder added, basically does the hand swaying animation from b1.8
 	{
-        float xrr = localPlayer->xBobO + (localPlayer->xBob - localPlayer->xBobO) * a;
-        float yrr = localPlayer->yBobO + (localPlayer->yBob - localPlayer->yBobO) * a;
+		float xrr = localPlayer->xBobO + (localPlayer->xBob - localPlayer->xBobO) * a;
+		float yrr = localPlayer->yBobO + (localPlayer->yBob - localPlayer->yBobO) * a;
 		// 4J - was using player->xRot and yRot directly here rather than interpolating between old & current with a
 		float yr = player->yRotO + (player->yRot - player->yRotO) * a;
-        glRotatef((xr - xrr) * 0.1f, 1, 0, 0);
-        glRotatef((yr - yrr) * 0.1f, 0, 1, 0);
-    }
+		float dx = xr - xrr;
+		while (dx >= 180.0f) dx -= 360.0f;
+		while (dx < -180.0f) dx += 360.0f;
+		float dy = yr - yrr;
+		while (dy >= 180.0f) dy -= 360.0f;
+		while (dy < -180.0f) dy += 360.0f;
+		glRotatef(dx * 0.1f, 1, 0, 0);
+		glRotatef(dy * 0.1f, 0, 1, 0);
+	}
 
 	float br = mc->level->getBrightness(Mth::floor(player->x), Mth::floor(player->y), Mth::floor(player->z));
 
@@ -430,6 +436,7 @@ void ItemInHandRenderer::render( float a )
 		playerRenderer->renderHand();
 		glPopMatrix2();
 	}
+	glDisable(GL_NORMALIZE);
 	glDisable2(GL_RESCALE_NORMAL);
 	Lighting::turnOff();
 	//w.stop();

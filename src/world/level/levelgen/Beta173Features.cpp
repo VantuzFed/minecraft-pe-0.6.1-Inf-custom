@@ -745,6 +745,9 @@ bool placeSpring(Level* level, JavaRandom& rand, int x, int y, int z, int liquid
 	if (level->isEmptyTile(x, y, z + 1)) air++;
 	if (stone == 3 && air == 1) {
 		level->setTile(x, y, z, liquidId);
+		level->instaTick = true;
+		Tile::tiles[liquidId]->tick(level, x, y, z, &level->random);
+		level->instaTick = false;
 		return true;
 	}
 	return false;

@@ -30,6 +30,48 @@
 #include <cmath>
 #include <algorithm>
 #include <sstream>
+#include <unistd.h>
+
+#ifndef GL_SHADING_LANGUAGE_VERSION
+#define GL_SHADING_LANGUAGE_VERSION 0x8B8C
+#endif
+
+static std::string getCpuName() {
+	static std::string cpuName;
+	if (!cpuName.empty()) return cpuName;
+#if defined(__linux__)
+	FILE* f = fopen("/proc/cpuinfo", "r");
+	if (f) {
+		char line[256];
+		while (fgets(line, sizeof(line), f)) {
+			if (strncmp(line, "model name", 10) == 0) {
+				char* colon = strchr(line, ':');
+				if (colon) {
+					colon++;
+					while (*colon == ' ' || *colon == '\t') colon++;
+					char* end = colon + strlen(colon) - 1;
+					while (end > colon && (*end == '\n' || *end == '\r' || *end == ' ')) *end-- = '\0';
+					cpuName = colon;
+					break;
+				}
+			} else if (strncmp(line, "Hardware", 8) == 0) {
+				char* colon = strchr(line, ':');
+				if (colon) {
+					colon++;
+					while (*colon == ' ' || *colon == '\t') colon++;
+					char* end = colon + strlen(colon) - 1;
+					while (end > colon && (*end == '\n' || *end == '\r' || *end == ' ')) *end-- = '\0';
+					cpuName = colon;
+					break;
+				}
+			}
+		}
+		fclose(f);
+	}
+#endif
+	if (cpuName.empty()) cpuName = "Unknown CPU";
+	return cpuName;
+}
 
 float Gui::InvGuiScale = 1.0f / 3.0f;
 float Gui::GuiScale = 1.0f / Gui::InvGuiScale;
@@ -144,14 +186,15 @@ void Gui::render(float a, bool mouseFree, int xMouse, int yMouse) {
 		renderOnSelectItemNameText(screenWidth, font, ySlot);
 #endif
 #if defined(RPI)
-		renderDebugInfo();
+		if (!minecraft->screen)
+			renderDebugInfo();
 #endif
 
 		if (Keyboard::isKeyDown(Keyboard::KEY_TAB)) {
 			renderPlayerList(font, screenWidth, screenHeight);
 		}
 
-		if (minecraft->options.getBooleanValue(OPTIONS_RENDER_DEBUG))
+		if (!minecraft->screen && minecraft->options.getBooleanValue(OPTIONS_RENDER_DEBUG))
 			renderDebugInfo();
 	}
 
@@ -947,6 +990,116 @@ void Gui::renderDebugInfo() {
 		font->draw(ln[i], MGN, y, col);
 	}
 	t.endOverrideAndDraw();
+	}
+
+	// Right-side technical hardware info
+	std::vector<std::string> rLines;
+	rLines.reserve(8);
+
+	// Line 0: Architecture / OS
+	rLines.push_back("Minecraft PE 0.6.1 (mcpe64, Linux)");
+
+	// Line 1: Memory
+	long rssMb = 0;
+	long totalMemMb = 0;
+#if defined(__linux__)
+	FILE* statm = fopen("/proc/self/statm", "r");
+	if (statm) {
+		long pages = 0;
+		if (fscanf(statm, "%*s %ld", &pages) == 1) {
+			rssMb = (pages * sysconf(_SC_PAGESIZE)) / (1024 * 1024);
+		}
+		fclose(statm);
+	}
+	long physPages = sysconf(_SC_PHYS_PAGES);
+	long pageSize = sysconf(_SC_PAGESIZE);
+	if (physPages > 0 && pageSize > 0) {
+		totalMemMb = (physPages * pageSize) / (1024 * 1024);
+	}
+#endif
+	if (totalMemMb > 0) {
+		int memPercent = (int)((rssMb * 100) / totalMemMb);
+		char memBuf[64];
+		snprintf(memBuf, sizeof(memBuf), "Mem: %d%% %ldMB / %ldMB", memPercent, rssMb, totalMemMb);
+		rLines.push_back(memBuf);
+	} else if (rssMb > 0) {
+		char memBuf[64];
+		snprintf(memBuf, sizeof(memBuf), "Mem: %ldMB", rssMb);
+		rLines.push_back(memBuf);
+	}
+
+	// Line 2: Display
+	const char* glVendor = (const char*)glGetString(GL_VENDOR);
+	char dispBuf[128];
+	if (glVendor && *glVendor) {
+		snprintf(dispBuf, sizeof(dispBuf), "Display: %dx%d (%s)", minecraft->width, minecraft->height, glVendor);
+	} else {
+		snprintf(dispBuf, sizeof(dispBuf), "Display: %dx%d", minecraft->width, minecraft->height);
+	}
+	rLines.push_back(dispBuf);
+
+	// Line 3: Video / GPU Renderer
+	const char* glRenderer = (const char*)glGetString(GL_RENDERER);
+	if (glRenderer && *glRenderer) {
+		rLines.push_back(glRenderer);
+	}
+
+	// Line 4: GL Version
+	const char* glVersion = (const char*)glGetString(GL_VERSION);
+	if (glVersion && *glVersion) {
+		rLines.push_back(std::string("GL: ") + glVersion);
+	}
+
+	// Line 5: GLSL Version
+	const char* glslVersion = (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION);
+	if (glslVersion && *glslVersion) {
+		rLines.push_back(std::string("GLSL: ") + glslVersion);
+	}
+
+	// Line 6: CPU
+	int cpus = (int)sysconf(_SC_NPROCESSORS_ONLN);
+	if (cpus < 1) cpus = 1;
+	std::string cpuModel = getCpuName();
+	char cpuBuf[160];
+	snprintf(cpuBuf, sizeof(cpuBuf), "CPU: %dx %s", cpus, cpuModel.c_str());
+	rLines.push_back(cpuBuf);
+
+	int screenWidth = (int)(minecraft->width * InvGuiScale);
+	const float LH_R  = (float)Font::DefaultLineHeight;
+	const float MGN_R = 2.0f;
+	const float PAD_R = 2.0f;
+
+	if (minecraft->options.getIntValue(OPTIONS_DEBUG_STYLE) == 1) {
+		for (size_t i = 0; i < rLines.size(); i++) {
+			if (rLines[i].empty()) continue;
+			float w  = (float)font->width(rLines[i]);
+			float x0 = screenWidth - MGN_R - w - PAD_R;
+			float y0 = MGN_R + (float)i * LH_R - 1.0f;
+			float x1 = screenWidth - MGN_R + PAD_R;
+			float y1 = MGN_R + ((float)i + 1) * LH_R - 1.0f;
+			fill(x0, y0, x1, y1, 0x90000000);
+		}
+
+		Tesselator& t = Tesselator::instance;
+		t.beginOverride();
+		for (size_t i = 0; i < rLines.size(); i++) {
+			if (rLines[i].empty()) continue;
+			float w  = (float)font->width(rLines[i]);
+			float x  = screenWidth - MGN_R - w;
+			float y  = MGN_R + (float)i * LH_R;
+			int col = (i == 0) ? 0xffFFFF55 : 0xffffffff;
+			font->draw(rLines[i], x, y, col);
+		}
+		t.endOverrideAndDraw();
+	} else {
+		for (size_t i = 0; i < rLines.size(); i++) {
+			if (rLines[i].empty()) continue;
+			float w = (float)font->width(rLines[i]);
+			float x = screenWidth - MGN_R - w;
+			float y = MGN_R + (float)i * LH_R;
+			int col = (i == 0) ? 0xffffff : 0xe0e0e0;
+			font->drawShadow(rLines[i], x, y, col);
+		}
 	}
 }
 

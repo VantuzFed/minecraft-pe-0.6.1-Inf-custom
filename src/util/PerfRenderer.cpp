@@ -218,6 +218,7 @@ void PerfRenderer::renderFpsMeter( float tickTime )
 		msg2 = toPercentString(result.globalPercentage);
 		_font->drawShadow(msg2, xx + 10 + 10 - _font->width(msg2), yy, result.getColor());
 	}
+	glEnable(GL_CULL_FACE);
 }
 
 std::string PerfRenderer::toPercentString( float percentage )

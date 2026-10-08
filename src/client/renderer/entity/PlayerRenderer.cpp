@@ -1,5 +1,6 @@
 #include "PlayerRenderer.h"
 #include "EntityRenderDispatcher.h"
+#include "../../Minecraft.h"
 #include "../Textures.h"
 #include "../../../world/entity/player/Player.h"
 #include "../../../world/level/Level.h"
@@ -22,12 +23,13 @@ PlayerRenderer::PlayerRenderer( HumanoidModel* humanoidModel, float shadow )
 {
 	// default to legacy skin path until we know the exact texture size
 	model = playerModel32;
-	humanoidModel = playerModel32;
+	this->humanoidModel = playerModel32;
 }
 
 PlayerRenderer::~PlayerRenderer() {
 	// prevent MobRenderer destructor from deleting model pointers we manage manually
 	model = nullptr;
+	humanoidModel = nullptr;
 
 	delete playerModel32;
 	delete playerModel64;
@@ -55,12 +57,34 @@ void PlayerRenderer::setupRotations( Entity* mob, float bob, float bodyRot, floa
 }
 
 bool PlayerRenderer::isModernPlayerSkin(Mob* mob) {
+	if (!mob || !entityRenderDispatcher || !entityRenderDispatcher->textures)
+		return false;
 	const std::string texName = mob->getTexture();
 	TextureId texId = entityRenderDispatcher->textures->loadTexture(texName);
 	if (!Textures::isTextureIdValid(texId))
 		return false;
 	const TextureData* texData = entityRenderDispatcher->textures->getTemporaryTextureData(texId);
 	return texData && texData->w == 64 && texData->h == 64;
+}
+
+void PlayerRenderer::renderHand() {
+	Mob* mob = entityRenderDispatcher ? (entityRenderDispatcher->cameraEntity ? (Mob*)entityRenderDispatcher->cameraEntity : (Mob*)entityRenderDispatcher->minecraft->player) : nullptr;
+	HumanoidModel* desired = (mob && isModernPlayerSkin(mob)) ? playerModel64 : playerModel32;
+	if (model != desired || humanoidModel != desired) {
+		model = desired;
+		humanoidModel = desired;
+	}
+
+	glEnable2(GL_ALPHA_TEST);
+	glAlphaFunc(GL_GREATER, 0.1f);
+	glEnable2(GL_BLEND);
+	glBlendFunc2(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable2(GL_CULL_FACE);
+
+	super::renderHand();
+
+	glEnable2(GL_CULL_FACE);
+	glDisable2(GL_BLEND);
 }
 
 void PlayerRenderer::renderName( Mob* mob, double x, double y, double z ){
