@@ -30,7 +30,17 @@
 #include <cmath>
 #include <algorithm>
 #include <sstream>
+#include <thread>
+
+#if !defined(_WIN32)
 #include <unistd.h>
+#if defined(__APPLE__)
+#include <sys/sysctl.h>
+#endif
+#else
+#include <windows.h>
+#include <psapi.h>
+#endif
 
 #ifndef GL_SHADING_LANGUAGE_VERSION
 #define GL_SHADING_LANGUAGE_VERSION 0x8B8C
@@ -67,6 +77,26 @@ static std::string getCpuName() {
 			}
 		}
 		fclose(f);
+	}
+#elif defined(_WIN32)
+	HKEY hKey;
+	if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+		char buf[128] = {0};
+		DWORD bufSize = sizeof(buf);
+		if (RegQueryValueExA(hKey, "ProcessorNameString", NULL, NULL, (LPBYTE)buf, &bufSize) == ERROR_SUCCESS) {
+			char* p = buf;
+			while (*p == ' ' || *p == '\t') p++;
+			char* end = p + strlen(p) - 1;
+			while (end > p && (*end == '\n' || *end == '\r' || *end == ' ')) *end-- = '\0';
+			cpuName = p;
+		}
+		RegCloseKey(hKey);
+	}
+#elif defined(__APPLE__)
+	char buf[128] = {0};
+	size_t len = sizeof(buf);
+	if (sysctlbyname("machdep.cpu.brand_string", &buf, &len, NULL, 0) == 0) {
+		cpuName = buf;
 	}
 #endif
 	if (cpuName.empty()) cpuName = "Unknown CPU";
@@ -997,12 +1027,30 @@ void Gui::renderDebugInfo() {
 	rLines.reserve(8);
 
 	// Line 0: Architecture / OS
+#if defined(__linux__)
 	rLines.push_back("Minecraft PE 0.6.1 (mcpe64, Linux)");
+#elif defined(_WIN32)
+	rLines.push_back("Minecraft PE 0.6.1 (mcpe64, Windows)");
+#elif defined(__APPLE__)
+	rLines.push_back("Minecraft PE 0.6.1 (mcpe64, macOS)");
+#else
+	rLines.push_back("Minecraft PE 0.6.1 (mcpe64)");
+#endif
 
 	// Line 1: Memory
 	long rssMb = 0;
 	long totalMemMb = 0;
-#if defined(__linux__)
+#if defined(_WIN32)
+	PROCESS_MEMORY_COUNTERS pmc;
+	if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+		rssMb = (long)(pmc.WorkingSetSize / (1024 * 1024));
+	}
+	MEMORYSTATUSEX memStatus;
+	memStatus.dwLength = sizeof(memStatus);
+	if (GlobalMemoryStatusEx(&memStatus)) {
+		totalMemMb = (long)(memStatus.ullTotalPhys / (1024 * 1024));
+	}
+#elif defined(__linux__)
 	FILE* statm = fopen("/proc/self/statm", "r");
 	if (statm) {
 		long pages = 0;
@@ -1057,11 +1105,11 @@ void Gui::renderDebugInfo() {
 	}
 
 	// Line 6: CPU
-	int cpus = (int)sysconf(_SC_NPROCESSORS_ONLN);
+	unsigned int cpus = std::thread::hardware_concurrency();
 	if (cpus < 1) cpus = 1;
 	std::string cpuModel = getCpuName();
 	char cpuBuf[160];
-	snprintf(cpuBuf, sizeof(cpuBuf), "CPU: %dx %s", cpus, cpuModel.c_str());
+	snprintf(cpuBuf, sizeof(cpuBuf), "CPU: %ux %s", cpus, cpuModel.c_str());
 	rLines.push_back(cpuBuf);
 
 	int screenWidth = (int)(minecraft->width * InvGuiScale);
