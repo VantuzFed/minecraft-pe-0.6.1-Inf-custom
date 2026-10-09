@@ -35,20 +35,15 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends build-essential ninja-build libgl-dev libwayland-dev xorg-dev libxkbcommon-dev libasound2-dev libpulse-dev
 
-      - name: Create Build Environment
-        run: cmake -E make_directory ${{ github.workspace }}/build
-
       - name: Configure CMake
         shell: bash
-        working-directory: ${{ github.workspace }}/build
-        run: cmake $GITHUB_WORKSPACE -G Ninja -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
 
       - name: Build
-        working-directory: ${{ github.workspace }}/build
         shell: bash
         run: |
-          cmake --build . --config $BUILD_TYPE --target MinecraftPE --parallel
-          cmake --build . --config $BUILD_TYPE --target MinecraftPE-server --parallel
+          cmake --build build --config ${{ env.BUILD_TYPE }} --target MinecraftPE --parallel
+          cmake --build build --config ${{ env.BUILD_TYPE }} --target MinecraftPE-server --parallel
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -75,32 +70,29 @@ jobs:
       - name: Ensure Ninja
         run: which ninja || brew install ninja
 
-      - name: Create Build Environment
-        run: cmake -E make_directory ${{ github.workspace }}/build
-
       - name: Configure CMake
-        working-directory: ${{ github.workspace }}/build
-        run: cmake $GITHUB_WORKSPACE -G Ninja -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        shell: bash
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
 
       - name: Build
-        working-directory: ${{ github.workspace }}/build
+        shell: bash
         run: |
-          cmake --build . --config $BUILD_TYPE --target MinecraftPE --parallel
-          cmake --build . --config $BUILD_TYPE --target MinecraftPE-server --parallel
+          cmake --build build --config ${{ env.BUILD_TYPE }} --target MinecraftPE --parallel
+          cmake --build build --config ${{ env.BUILD_TYPE }} --target MinecraftPE-server --parallel
 
       - name: Prepare macOS Artifacts
-        working-directory: ${{ github.workspace }}/build
+        shell: bash
         run: |
           mkdir -p dist
-          cp MinecraftPE dist/
-          cp MinecraftPE-server dist/
-          find . -name "*.dylib" -exec cp {} dist/ \; || true
+          cp build/MinecraftPE dist/
+          cp build/MinecraftPE-server dist/
+          find build -name "*.dylib" -exec cp {} dist/ \; || true
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: mcpe-macos
-          path: ${{ github.workspace }}/build/dist/
+          path: dist/
 
   build-windows:
     name: Build Windows
@@ -116,30 +108,28 @@ jobs:
           host: win
           target: win
 
-      - name: Create Build Environment
-        run: cmake -E make_directory ${{ github.workspace }}/build
-
       - name: Configure CMake
-        working-directory: ${{ github.workspace }}/build
-        run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        shell: bash
+        run: cmake -B build -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
 
       - name: Build
-        working-directory: ${{ github.workspace }}/build
-        run: cmake --build . --config $BUILD_TYPE --target MinecraftPE --parallel
+        shell: bash
+        run: cmake --build build --config ${{ env.BUILD_TYPE }} --target MinecraftPE --parallel
 
       - name: Prepare Windows Dist
-        working-directory: ${{ github.workspace }}/build
         shell: bash
         run: |
           mkdir -p dist
-          find . -name "MinecraftPE.exe" -exec cp {} dist/ \;
-          find . -name "*.dll" -exec cp {} dist/ \; || true
+          cp build/Release/MinecraftPE.exe dist/ 2>/dev/null || cp build/MinecraftPE.exe dist/ 2>/dev/null || find build -name "MinecraftPE.exe" -exec cp {} dist/ \;
+          cp build/Release/*.dll dist/ 2>/dev/null || true
+          cp build/*.dll dist/ 2>/dev/null || true
+          find build -name "*.dll" -exec cp {} dist/ \; || true
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: mcpe-windows
-          path: ${{ github.workspace }}/build/dist/
+          path: dist/
 
   deploy-site:
     name: Deploy Retro Website
