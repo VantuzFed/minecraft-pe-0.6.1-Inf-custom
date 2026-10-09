@@ -38,8 +38,15 @@
 #include <sys/sysctl.h>
 #endif
 #else
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <psapi.h>
+#include <intrin.h>
 #endif
 
 #ifndef GL_SHADING_LANGUAGE_VERSION
@@ -79,18 +86,18 @@ static std::string getCpuName() {
 		fclose(f);
 	}
 #elif defined(_WIN32)
-	HKEY hKey;
-	if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
-		char buf[128] = {0};
-		DWORD bufSize = sizeof(buf);
-		if (RegQueryValueExA(hKey, "ProcessorNameString", NULL, NULL, (LPBYTE)buf, &bufSize) == ERROR_SUCCESS) {
-			char* p = buf;
-			while (*p == ' ' || *p == '\t') p++;
-			char* end = p + strlen(p) - 1;
-			while (end > p && (*end == '\n' || *end == '\r' || *end == ' ')) *end-- = '\0';
-			cpuName = p;
-		}
-		RegCloseKey(hKey);
+	int cpuInfo[4] = {0};
+	__cpuid(cpuInfo, (int)0x80000000);
+	if ((unsigned int)cpuInfo[0] >= 0x80000004) {
+		char brand[49] = {0};
+		__cpuid((int*)(brand),      (int)0x80000002);
+		__cpuid((int*)(brand + 16), (int)0x80000003);
+		__cpuid((int*)(brand + 32), (int)0x80000004);
+		char* p = brand;
+		while (*p == ' ' || *p == '\t') p++;
+		char* end = p + strlen(p) - 1;
+		while (end > p && (*end == '\n' || *end == '\r' || *end == ' ')) *end-- = '\0';
+		cpuName = p;
 	}
 #elif defined(__APPLE__)
 	char buf[128] = {0};
