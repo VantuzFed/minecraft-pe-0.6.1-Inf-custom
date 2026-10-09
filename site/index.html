@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minecraft PE 0.6.1 — Desktop Remaster</title>
+  <link rel="icon" type="image/png" href="images/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Silkscreen&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      image-rendering: pixelated;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #2b1f16;
+      background-image: url('images/bg32.png');
+      background-repeat: repeat;
+      background-size: 64px 64px;
+      color: #e0e0e0;
+      font-family: 'VT323', monospace, 'Courier New', sans-serif;
+      font-size: 20px;
+      line-height: 1.4;
+      text-shadow: 2px 2px 0px #000;
+    }
+
+    a {
+      color: #55ff55;
+      text-decoration: none;
+    }
+
+    a:hover {
+      color: #ffff55;
+      text-decoration: underline;
+    }
+
+    /* Top Banner / Navbar */
+    .top-bar {
+      background: #181818;
+      border-bottom: 3px solid #3c3c3c;
+      padding: 10px 0;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
+    }
+
+    .top-bar-inner {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 0 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .site-tagline {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 11px;
+      color: #ffaa00;
+      letter-spacing: 1px;
+    }
+
+    .top-nav {
+      display: flex;
+      gap: 15px;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .top-nav a {
+      color: #cccccc;
+      font-size: 19px;
+      padding: 2px 6px;
+      transition: color 0.1s;
+    }
+
+    .top-nav a:hover {
+      color: #ffffff;
+      text-decoration: none;
+      background: #333333;
+    }
+
+    /* Container */
+    .container {
+      max-width: 880px;
+      margin: 30px auto 50px auto;
+      padding: 0 15px;
+    }
+
+    /* Header with Logo & Splash */
+    .header-box {
+      text-align: center;
+      margin-bottom: 25px;
+      position: relative;
+    }
+
+    .mc-logo {
+      max-width: 480px;
+      width: 90%;
+      height: auto;
+      filter: drop-shadow(4px 4px 0px #000000);
+    }
+
+    .splash-text {
+      position: absolute;
+      right: 18%;
+      bottom: -10px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 14px;
+      color: #ffff55;
+      text-shadow: 2px 2px 0px #3f3f00, 3px 3px 0px #000;
+      transform: rotate(-15deg);
+      animation: splash-pulse 1.2s infinite alternate ease-in-out;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    @keyframes splash-pulse {
+      0% {
+        transform: rotate(-15deg) scale(1);
+      }
+      100% {
+        transform: rotate(-15deg) scale(1.08);
+      }
+    }
+
+    /* Main Window Frame */
+    .retro-window {
+      background: #1c1c1c;
+      border: 4px solid #4a4a4a;
+      outline: 2px solid #000;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+      margin-bottom: 25px;
+    }
+
+    .window-header {
+      background: #333333;
+      border-bottom: 3px solid #222222;
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .window-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 12px;
+      color: #ffffff;
+      letter-spacing: 1px;
+    }
+
+    .window-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .window-dot {
+      width: 10px;
+      height: 10px;
+      background: #555555;
+      border: 1px solid #111;
+    }
+
+    .window-body {
+      padding: 24px;
+    }
+
+    /* Hero section */
+    .hero {
+      text-align: center;
+      padding: 10px 0 25px 0;
+      border-bottom: 2px dashed #3a3a3a;
+      margin-bottom: 25px;
+    }
+
+    .hero-title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 18px;
+      color: #ffffff;
+      margin: 0 0 10px 0;
+      line-height: 1.5;
+    }
+
+    .hero-sub {
+      color: #aaaaaa;
+      font-size: 22px;
+      margin-bottom: 25px;
+    }
+
+    /* Retro Minecraft Buttons */
+    .mc-btn {
+      display: inline-block;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 13px;
+      padding: 14px 24px;
+      color: #ffffff;
+      text-decoration: none !important;
+      cursor: pointer;
+      border-top: 3px solid #999999;
+      border-left: 3px solid #999999;
+      border-right: 3px solid #222222;
+      border-bottom: 3px solid #222222;
+      background: #5c5c5c;
+      box-shadow: inset 1px 1px 0px #c0c0c0, inset -1px -1px 0px #333333;
+      transition: background 0.05s;
+    }
+
+    .mc-btn:hover {
+      background: #737373;
+    }
+
+    .mc-btn:active {
+      border-top: 3px solid #222222;
+      border-left: 3px solid #222222;
+      border-right: 3px solid #999999;
+      border-bottom: 3px solid #999999;
+      box-shadow: inset 1px 1px 0px #111111;
+    }
+
+    .mc-btn-green {
+      background: #3a8528;
+      border-top-color: #6dd454;
+      border-left-color: #6dd454;
+      border-right-color: #1e4714;
+      border-bottom-color: #1e4714;
+      box-shadow: inset 1px 1px 0px #8ef073, inset -1px -1px 0px #183810;
+    }
+
+    .mc-btn-green:hover {
+      background: #46a130;
+    }
+
+    .mc-btn-large {
+      font-size: 15px;
+      padding: 16px 32px;
+    }
+
+    /* Grid and Panels */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 25px;
+    }
+
+    @media (max-width: 700px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+      .splash-text {
+        right: 5%;
+        font-size: 11px;
+      }
+      .hero-title {
+        font-size: 14px;
+      }
+    }
+
+    .retro-box {
+      background: #141414;
+      border: 2px solid #333333;
+      padding: 16px;
+    }
+
+    .retro-box h3 {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 12px;
+      color: #ffff55;
+      margin-top: 0;
+      margin-bottom: 12px;
+      border-bottom: 2px solid #2a2a2a;
+      padding-bottom: 6px;
+    }
+
+    /* Downloads Table */
+    .download-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+      font-size: 20px;
+    }
+
+    .download-table th, .download-table td {
+      border: 2px solid #2c2c2c;
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    .download-table th {
+      background: #252525;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 11px;
+      color: #ffaa00;
+    }
+
+    .download-table tr:nth-child(even) {
+      background: #181818;
+    }
+
+    .badge {
+      display: inline-block;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      padding: 4px 6px;
+      background: #2b4920;
+      color: #8ef073;
+      border: 1px solid #4ba236;
+    }
+
+    /* Code Block */
+    pre, code {
+      font-family: 'VT323', monospace;
+      background: #0e0e0e;
+      border: 2px solid #262626;
+      color: #55ff55;
+      padding: 12px;
+      font-size: 21px;
+      overflow-x: auto;
+      display: block;
+      margin: 10px 0;
+    }
+
+    /* Feature List */
+    .feature-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .feature-list li {
+      margin-bottom: 8px;
+      padding-left: 24px;
+      position: relative;
+    }
+
+    .feature-list li::before {
+      content: "■";
+      color: #ffaa00;
+      position: absolute;
+      left: 6px;
+      font-size: 14px;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      margin-top: 40px;
+      padding: 20px 0;
+      color: #888888;
+      font-size: 18px;
+      border-top: 2px solid #333333;
+    }
+
+    footer a {
+      color: #aaaaaa;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top bar -->
+  <header class="top-bar">
+    <div class="top-bar-inner">
+      <div class="site-tagline">MINECRAFT.NET // RETRO DESKTOP ARCHIVE</div>
+      <nav>
+        <ul class="top-nav">
+          <li><a href="#about">About</a></li>
+          <li><a href="#downloads">Downloads</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#roadmap">Roadmap</a></li>
+          <li><a href="https://github.com/vantuzfed/minecraft-pe-0.6.1-Inf" target="_blank">GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="container">
+
+    <!-- Header Logo & Splash -->
+    <div class="header-box">
+      <img src="images/title.png" alt="Minecraft" class="mc-logo">
+      <div id="splash" class="splash-text">Now on Desktop PC!</div>
+    </div>
+
+    <!-- Main Window Frame -->
+    <div class="retro-window" id="about">
+      <div class="window-header">
+        <div class="window-title">PORT // MINECRAFT POCKET EDITION 0.6.1 (INF)</div>
+        <div class="window-dots">
+          <div class="window-dot"></div>
+          <div class="window-dot"></div>
+          <div class="window-dot"></div>
+        </div>
+      </div>
+
+      <div class="window-body">
+        <div class="hero">
+          <h1 class="hero-title">AUTHENTIC NOSTALGIA, INFINITE WORLDS & PURE C++</h1>
+          <div class="hero-sub">The classic 2013 Minecraft Pocket Edition alpha, remastered natively for modern desktop PCs.</div>
+          <a href="#downloads" class="mc-btn mc-btn-green mc-btn-large">▶ GET DESKTOP BUILDS</a>
+        </div>
+
+        <div class="grid-2">
+          <div class="retro-box">
+            <h3>ABOUT THE PROJECT</h3>
+            <p>
+              This is an open-source reverse-engineering and desktop preservation project based on <strong>Minecraft: Pocket Edition 0.6.1</strong>.
+            </p>
+            <p>
+              We bring the classic early PE experience to desktop operating systems (Linux, Windows, macOS) with genuine keyboard & mouse controls, infinite procedural Beta 1.7.3 terrain, dynamic lighting, and integrated RakNet multiplayer.
+            </p>
+          </div>
+
+          <div class="retro-box">
+            <h3>CORE HIGHLIGHTS</h3>
+            <ul class="feature-list">
+              <li><strong>Native Desktop Target</strong>: High-performance C++ binaries.</li>
+              <li><strong>Zero Emulators</strong>: Runs directly via OpenGL & GLFW.</li>
+              <li><strong>Infinite Terrain</strong>: Beta 1.7.3 biomes, caves & springs.</li>
+              <li><strong>Classic Mechanics</strong>: Alpha/Beta combat, sprint & sounds.</li>
+              <li><strong>Dedicated Server</strong>: Built-in RakNet multiplayer.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Downloads Section -->
+        <div id="downloads" style="margin-top: 30px;">
+          <h2 style="font-family: 'Press Start 2P', monospace; font-size: 15px; color: #ffffff; margin-bottom: 12px; border-bottom: 2px solid #444; padding-bottom: 8px;">
+            DOWNLOADS // LATEST NIGHTLY BUILDS
+          </h2>
+          <p>
+            Binaries are built directly from source via GitHub Actions CI for every commit.
+          </p>
+
+          <table class="download-table">
+            <thead>
+              <tr>
+                <th>PLATFORM</th>
+                <th>ARCHITECTURE</th>
+                <th>PACKAGE</th>
+                <th>STATUS</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>🪟 Windows</td>
+                <td>x86_64</td>
+                <td><a href="https://github.com/vantuzfed/minecraft-pe-0.6.1-Inf/releases/tag/dev" target="_blank">minecraftpe-windows.zip</a></td>
+                <td><span class="badge">ACTIVE CI</span></td>
+              </tr>
+              <tr>
+                <td>🐧 Linux (Client)</td>
+                <td>x86_64</td>
+                <td><a href="https://github.com/vantuzfed/minecraft-pe-0.6.1-Inf/releases/tag/dev" target="_blank">minecraftpe-linux.zip</a></td>
+                <td><span class="badge">ACTIVE CI</span></td>
+              </tr>
+              <tr>
+                <td>🖥️ Linux (Server)</td>
+                <td>x86_64</td>
+                <td><a href="https://github.com/vantuzfed/minecraft-pe-0.6.1-Inf/releases/tag/dev" target="_blank">minecraftpe-server-linux.zip</a></td>
+                <td><span class="badge">ACTIVE CI</span></td>
+              </tr>
+              <tr>
+                <td>🍎 macOS</td>
+                <td>Universal / ARM64</td>
+                <td><a href="https://github.com/vantuzfed/minecraft-pe-0.6.1-Inf/releases/tag/dev" target="_blank">minecraftpe-macos.zip</a></td>
+                <td><span class="badge">ACTIVE CI</span></td>
+              </tr>
+              <tr>
+                <td>📦 Game Assets</td>
+                <td>All Platforms</td>
+                <td><a href="https://github.com/vantuzfed/minecraft-pe-0.6.1-Inf/releases/tag/dev" target="_blank">data.zip (Required)</a></td>
+                <td><span class="badge">REQUIRED</span></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="retro-box" style="margin-top: 15px;">
+            <h3>QUICK START INSTRUCTIONS</h3>
+            <code>
+1. Download the executable zip for your platform and data.zip.
+2. Extract the binary and extract data.zip into the same folder.
+   (The 'data' folder must be placed directly beside the executable)
+3. Launch MinecraftPE (or MinecraftPE.exe on Windows).
+4. Enjoy genuine 2013 Minecraft nostalgia!
+            </code>
+          </div>
+        </div>
+
+        <!-- Features Section -->
+        <div id="features" style="margin-top: 30px;">
+          <h2 style="font-family: 'Press Start 2P', monospace; font-size: 15px; color: #ffffff; margin-bottom: 12px; border-bottom: 2px solid #444; padding-bottom: 8px;">
+            CONTROLS & FEATURES
+          </h2>
+
+          <div class="grid-2">
+            <div class="retro-box">
+              <h3>DESKTOP CONTROLS</h3>
+              <ul class="feature-list">
+                <li><strong>W, A, S, D</strong>: Movement</li>
+                <li><strong>Double W</strong>: Vanilla sprint</li>
+                <li><strong>Left Mouse</strong>: Mine / Attack</li>
+                <li><strong>Right Mouse</strong>: Place block / Interact</li>
+                <li><strong>Space</strong>: Jump / Fly upwards</li>
+                <li><strong>Left Shift</strong>: Sneak / Fly downwards</li>
+                <li><strong>F5</strong>: Toggle 3rd person / front view</li>
+                <li><strong>F3</strong>: Technical hardware telemetry</li>
+                <li><strong>/ (Slash)</strong>: Quick command console</li>
+              </ul>
+            </div>
+
+            <div class="retro-box">
+              <h3>GRAPHICS & SHADERS</h3>
+              <ul class="feature-list">
+                <li><strong>Dynamic Lighting</strong>: Sun elevation & shadows.</li>
+                <li><strong>Water Effects</strong>: Animated shimmer & caustics.</li>
+                <li><strong>Tone Mapping</strong>: Cinematic color grading.</li>
+                <li><strong>OpenGL 3.0 Profile</strong>: Compatibility fallback to 2.1.</li>
+                <li><strong>F3 Overlay</strong>: Detailed memory, CPU and GPU stats.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Roadmap Section -->
+        <div id="roadmap" style="margin-top: 25px;">
+          <h2 style="font-family: 'Press Start 2P', monospace; font-size: 15px; color: #ffffff; margin-bottom: 12px; border-bottom: 2px solid #444; padding-bottom: 8px;">
+            ROADMAP & NEXT STEPS
+          </h2>
+          <div class="retro-box">
+            <ul class="feature-list">
+              <li><strong>[DONE]</strong> Desktop Autobuilds for Linux, Windows, macOS.</li>
+              <li><strong>[IN PROGRESS]</strong> Removing touch UI remnants & achieving 100% desktop GUI parity.</li>
+              <li><strong>[PLANNED]</strong> Desktop UI bugfixes (darkened slider backgrounds, centered buttons).</li>
+              <li><strong>[PLANNED]</strong> Modern OpenGL stack upgrade and preparation for Iris/OptiFine shader pipeline.</li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+      <p>
+        Minecraft is copyright Mojang AB. Not an official Minecraft product.<br>
+        Port maintained by <a href="https://github.com/vantuzfed" target="_blank">vantuzfed</a>. Source code available on <a href="https://github.com/vantuzfed/minecraft-pe-0.6.1-Inf" target="_blank">GitHub</a>.
+      </p>
+      <p style="font-size: 16px; color: #666;">
+        Best viewed in any browser. Powered by GitHub Actions & Pages.
+      </p>
+    </footer>
+
+  </div>
+
+  <script>
+    // Classic rotating splash text
+    var splashes = [
+      "Now on Desktop PC!",
+      "Infinite worlds!",
+      "Made with C++!",
+      "No touchscreen required!",
+      "Beta 1.7.3 terrain inside!",
+      "F5 front view included!",
+      "Native 60 FPS!",
+      "Pocket Edition 0.6.1 Remaster!",
+      "Also try Terraria!",
+      "Pure nostalgia!",
+      "Sand falls properly!"
+    ];
+    var splashEl = document.getElementById('splash');
+    if (splashEl) {
+      var rand = splashes[Math.floor(Math.random() * splashes.length)];
+      splashEl.textContent = rand;
+    }
+  </script>
+</body>
+</html>
