@@ -251,6 +251,7 @@ file(GLOB CLIENT_SOURCES
     "src/client/player/input/*.cpp"
 
     "src/client/renderer/*.cpp"
+    "src/client/renderer/shader/*.cpp"
     "src/client/renderer/culling/*.cpp"
     "src/client/renderer/entity/*.cpp"
     "src/client/renderer/ptexture/*.cpp"

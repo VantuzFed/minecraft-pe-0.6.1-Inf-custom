@@ -27,11 +27,18 @@
     #else
         #include <glad/glad.h>
 
-		// https://github.com/programmer1o1/MinecraftPE-v0.6.1/blob/main/handheld/src/client/renderer/gles.h#L135-L138
+		#ifndef glFogx
 		#define glFogx(a,b)             glFogi(a,b)
+		#endif
+		#ifndef glOrthof
 		#define glOrthof(a,b,c,d,e,f)   glOrtho(a,b,c,d,e,f)
+		#endif
+		#ifndef glClearDepthf
 		#define glClearDepthf(x)        glClearDepth(x)
+		#endif
+		#ifndef glDepthRangef
 		#define glDepthRangef(a,b)      glDepthRange(a,b)
+		#endif
     #endif
 // #else
 //     // Uglyness to fix redeclaration issues

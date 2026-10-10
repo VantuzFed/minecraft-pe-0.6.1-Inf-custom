@@ -97,10 +97,10 @@ void RenderList::render() {
 }
 
 void RenderList::renderChunks() {
-	//glDisableClientState2(GL_NORMAL_ARRAY);
 	glEnableClientState2(GL_VERTEX_ARRAY);
 	glEnableClientState2(GL_COLOR_ARRAY);
 	glEnableClientState2(GL_TEXTURE_COORD_ARRAY);
+	glEnableClientState2(GL_NORMAL_ARRAY);
 
 	const int Stride = VertexSizeBytes;
 
@@ -117,12 +117,14 @@ void RenderList::renderChunks() {
 		glVertexPointer2	(3, GL_FLOAT, Stride,  0);
 		glTexCoordPointer2	(2, GL_FLOAT, Stride, (GLvoid*) (3 * 4));
 		glColorPointer2		(4, GL_UNSIGNED_BYTE, Stride, (GLvoid*) (5 * 4));
+		glNormalPointer		(GL_FLOAT, Stride, (GLvoid*) (6 * 4));
 
 		glDrawArrays2(GL_TRIANGLES, 0, rc.vertexCount);
 
 		glPopMatrix2();
 	}
 
+	glDisableClientState2(GL_NORMAL_ARRAY);
 	glDisableClientState2(GL_VERTEX_ARRAY);
 	glDisableClientState2(GL_COLOR_ARRAY);
 	glDisableClientState2(GL_TEXTURE_COORD_ARRAY);

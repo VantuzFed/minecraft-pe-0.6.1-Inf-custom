@@ -28,6 +28,7 @@
 #include "Textures.h"
 #include "../gui/components/ImageButton.h"
 #include "Tesselator.h"
+#include "shader/ShaderPipeline.h"
 
 static int _shTicks = -1;
 
@@ -188,6 +189,10 @@ void GameRenderer::render(double a) {
 				if (mc->screen && mc->screen->hasClippingArea(screenScissorArea))
 					useScreenScissor = true;
 
+				if (mc->options.getBooleanValue(OPTIONS_SHADERS)) {
+					g_shaderPipeline.beginFrame(mc, a);
+				}
+
 				renderLevel(a);
 				hasClearedColorBuffer = true;
 
@@ -268,6 +273,11 @@ void GameRenderer::renderLevel(double a) {
 		TIMER_POP_PUSH("clear");
 		glViewport(0, 0, mc->width, mc->height);
 		setupClearColor(a);
+
+		bool useShaders = mc->options.getBooleanValue(OPTIONS_SHADERS);
+		if (useShaders) {
+			g_shaderPipeline.beginScene();
+		}
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glEnable2(GL_CULL_FACE);
@@ -351,7 +361,9 @@ void GameRenderer::renderLevel(double a) {
 		glShadeModel2(GL_FLAT);
 		Lighting::turnOn(mc);
 		TIMER_POP_PUSH("entities");
+		if (useShaders) g_shaderPipeline.bindPass(STAGE_GBUFFERS_ENTITIES);
 		mc->levelRenderer->renderEntities(cameraEntity->getPos(a), &frustum, a);
+		if (useShaders) g_shaderPipeline.unbindPass();
 		//        setupFog(0);
 		TIMER_POP_PUSH("particles");
 		particleEngine->render(cameraEntity, a);
@@ -432,7 +444,13 @@ void GameRenderer::renderLevel(double a) {
 		if (zoom == 1 && !mc->options.getBooleanValue(OPTIONS_HIDEGUI)) {
 			TIMER_POP_PUSH("hand");
 			glClear(GL_DEPTH_BUFFER_BIT);
+			if (useShaders) g_shaderPipeline.bindPass(STAGE_GBUFFERS_HAND);
 			renderItemInHand(a, i);
+			if (useShaders) g_shaderPipeline.unbindPass();
+		}
+
+		if (useShaders) {
+			g_shaderPipeline.endScene();
 		}
 
 		if (!mc->options.getBooleanValue(OPTIONS_ANAGLYPH_3D)) {

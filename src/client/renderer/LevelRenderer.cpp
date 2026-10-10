@@ -4,7 +4,6 @@
 #include "DistanceChunkSorter.h"
 #include "Chunk.h"
 #include "TileRenderer.h"
-#include "TerrainShader.h"
 #include "../Minecraft.h"
 #include "../../util/Mth.h"
 #include "../../world/entity/player/Player.h"
@@ -28,6 +27,7 @@
 
 #include "../../world/level/GrassColor.h"
 #include "Lighting.h"
+#include "shader/ShaderPipeline.h"
 
 #ifdef GFX_SMALLER_CHUNKS
 /* static */ const int LevelRenderer::CHUNK_SIZE = 8;
@@ -667,19 +667,13 @@ void LevelRenderer::renderSameAsLast( int layer, float alpha )
 {
 	bool useShaders = mc->options.getBooleanValue(OPTIONS_SHADERS);
 	if (useShaders) {
-		Mob* player = mc->cameraTargetPlayer;
-		float time = (float)ticks + alpha;
-		double xOff = player ? (player->xOld + (player->x - player->xOld) * alpha) : 0.0;
-		double yOff = player ? (player->yOld + (player->y - player->yOld) * alpha) : 0.0;
-		double zOff = player ? (player->zOld + (player->z - player->zOld) * alpha) : 0.0;
-		float timeOfDay = mc->level ? mc->level->getTimeOfDay(alpha) : 0.0f;
-		g_terrainShader.bind(layer, time * 0.05f, (float)xOff, (float)yOff, (float)zOff, timeOfDay);
+		g_shaderPipeline.bindPass(layer == 2 ? STAGE_GBUFFERS_WATER : STAGE_GBUFFERS_TERRAIN, layer);
 	}
 
 	renderList.render();
 
 	if (useShaders) {
-		g_terrainShader.unbind();
+		g_shaderPipeline.unbindPass();
 	}
 }
 
