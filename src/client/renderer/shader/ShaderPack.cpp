@@ -75,6 +75,11 @@ bool ShaderPack::open(const std::string& packNameOrPath) {
 		std::string testPath = "shaderpacks/" + packNameOrPath;
 		if (stat(testPath.c_str(), &st) == 0) {
 			fullPath = testPath;
+		} else {
+			std::string buildPath = "build/shaderpacks/" + packNameOrPath;
+			if (stat(buildPath.c_str(), &st) == 0) {
+				fullPath = buildPath;
+			}
 		}
 	}
 
@@ -128,6 +133,9 @@ bool ShaderPack::openZip(const std::string& zipPath) {
 			unz_file_info file_info;
 			if (unzGetCurrentFileInfo(uf, &file_info, fn, sizeof(fn), NULL, 0, NULL, 0) == UNZ_OK) {
 				std::string normalized = normalizeSeparators(fn);
+				while (!normalized.empty() && (normalized[0] == '/' || normalized[0] == '\\')) {
+					normalized.erase(0, 1);
+				}
 				m_zipFiles.insert(normalized);
 			}
 		} while (unzGoToNextFile(uf) == UNZ_OK);
@@ -163,25 +171,30 @@ void ShaderPack::findShaderPrefix() {
 				}
 			}
 			closedir(dir);
+			if (!m_shaderPrefix.empty()) return;
 		}
+
+		// Flat root in directory
+		m_shaderPrefix = "";
 	} else if (m_type == PACK_TYPE_ZIP) {
-		// Look for shaders/
+		// Look for any file in shaders/
 		for (const auto& f : m_zipFiles) {
-			if (f.find("shaders/gbuffers_terrain.vsh") != std::string::npos ||
-			    f.find("shaders/composite.fsh") != std::string::npos ||
-			    f.find("shaders/final.fsh") != std::string::npos) {
-				size_t idx = f.find("shaders/");
+			size_t idx = f.find("shaders/");
+			if (idx != std::string::npos) {
 				m_shaderPrefix = f.substr(0, idx + 8);
 				return;
 			}
 		}
-		// Flat root in zip
+		// Look for world0/
 		for (const auto& f : m_zipFiles) {
-			if (f == "gbuffers_terrain.vsh" || f == "composite.fsh" || f == "final.fsh") {
-				m_shaderPrefix = "";
+			size_t idx = f.find("world0/");
+			if (idx != std::string::npos) {
+				m_shaderPrefix = f.substr(0, idx);
 				return;
 			}
 		}
+		// Flat root in zip
+		m_shaderPrefix = "";
 	}
 }
 
@@ -251,22 +264,31 @@ std::string ShaderPack::readTextFile(const std::string& path) const {
 
 std::vector<std::string> ShaderPack::scanAvailablePacks(const std::string& directory) {
 	std::vector<std::string> packs;
-	DIR* dir = opendir(directory.c_str());
-	if (!dir) return packs;
+	auto scanDir = [&](const std::string& dirPath) {
+		DIR* dir = opendir(dirPath.c_str());
+		if (!dir) return;
 
-	struct dirent* entry;
-	while ((entry = readdir(dir)) != NULL) {
-		if (entry->d_name[0] == '.') continue;
-		std::string name = entry->d_name;
-		std::string fullPath = directory + "/" + name;
-		struct stat st;
-		if (stat(fullPath.c_str(), &st) == 0) {
-			if (S_ISDIR(st.st_mode) || endsWith(name, ".zip")) {
-				packs.push_back(name);
+		struct dirent* entry;
+		while ((entry = readdir(dir)) != NULL) {
+			if (entry->d_name[0] == '.') continue;
+			std::string name = entry->d_name;
+			std::string fullPath = dirPath + "/" + name;
+			struct stat st;
+			if (stat(fullPath.c_str(), &st) == 0) {
+				if (S_ISDIR(st.st_mode) || endsWith(name, ".zip")) {
+					if (std::find(packs.begin(), packs.end(), name) == packs.end()) {
+						packs.push_back(name);
+					}
+				}
 			}
 		}
+		closedir(dir);
+	};
+
+	scanDir(directory);
+	if (directory == "shaderpacks") {
+		scanDir("build/shaderpacks");
 	}
-	closedir(dir);
 	std::sort(packs.begin(), packs.end());
 	return packs;
 }

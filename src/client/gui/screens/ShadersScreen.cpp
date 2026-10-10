@@ -2,6 +2,8 @@
 #include "OptionsScreen.h"
 #include "../../renderer/shader/ShaderPipeline.h"
 #include "../../renderer/LevelRenderer.h"
+#include "../../renderer/Tesselator.h"
+#include "../../sound/SoundEngine.h"
 #include "../../Minecraft.h"
 #include "../../../locale/I18n.h"
 #include "../../../platform/input/Keyboard.h"
@@ -79,6 +81,27 @@ void ShaderPackList::renderItem(int i, int x, int y, int h, Tesselator& t) {
 
 	std::string name = m_packs[i];
 	int boxX = width / 2 - 120;
+	int boxW = 240;
+
+	if (isSelectedItem(i)) {
+		glDisable2(GL_TEXTURE_2D);
+		glColor4f2(1, 1, 1, 1);
+		t.begin();
+		t.color(0x70, 0x70, 0x70);
+		t.vertex(boxX - 2, y + h + 2, 0);
+		t.vertex(boxX + boxW + 2, y + h + 2, 0);
+		t.vertex(boxX + boxW + 2, y - 2, 0);
+		t.vertex(boxX - 2, y - 2, 0);
+
+		t.color(0x00, 0x00, 0x00);
+		t.vertex(boxX - 1, y + h + 1, 0);
+		t.vertex(boxX + boxW + 1, y + h + 1, 0);
+		t.vertex(boxX + boxW + 1, y - 1, 0);
+		t.vertex(boxX - 1, y - 1, 0);
+		t.draw();
+		glEnable2(GL_TEXTURE_2D);
+	}
+
 	int color = (i == m_selectedIndex) ? 0xFFFFA0 : 0xFFFFFF;
 
 	if (name == "(OFF)") {
@@ -114,6 +137,7 @@ static void openShaderpacksFolder() {
 
 ShadersScreen::ShadersScreen()
 	: m_packList(nullptr),
+	  m_mouseHasBeenUp(false),
 	  m_btnOpenFolder(101, "Open shaderpacks folder"),
 	  m_btnDone(102, I18n::get("gui.done"))
 {}
@@ -142,6 +166,8 @@ void ShadersScreen::init() {
 	buttons.push_back(&m_btnOpenFolder);
 	buttons.push_back(&m_btnDone);
 
+	m_mouseHasBeenUp = !Mouse::getButtonState(MouseAction::ACTION_LEFT);
+
 	setupPositions();
 }
 
@@ -168,6 +194,28 @@ void ShadersScreen::setupPositions() {
 	}
 }
 
+void ShadersScreen::tick() {
+	if (m_packList) {
+		m_packList->tick();
+	}
+}
+
+void ShadersScreen::mouseClicked(int x, int y, int buttonNum) {
+	Screen::mouseClicked(x, y, buttonNum);
+
+	if (buttonNum == MouseAction::ACTION_LEFT && m_packList) {
+		if (y >= 32 && y <= height - 48 && x >= 0 && x <= width) {
+			int slot = m_packList->getItemAtPosition(width / 2, y);
+			if (slot >= 0 && slot < m_packList->getNumberOfItems()) {
+				m_packList->selectItem(slot, false);
+				if (minecraft && minecraft->soundEngine) {
+					minecraft->soundEngine->playUI("random.click", 1.0f, 1.0f);
+				}
+			}
+		}
+	}
+}
+
 void ShadersScreen::applySelectedPack(const std::string& packName) {
 	if (!minecraft) return;
 
@@ -183,8 +231,7 @@ void ShadersScreen::applySelectedPack(const std::string& packName) {
 		minecraft->options.set(OPTIONS_SHADERPACK, packName);
 		minecraft->options.set(OPTIONS_SHADERS, true);
 		if (!g_shaderPipeline.loadShaderPack(packName)) {
-			minecraft->options.set(OPTIONS_SHADERPACK, "Built-in");
-			g_shaderPipeline.loadShaderPack("Built-in");
+			printf("[ShadersScreen] Failed to load pack '%s', pipeline fell back to built-in\n", packName.c_str());
 		}
 	}
 	minecraft->options.save();
@@ -229,7 +276,12 @@ void ShadersScreen::render(int xm, int ym, float a) {
 	renderDirtBackground(0);
 
 	if (m_packList) {
-		m_packList->render(xm, ym, a);
+		if (m_mouseHasBeenUp) {
+			m_packList->render(xm, ym, a);
+		} else {
+			m_packList->render(0, 0, a);
+			m_mouseHasBeenUp = !Mouse::getButtonState(MouseAction::ACTION_LEFT);
+		}
 	}
 
 	Screen::render(xm, ym, a);

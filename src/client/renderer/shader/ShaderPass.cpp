@@ -103,25 +103,51 @@ bool ShaderPass::loadFromFiles(const std::string& vsPath, const std::string& fsP
 }
 
 bool ShaderPass::loadFromPack(const ShaderPack& pack, const std::string& baseName) {
-	std::string vsFile = baseName + ".vsh";
-	std::string fsFile = baseName + ".fsh";
+	std::vector<std::string> candidatePrefixes;
+	if (baseName.find("world") == std::string::npos) {
+		candidatePrefixes.push_back("world0/" + baseName);
+	}
+	candidatePrefixes.push_back(baseName);
 
-	if (!pack.hasFile(vsFile) || !pack.hasFile(fsFile)) {
-		return false;
+	for (const auto& target : candidatePrefixes) {
+		std::string vsFile = target + ".vsh";
+		std::string fsFile = target + ".fsh";
+
+		if (!pack.hasFile(fsFile)) {
+			continue;
+		}
+
+		std::string vsProcessed, fsProcessed, err;
+
+		if (pack.hasFile(vsFile)) {
+			if (!ShaderPreprocessor::process(pack, vsFile, vsProcessed, err)) {
+				printf("[ShaderPass] Preprocess error in %s: %s\n", vsFile.c_str(), err.c_str());
+				continue;
+			}
+		} else if (baseName.rfind("composite", 0) == 0 || baseName == "final") {
+			// Fallback to default fullscreen quad vertex shader (OptiFine/Iris standard)
+			vsProcessed =
+				"#version 120\n"
+				"varying vec2 v_texCoord;\n"
+				"void main() {\n"
+				"    v_texCoord = gl_MultiTexCoord0.xy;\n"
+				"    gl_Position = vec4(gl_Vertex.xy, 0.0, 1.0);\n"
+				"}\n";
+		} else {
+			continue;
+		}
+
+		if (!ShaderPreprocessor::process(pack, fsFile, fsProcessed, err)) {
+			printf("[ShaderPass] Preprocess error in %s: %s\n", fsFile.c_str(), err.c_str());
+			continue;
+		}
+
+		if (loadFromSource(vsProcessed.c_str(), fsProcessed.c_str(), baseName)) {
+			return true;
+		}
 	}
 
-	std::string vsProcessed, fsProcessed, err;
-	if (!ShaderPreprocessor::process(pack, vsFile, vsProcessed, err)) {
-		printf("[ShaderPass] Preprocess error in %s: %s\n", vsFile.c_str(), err.c_str());
-		return false;
-	}
-
-	if (!ShaderPreprocessor::process(pack, fsFile, fsProcessed, err)) {
-		printf("[ShaderPass] Preprocess error in %s: %s\n", fsFile.c_str(), err.c_str());
-		return false;
-	}
-
-	return loadFromSource(vsProcessed.c_str(), fsProcessed.c_str(), baseName);
+	return false;
 }
 
 bool ShaderPass::loadWithFallback(const ShaderPack& pack, const std::vector<std::string>& candidates) {

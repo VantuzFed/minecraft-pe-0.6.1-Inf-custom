@@ -43,11 +43,14 @@ public:
 	virtual void buttonClicked(Button* button) override;
 	virtual void keyPressed(int eventKey) override;
 	virtual void mouseWheel(int dx, int dy, int xm, int ym) override;
+	virtual void mouseClicked(int x, int y, int buttonNum) override;
+	virtual void tick() override;
 
 	void applySelectedPack(const std::string& packName);
 
 private:
 	ShaderPackList* m_packList;
+	bool m_mouseHasBeenUp;
 
 	Button m_btnOpenFolder;
 	Button m_btnDone;

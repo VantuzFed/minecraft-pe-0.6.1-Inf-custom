@@ -44,6 +44,10 @@ bool ShaderPreprocessor::process(const ShaderPack& pack,
 	   << "#define MC_GL_RENDERER_GENERIC\n"
 	   << "#define MC_NORMAL_MAP\n"
 	   << "#define MC_SPECULAR_MAP\n"
+	   << "#define MC_RENDER_QUALITY 1.0\n"
+	   << "#define MC_SHADOW_QUALITY 1.0\n"
+	   << "#define MC_HAND_DEPTH 0.125\n"
+	   << "#define IS_IRIS\n"
 	   << "#line 1 0\n";
 	ss << body;
 
@@ -134,9 +138,11 @@ bool ShaderPreprocessor::processFile(const ShaderPack& pack,
 
 				std::string subGlsl;
 				std::string dummyVersion;
-				if (!processFile(pack, resolvedTarget, subGlsl, dummyVersion, activeIncludes, depth + 1, outError)) {
+				std::string subErr;
+				if (!processFile(pack, resolvedTarget, subGlsl, dummyVersion, activeIncludes, depth + 1, subErr)) {
 					// If failed, try resolving from root as fallback
 					if (!processFile(pack, incPath, subGlsl, dummyVersion, activeIncludes, depth + 1, outError)) {
+						if (outError.empty()) outError = subErr;
 						return false;
 					}
 				}
