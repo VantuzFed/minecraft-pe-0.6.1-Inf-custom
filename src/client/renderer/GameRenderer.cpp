@@ -1003,6 +1003,10 @@ void GameRenderer::saveMatrices()
 
 	glGetFloatv(GL_PROJECTION_MATRIX, lastProjMatrix);
 	glGetFloatv(GL_MODELVIEW_MATRIX, lastModelMatrix);
+
+#ifndef STANDALONE_SERVER
+	g_shaderPipeline.updateCameraMatrices();
+#endif
 }
 
 void GameRenderer::prepareAndRenderClouds( LevelRenderer* levelRenderer, double a ) {

@@ -142,11 +142,16 @@ ShaderPipeline::~ShaderPipeline() {
 
 bool ShaderPipeline::init(int width, int height) {
 	if (m_initialized) return true;
+	if (width <= 0 || height <= 0) return false;
 
 	if (!m_fbo.init(width, height)) {
 		printf("[ShaderPipeline] Failed to create framebuffers\n");
 		return false;
 	}
+
+	m_uniforms.viewWidth = (float)width;
+	m_uniforms.viewHeight = (float)height;
+	m_uniforms.aspectRatio = (height > 0) ? ((float)width / (float)height) : 1.0f;
 
 	if (m_lightmapTexture == 0 && glGenTextures) {
 		glGenTextures(1, &m_lightmapTexture);
@@ -158,8 +163,18 @@ bool ShaderPipeline::init(int width, int height) {
 		updateLightmap(0.0f);
 	}
 
-	setupBuiltInShaders();
 	m_initialized = true;
+
+	if (m_mode == SHADER_MODE_CUSTOM && !m_currentPack.empty() && m_currentPack != "Built-in" && m_currentPack != "(internal)") {
+		if (!m_passTerrain.isValid() && !m_passFinal.isValid()) {
+			loadShaderPack(m_currentPack);
+		}
+	} else if (m_mode == SHADER_MODE_BUILTIN) {
+		if (!m_passTerrain.isValid() && !m_passFinal.isValid()) {
+			setupBuiltInShaders();
+		}
+	}
+
 	printf("[ShaderPipeline] Pipeline successfully initialized (%dx%d)\n", width, height);
 	return true;
 }
@@ -241,9 +256,13 @@ void ShaderPipeline::setMode(ShaderPipelineMode mode) {
 }
 
 void ShaderPipeline::beginFrame(Minecraft* mc, double partialTicks) {
-	if (!m_initialized || !mc || m_mode == SHADER_MODE_OFF) return;
+	if (!mc || m_mode == SHADER_MODE_OFF) return;
 
-	resize(mc->width, mc->height);
+	if (!m_initialized) {
+		if (!init(mc->width, mc->height)) return;
+	} else {
+		resize(mc->width, mc->height);
+	}
 
 	m_uniforms.frameCounter++;
 	m_uniforms.frameTimeCounter += 0.05f;
@@ -275,10 +294,64 @@ void ShaderPipeline::beginFrame(Minecraft* mc, double partialTicks) {
 		m_uniforms.moonPosition[1] = -m_uniforms.sunPosition[1];
 		m_uniforms.moonPosition[2] = 0.0f;
 
+		m_uniforms.sunDir[0] = std::sin(angle);
+		m_uniforms.sunDir[1] = std::cos(angle);
+		m_uniforms.sunDir[2] = 0.0f;
+
+		m_uniforms.moonDir[0] = -m_uniforms.sunDir[0];
+		m_uniforms.moonDir[1] = -m_uniforms.sunDir[1];
+		m_uniforms.moonDir[2] = 0.0f;
+
+		m_uniforms.upDir[0] = 0.0f;
+		m_uniforms.upDir[1] = 1.0f;
+		m_uniforms.upDir[2] = 0.0f;
+
+		float sunHeight = m_uniforms.sunDir[1];
+		float dayFactor = std::max(0.0f, std::min(1.0f, sunHeight * 2.0f + 0.5f));
+		float nightFactor = 1.0f - dayFactor;
+		float sunriseFactor = 0.0f;
+		float sunsetFactor = 0.0f;
+
+		if (std::abs(sunHeight) < 0.35f) {
+			float twilight = 1.0f - std::abs(sunHeight) / 0.35f;
+			if (m_uniforms.sunDir[0] > 0.0f) {
+				sunriseFactor = twilight;
+			} else {
+				sunsetFactor = twilight;
+			}
+		}
+
+		float noonFactor = std::max(0.0f, dayFactor - (sunriseFactor + sunsetFactor));
+		float sum = sunriseFactor + noonFactor + sunsetFactor + nightFactor;
+		if (sum > 0.0001f) {
+			m_uniforms.daytime[0] = sunriseFactor / sum;
+			m_uniforms.daytime[1] = noonFactor / sum;
+			m_uniforms.daytime[2] = sunsetFactor / sum;
+			m_uniforms.daytime[3] = nightFactor / sum;
+		} else {
+			m_uniforms.daytime[0] = 0.0f;
+			m_uniforms.daytime[1] = 1.0f;
+			m_uniforms.daytime[2] = 0.0f;
+			m_uniforms.daytime[3] = 0.0f;
+		}
+
+		if (nightFactor > 0.5f) {
+			m_uniforms.lightDir[0] = m_uniforms.moonDir[0];
+			m_uniforms.lightDir[1] = m_uniforms.moonDir[1];
+			m_uniforms.lightDir[2] = m_uniforms.moonDir[2];
+		} else {
+			m_uniforms.lightDir[0] = m_uniforms.sunDir[0];
+			m_uniforms.lightDir[1] = m_uniforms.sunDir[1];
+			m_uniforms.lightDir[2] = m_uniforms.sunDir[2];
+		}
+
 		updateLightmap(m_uniforms.timeOfDay);
 	}
 
-	// Read ModelView and Projection matrices directly from current OpenGL state
+	updateCameraMatrices();
+}
+
+void ShaderPipeline::updateCameraMatrices() {
 	float mv[16];
 	float pr[16];
 	glGetFloatv(GL_MODELVIEW_MATRIX, mv);
@@ -287,6 +360,18 @@ void ShaderPipeline::beginFrame(Minecraft* mc, double partialTicks) {
 	m_uniforms.gbufferModelViewInverse = m_uniforms.gbufferModelView.inverse();
 	m_uniforms.gbufferProjection = Matrix4(pr);
 	m_uniforms.gbufferProjectionInverse = m_uniforms.gbufferProjection.inverse();
+
+	m_uniforms.upDirView[0] = mv[1];
+	m_uniforms.upDirView[1] = mv[5];
+	m_uniforms.upDirView[2] = mv[9];
+
+	m_uniforms.sunDirView[0] = mv[0] * m_uniforms.sunDir[0] + mv[4] * m_uniforms.sunDir[1] + mv[8] * m_uniforms.sunDir[2];
+	m_uniforms.sunDirView[1] = mv[1] * m_uniforms.sunDir[0] + mv[5] * m_uniforms.sunDir[1] + mv[9] * m_uniforms.sunDir[2];
+	m_uniforms.sunDirView[2] = mv[2] * m_uniforms.sunDir[0] + mv[6] * m_uniforms.sunDir[1] + mv[10] * m_uniforms.sunDir[2];
+
+	m_uniforms.moonDirView[0] = -m_uniforms.sunDirView[0];
+	m_uniforms.moonDirView[1] = -m_uniforms.sunDirView[1];
+	m_uniforms.moonDirView[2] = -m_uniforms.sunDirView[2];
 }
 
 void ShaderPipeline::beginScene() {
@@ -302,11 +387,20 @@ void ShaderPipeline::bindPass(ShaderStage stage, int layer) {
 	m_uniforms.currentLayer = layer;
 	m_activeStage = stage;
 
-	// Bind lightmap texture to texture unit 1 for all gbuffers passes
+	// Bind lightmap texture to texture unit 1 and setup texture matrix (1/256 scaling for vanilla shaders)
 	if (glActiveTexture && m_lightmapTexture != 0) {
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, m_lightmapTexture);
+		glMatrixMode(GL_TEXTURE);
+		glLoadIdentity();
+		glScalef(1.0f / 256.0f, 1.0f / 256.0f, 1.0f);
+		glMatrixMode(GL_MODELVIEW);
 		glActiveTexture(GL_TEXTURE0);
+	}
+	if (glMultiTexCoord2f) {
+		glMultiTexCoord2f(GL_TEXTURE1, 240.0f, 240.0f);
+	} else if (glMultiTexCoord2fARB) {
+		glMultiTexCoord2fARB(GL_TEXTURE1, 240.0f, 240.0f);
 	}
 
 	switch (stage) {
@@ -372,6 +466,14 @@ void ShaderPipeline::bindPass(ShaderStage stage, int layer) {
 void ShaderPipeline::unbindPass() {
 	if (glUseProgram) {
 		glUseProgram(0);
+	}
+	if (glActiveTexture) {
+		glActiveTexture(GL_TEXTURE1);
+		glMatrixMode(GL_TEXTURE);
+		glLoadIdentity();
+		glMatrixMode(GL_MODELVIEW);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glActiveTexture(GL_TEXTURE0);
 	}
 	m_activeStage = STAGE_NONE;
 }

@@ -1400,6 +1400,8 @@ void Minecraft::setSize(int w, int h) {
 		inputHolder->onConfigChanged(config);
 	//LOGI("Setting size: %d, %d: %f\n", width, height, Gui::InvGuiScale);
 
+	g_shaderPipeline.resize(width, height);
+
 #ifdef WIN32
 	char resbuf[128];
 	sprintf(resbuf, "            %d x %d @ scale %.2f", width, height, Gui::GuiScale);

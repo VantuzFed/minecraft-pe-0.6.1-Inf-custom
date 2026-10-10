@@ -39,6 +39,7 @@ public:
 	void resize(int width, int height);
 
 	void beginFrame(Minecraft* mc, double partialTicks);
+	void updateCameraMatrices();
 	void beginScene();
 	void bindPass(ShaderStage stage, int layer = 0);
 	void unbindPass();

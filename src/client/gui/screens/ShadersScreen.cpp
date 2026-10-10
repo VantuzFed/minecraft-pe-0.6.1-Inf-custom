@@ -234,6 +234,10 @@ void ShadersScreen::applySelectedPack(const std::string& packName) {
 			printf("[ShadersScreen] Failed to load pack '%s', pipeline fell back to built-in\n", packName.c_str());
 		}
 	}
+
+	if (minecraft->options.getBooleanValue(OPTIONS_SHADERS) && minecraft->width > 0 && minecraft->height > 0) {
+		g_shaderPipeline.init(minecraft->width, minecraft->height);
+	}
 	minecraft->options.save();
 	if (minecraft->levelRenderer) {
 		minecraft->levelRenderer->allChanged();
