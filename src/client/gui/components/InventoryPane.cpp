@@ -1,7 +1,6 @@
 #include "InventoryPane.h"
 #include "../Gui.h"
 #include "../../Minecraft.h"
-#include "../../player/input/touchscreen/TouchAreaModel.h"
 #include "../../renderer/entity/ItemRenderer.h"
 #include "../../renderer/Tesselator.h"
 #include "../../renderer/Textures.h"

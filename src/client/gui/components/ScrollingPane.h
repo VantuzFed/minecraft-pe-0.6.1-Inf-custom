@@ -3,7 +3,8 @@
 
 #include "../GuiComponent.h"
 #include "ImageButton.h"
-#include "../../player/input/touchscreen/TouchAreaModel.h"
+#include "../RectangleArea.h"
+#include "../../../platform/input/Mouse.h"
 #include "../../../world/phys/Vec3.h"
 #include "../../Timer.h"
 

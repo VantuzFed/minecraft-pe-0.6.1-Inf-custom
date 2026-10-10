@@ -5,7 +5,6 @@
 
 #include "GuiComponent.h"
 #include "Font.h"
-#include "../player/input/touchscreen/TouchAreaModel.h"
 #include "../renderer/RenderChunk.h"
 #include "../../util/Random.h"
 #include "../IConfigListener.h"
@@ -36,7 +35,6 @@ public:
 	int getSlotIdAt(int x, int y);
 	void flashSlot(int slotId);
 	bool isInside(int x, int y);
-	RectangleArea getRectangleArea(int extendSide);
 	void getSlotPos(int slot, int& posX, int& posY);
 	int getNumSlots();
 	bool hasOpenInventorySlot() const;

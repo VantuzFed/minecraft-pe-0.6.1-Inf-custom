@@ -241,7 +241,6 @@ file(GLOB CLIENT_SOURCES
     "src/client/gui/components/*.cpp"
     "src/client/gui/screens/*.cpp"
     "src/client/gui/screens/crafting/*.cpp"
-    "src/client/gui/screens/touch/*.cpp"
 
     "src/client/model/*.cpp"
     "src/client/model/geom/*.cpp"
@@ -250,7 +249,6 @@ file(GLOB CLIENT_SOURCES
 
     "src/client/player/*.cpp"
     "src/client/player/input/*.cpp"
-    "src/client/player/input/touchscreen/*.cpp"
 
     "src/client/renderer/*.cpp"
     "src/client/renderer/culling/*.cpp"

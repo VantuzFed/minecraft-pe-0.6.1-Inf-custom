@@ -554,15 +554,11 @@ void OptionsScreen::generateOptionScreens() {
 		.addOptionItem(OPTIONS_SENSITIVITY, minecraft)
 		.addOptionItem(OPTIONS_MUSIC_VOLUME, minecraft)
 		.addOptionItem(OPTIONS_SOUND_VOLUME, minecraft)
-		.addOptionItem(OPTIONS_SMOOTH_CAMERA, minecraft)
-		.addOptionItem(OPTIONS_DESTROY_VIBRATION, minecraft)
-		.addOptionItem(OPTIONS_IS_LEFT_HANDED, minecraft);
+		.addOptionItem(OPTIONS_SMOOTH_CAMERA, minecraft);
 
 	// // Controls Pane
 	optionPanes[2]->addOptionItem(OPTIONS_INVERT_Y_MOUSE, minecraft)
-		.addOptionItem(OPTIONS_USE_TOUCHSCREEN, minecraft)
-		.addOptionItem(OPTIONS_AUTOJUMP, minecraft)
-		.addOptionItem(OPTIONS_IS_JOY_TOUCH_AREA, minecraft);
+		.addOptionItem(OPTIONS_AUTOJUMP, minecraft);
 
 	for (int i = OPTIONS_KEY_FORWARD; i <= OPTIONS_KEY_SPRINT; i++) {
 		optionPanes[2]->addOptionItem((OptionId)i, minecraft);

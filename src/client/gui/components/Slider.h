@@ -3,6 +3,7 @@
 
 #include "GuiElement.h"
 #include "../../../client/Options.h"
+#include "../../../platform/input/Mouse.h"
 
 class Slider : public GuiElement {
 	typedef GuiElement super;
