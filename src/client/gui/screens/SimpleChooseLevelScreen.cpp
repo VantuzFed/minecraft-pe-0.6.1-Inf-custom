@@ -2,22 +2,22 @@
 #include "ProgressScreen.h"
 #include "ScreenChooser.h"
 #include "../components/Button.h"
-#include "../components/ImageButton.h"
 #include "../../Minecraft.h"
 #include "../../../world/level/LevelSettings.h"
 #include "../../../SharedConstants.h"
 #include "../../../platform/time.h"
 #include "../../../platform/input/Keyboard.h"
+#include "../../../platform/input/Mouse.h"
 #include "../../../platform/log.h"
+#include "../../../util/Mth.h"
 #include <cstdlib>
 
 SimpleChooseLevelScreen::SimpleChooseLevelScreen(const std::string& levelName)
-:   bHeader(0),
-    bGamemode(0),
+:   bGamemode(0),
     bCheats(0),
     bWorldType(0),
-    bBack(0),
     bCreate(0),
+    bCancel(0),
     levelName(levelName),
     hasChosen(false),
     gamemode(GameType::Survival),
@@ -30,134 +30,86 @@ SimpleChooseLevelScreen::SimpleChooseLevelScreen(const std::string& levelName)
 
 SimpleChooseLevelScreen::~SimpleChooseLevelScreen()
 {
-    if (bHeader) delete bHeader;
     delete bGamemode;
     delete bCheats;
     delete bWorldType;
-    delete bBack;
     delete bCreate;
+    delete bCancel;
 }
 
 void SimpleChooseLevelScreen::init()
 {
-    // make sure the base class loads the existing level list; the
-    // derived screen uses ChooseLevelScreen::getUniqueLevelName(), which
-    // depends on `levels` being populated.  omitting this used to result
-    // in duplicate IDs ("creating the second world would load the
-    // first") when the name already existed.
     ChooseLevelScreen::init();
 
-    tLevelName.text = "New world";
+    tLevelName.text = "New World";
     tLevelName.setMaxChars(32);
     tSeed.setMaxChars(64);
 
-    // header + close button
-    bHeader = new Touch::THeader(0, "Create World");
-    // create the back/X button as ImageButton like CreditsScreen
-    bBack = new ImageButton(2, "");
-    {
-        ImageDef def;
-        def.name = "gui/touchgui.png";
-        def.width = 34;
-        def.height = 26;
-        def.setSrc(IntRectangle(150, 0, (int)def.width, (int)def.height));
-        bBack->setImageDef(def, true);
-    }
-    if (/* minecraft->useTouchscreen() */ true) {
-        bGamemode = new Touch::TButton(1, "Survival mode");
-        bCheats  = new Touch::TButton(4, "Cheats: Off");
-        bWorldType = new Touch::TButton(5, "World: PE 0.6.1");
-        bCreate  = new Touch::TButton(3, "Create");
-    } else {
-        bGamemode = new Button(1, "Survival mode");
-        bCheats  = new Button(4, "Cheats: Off");
-        bWorldType = new Button(5, "World: PE 0.6.1");
-        bCreate  = new Button(3, "Create");
-    }
+    bGamemode = new Button(1, "Survival mode");
+    bCheats  = new Button(4, "Cheats: Off");
+    bWorldType = new Button(5, "World: PE 0.6.1");
+    bCreate  = new Button(3, "Create New World");
+    bCancel  = new Button(2, "Cancel");
 
-    buttons.push_back(bHeader);
-    buttons.push_back(bBack);
+    buttons.clear();
+    tabButtons.clear();
+    textBoxes.clear();
+
     buttons.push_back(bGamemode);
     buttons.push_back(bCheats);
     buttons.push_back(bWorldType);
     buttons.push_back(bCreate);
+    buttons.push_back(bCancel);
 
     tabButtons.push_back(bGamemode);
     tabButtons.push_back(bCheats);
     tabButtons.push_back(bWorldType);
-    tabButtons.push_back(bBack);
     tabButtons.push_back(bCreate);
+    tabButtons.push_back(bCancel);
 
     textBoxes.push_back(&tLevelName);
     textBoxes.push_back(&tSeed);
+
+    tLevelName.setFocus(minecraft);
 }
 
 void SimpleChooseLevelScreen::setupPositions()
 {
-    int buttonHeight = bBack->height;
-
-    // position back button in upper-right
-    bBack->x = width - bBack->width;
-    bBack->y = 0;
-
-    // header occupies remaining top bar
-    if (bHeader) {
-        bHeader->x = 0;
-        bHeader->y = 0;
-        bHeader->width = width - bBack->width;
-        bHeader->height = buttonHeight;
-    }
-
-    // layout the form elements below the header
     int centerX = width / 2;
-    const int padding = 5;
 
     tLevelName.width = tSeed.width = 200;
-    tLevelName.x = centerX - tLevelName.width / 2;
-    tLevelName.y = buttonHeight + 20;
+    tLevelName.height = tSeed.height = 20;
+    tLevelName.x = tSeed.x = centerX - 100;
 
-    tSeed.x = tLevelName.x;
-    tSeed.y = tLevelName.y + 30;
+    tLevelName.y = 48;
+    tSeed.y = 88;
 
-    int buttonWidth = 120;
-    const int buttonSpacing = 10;
-    int totalButtonWidth = buttonWidth * 3 + buttonSpacing * 2;
-    if (totalButtonWidth > width - 20) {
-        buttonWidth = (width - 20 - buttonSpacing * 2) / 3;
-        if (buttonWidth < 60) buttonWidth = 60;
-        totalButtonWidth = buttonWidth * 3 + buttonSpacing * 2;
+    int optBtnW = 150;
+    bGamemode->width = optBtnW;
+    bGamemode->height = 20;
+    bGamemode->x = centerX - optBtnW / 2;
+    bGamemode->y = 126;
+
+    int halfBtnW = 98;
+    bCheats->width = bWorldType->width = halfBtnW;
+    bCheats->height = bWorldType->height = 20;
+    bCheats->x = centerX - halfBtnW - 4;
+    bWorldType->x = centerX + 4;
+    bCheats->y = bWorldType->y = 162;
+
+    int bottomBtnW = 150;
+    if (bottomBtnW * 2 + 10 > width) {
+        bottomBtnW = (width - 24) / 2;
     }
-
-    bGamemode->width = buttonWidth;
-    bCheats->width = buttonWidth;
-    bWorldType->width = buttonWidth;
-
-    bGamemode->x = centerX - totalButtonWidth / 2;
-    bCheats->x = bGamemode->x + buttonWidth + buttonSpacing;
-    bWorldType->x = bCheats->x + buttonWidth + buttonSpacing;
-
-    // compute vertical centre for buttons in remaining space
-    {
-        int bottomPad = 20;
-        int availTop = buttonHeight + 20 + 30 + 10; // just below seed
-        int availBottom = height - bottomPad - bCreate->height - 10; // leave some gap before create
-        int availHeight = availBottom - availTop;
-        if (availHeight < 0) availHeight = 0;
-        int y = availTop + (availHeight - bGamemode->height) / 2;
-        bGamemode->y = y;
-        bCheats->y = y;
-        bWorldType->y = y;
-    }
-
-    bCreate->width = 100;
-    bCreate->x = centerX - bCreate->width / 2;
-    int bottomPadding = 20;
-    bCreate->y = height - bottomPadding - bCreate->height;
+    bCreate->width = bCancel->width = bottomBtnW;
+    bCreate->height = bCancel->height = 20;
+    bCreate->x = centerX - bottomBtnW - 5;
+    bCancel->x = centerX + 5;
+    bCreate->y = bCancel->y = height - 28;
 }
 
 void SimpleChooseLevelScreen::tick()
 {
-    // let any textboxes handle their own blinking/input
     for (auto* tb : textBoxes)
         tb->tick(minecraft);
 }
@@ -167,68 +119,47 @@ void SimpleChooseLevelScreen::render( int xm, int ym, float a )
     renderDirtBackground(0);
     glEnable2(GL_BLEND);
 
-    const char* modeDesc = NULL;
-    if (gamemode == GameType::Survival) {
-        modeDesc = "Mobs, health and gather resources";
-    } else if (gamemode == GameType::Creative) {
-        modeDesc = "Unlimited resources and flying";
-    }
-    if (modeDesc) {
-        drawCenteredString(minecraft->font, modeDesc, width / 2, bGamemode->y + bGamemode->height + 4, 0xffcccccc);
-    }
-    // World-type description on its own line below the mode description
-    // (same Y as the mode line would overlap it: all three buttons
-    // sit in one row).
-    if (bWorldType) {
-        const char* worldDesc = (worldType == LGV_BETA173)
-            ? "Classic Beta 1.7.3 terrain"
-            : ((worldType == LGV_ALPHA112)
-                ? "Classic Alpha 1.1.2 terrain"
-                : "Pocket Edition 0.6.1 terrain");
-        drawCenteredString(minecraft->font, worldDesc, width / 2,
-            bWorldType->y + bWorldType->height + 4 + Font::DefaultLineHeight + 2, 0xffcccccc);
-    }
+    drawCenteredString(minecraft->font, "Create New World", width / 2, 14, 0xffffffff);
 
-    drawString(minecraft->font, "World name:", tLevelName.x, tLevelName.y - Font::DefaultLineHeight - 2, 0xffcccccc);
-    drawString(minecraft->font, "World seed:", tSeed.x, tSeed.y - Font::DefaultLineHeight - 2, 0xffcccccc);
+    drawString(minecraft->font, "World Name:", tLevelName.x, tLevelName.y - 11, 0xffa0a0a0);
+    drawString(minecraft->font, "Seed for World Generator:", tSeed.x, tSeed.y - 11, 0xffa0a0a0);
+
+    const char* modeDesc = (gamemode == GameType::Survival)
+        ? "Survival mode: Mobs, health and gather resources"
+        : "Creative mode: Unlimited resources and flying";
+    drawCenteredString(minecraft->font, modeDesc, width / 2, bGamemode->y + 22, 0xff808080);
 
     Screen::render(xm, ym, a);
     glDisable2(GL_BLEND);
 }
 
-// mouse clicks should also manage textbox focus explicitly
 void SimpleChooseLevelScreen::mouseClicked(int x, int y, int buttonNum)
 {
     if (buttonNum == MouseAction::ACTION_LEFT) {
-        // determine if the click landed on either textbox or its label above
-        int lvlTop = tLevelName.y - (Font::DefaultLineHeight + 4);
+        int lvlTop = tLevelName.y - 12;
         int lvlBottom = tLevelName.y + tLevelName.height;
         int lvlLeft = tLevelName.x;
         int lvlRight = tLevelName.x + tLevelName.width;
         bool clickedLevel = x >= lvlLeft && x < lvlRight && y >= lvlTop && y < lvlBottom;
 
-        int seedTop = tSeed.y - (Font::DefaultLineHeight + 4);
+        int seedTop = tSeed.y - 12;
         int seedBottom = tSeed.y + tSeed.height;
         int seedLeft = tSeed.x;
         int seedRight = tSeed.x + tSeed.width;
-        bool clickedSeed  = x >= seedLeft && x < seedRight && y >= seedTop && y < seedBottom;
+        bool clickedSeed = x >= seedLeft && x < seedRight && y >= seedTop && y < seedBottom;
 
         if (clickedLevel) {
-            LOGI("SimpleChooseLevelScreen: level textbox clicked (%d,%d)\n", x, y);
             tLevelName.setFocus(minecraft);
             tSeed.loseFocus(minecraft);
         } else if (clickedSeed) {
-            LOGI("SimpleChooseLevelScreen: seed textbox clicked (%d,%d)\n", x, y);
             tSeed.setFocus(minecraft);
             tLevelName.loseFocus(minecraft);
         } else {
-            // click outside both fields -> blur both
             tLevelName.loseFocus(minecraft);
             tSeed.loseFocus(minecraft);
         }
     }
 
-    // allow normal button and textbox handling too
     Screen::mouseClicked(x, y, buttonNum);
 }
 
@@ -282,23 +213,26 @@ void SimpleChooseLevelScreen::buttonClicked( Button* button )
         return;
     }
 
-    if (button == bBack) {
-        minecraft->screenChooser.setScreen(SCREEN_STARTMENU);
+    if (button == bCancel) {
+        minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
     }
 }
 
 void SimpleChooseLevelScreen::keyPressed(int eventKey)
 {
     if (eventKey == Keyboard::KEY_ESCAPE) {
-        minecraft->screenChooser.setScreen(SCREEN_STARTMENU);
+        minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
         return;
     }
-    // let base class handle navigation and text box keys
+    if (eventKey == Keyboard::KEY_RETURN && !tLevelName.text.empty()) {
+        buttonClicked(bCreate);
+        return;
+    }
     Screen::keyPressed(eventKey);
 }
 
 bool SimpleChooseLevelScreen::handleBackEvent(bool isDown) {
 	if (!isDown)
-		minecraft->screenChooser.setScreen(SCREEN_STARTMENU);
+		minecraft->screenChooser.setScreen(SCREEN_SELECTWORLD);
 	return true; 
 }

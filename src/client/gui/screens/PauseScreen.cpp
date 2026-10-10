@@ -19,25 +19,8 @@ PauseScreen::PauseScreen(bool wasBackPaused)
 	bOptions(0),
 	bQuitAndSaveLocally(0),
 	bServerVisibility(0),
-	//	bThirdPerson(0),
-	wasBackPaused(wasBackPaused),
-	// bSound(OPTIONS_SOUND_VOLUME, 1, 0),
-	bThirdPerson(OPTIONS_THIRD_PERSON_VIEW),
-	bHideGui(OPTIONS_HIDEGUI)
+	wasBackPaused(wasBackPaused)
 {
-	ImageDef def;
-	def.setSrc(IntRectangle(160, 144, 39, 31));
-	def.name = "gui/touchgui.png";
-	IntRectangle& defSrc = *def.getSrc();
-
-	def.width = defSrc.w * 0.666667f;
-	def.height = defSrc.h * 0.666667f;
-
-	// bSound.setImageDef(def, true);
-	defSrc.y += defSrc.h;
-	bThirdPerson.setImageDef(def, true);
-	bHideGui.setImageDef(def, true);
-	//void setImageDef(ImageDef& imageDef, bool setButtonSize);
 }
 
 PauseScreen::~PauseScreen() {
@@ -46,67 +29,38 @@ PauseScreen::~PauseScreen() {
 	delete bQuitAndSaveLocally;
 	delete bServerVisibility;
 	delete bOptions;
-	//	delete bThirdPerson;
 }
 
 void PauseScreen::init() {
-	if (minecraft->options.getIntValue(OPTIONS_MENU_STYLE) == 0) {
-		bContinue = new Touch::TButton(1, "Back to game");
-		bOptions = new Touch::TButton(5, "Options");
-		bQuit = new Touch::TButton(2, "Quit to title");
-		bQuitAndSaveLocally = new Touch::TButton(3, "Quit and copy map");
-		bServerVisibility = new Touch::TButton(4, "");
-		//		bThirdPerson = new Touch::TButton(5, "Toggle 3:rd person view");
-	} else if (minecraft->options.getIntValue(OPTIONS_MENU_STYLE) == 1) {
-		bContinue = new Button(1, "Back to game");
-		bOptions = new Button(5, "Options");
-		bQuit = new Button(2, "Quit to title");
-		bQuitAndSaveLocally = new Button(3, "Quit and copy map");
-		bServerVisibility = new Button(4, "");
-		//		bThirdPerson = new Button(5, "Toggle 3:rd person view");
-	} else {
-		bContinue = new Button(1, 0, 0, 200, 20, "Back to game");
-		bServerVisibility = new Button(4, 0, 0, 200, 20, "");
-		bOptions = new Button(5, 0, 0, 200, 20, "Options...");
-		bQuit = new Button(2, 0, 0, 200, 20, "Save and quit to title");
-		bQuitAndSaveLocally = new Button(3, 0, 0, 200, 20, "Copy and quit map");
-		//		bThirdPerson = new Button(5, "Toggle 3:rd person view");
-	}
+	bContinue = new Button(1, 0, 0, 200, 20, "Back to game");
+	bServerVisibility = new Button(4, 0, 0, 200, 20, "");
+	bOptions = new Button(5, 0, 0, 200, 20, "Options...");
+	bQuit = new Button(2, 0, 0, 200, 20, "Save and quit to title");
+	bQuitAndSaveLocally = new Button(3, 0, 0, 200, 20, "Copy and quit map");
+
+	buttons.clear();
+	tabButtons.clear();
 
 	buttons.push_back(bContinue);
-	buttons.push_back(bQuit);
-	buttons.push_back(bOptions);
-	// bSound.updateImage(&minecraft->options);
-	bThirdPerson.updateImage(&minecraft->options);
-	bHideGui.updateImage(&minecraft->options);
-	// buttons.push_back(&bSound);
-	buttons.push_back(&bThirdPerson);
-	//buttons.push_back(&bHideGui);
-
-	// If Back wasn't pressed, set up additional items (more than Quit to menu
-	// and Back to game) here
 
 #if !defined(APPLE_DEMO_PROMOTION) && !defined(RPI)
-	if (true || !wasBackPaused) {
-		if (minecraft->raknetInstance) {
-			if (minecraft->raknetInstance->isServer()) {
-				updateServerVisibilityText();
-				buttons.push_back(bServerVisibility);
-			}
-			else {
+	if (minecraft->raknetInstance) {
+		if (minecraft->raknetInstance->isServer()) {
+			updateServerVisibilityText();
+			buttons.push_back(bServerVisibility);
+		}
+		else {
 #if !defined(DEMO_MODE)
-				buttons.push_back(bQuitAndSaveLocally);
+			buttons.push_back(bQuitAndSaveLocally);
 #endif
-			}
 		}
 	}
 #endif
-	//	buttons.push_back(bThirdPerson);
 
-	for (unsigned int i = 0; i < buttons.size(); ++i) {
-		// if (buttons[i] == &bSound) continue;
-		if (buttons[i] == &bThirdPerson) continue;
-		if (buttons[i] == &bHideGui) continue;
+	buttons.push_back(bOptions);
+	buttons.push_back(bQuit);
+
+	for (size_t i = 0; i < buttons.size(); ++i) {
 		tabButtons.push_back(buttons[i]);
 	}
 
@@ -118,55 +72,37 @@ void PauseScreen::init() {
 
 void PauseScreen::setupPositions() {
 	saveStep = 0;
-	int yBase = 16;
-	if (minecraft->options.getIntValue(OPTIONS_MENU_STYLE) == 2){
-		yBase = 50;
+	int btnW = Mth::Min(200, width - 20);
 
-		bContinue->width = bOptions->width = bQuit->width = /*bThirdPerson->w =*/ 200;
-		bQuitAndSaveLocally->width = bServerVisibility->width = 200;
+	bContinue->width = bOptions->width = bQuit->width = btnW;
+	bQuitAndSaveLocally->width = bServerVisibility->width = btnW;
 
-		bContinue->x = (width - bContinue->width) / 2;
-		bContinue->y = yBase + 24 * 1;
+	bool hasServerVis = (minecraft->raknetInstance && minecraft->raknetInstance->isServer());
+	bool hasQuitSave = (minecraft->raknetInstance && !minecraft->raknetInstance->isServer());
 
-		bQuitAndSaveLocally->x = bServerVisibility->x = (width - bQuitAndSaveLocally->width) / 2;
-		bQuitAndSaveLocally->y = bServerVisibility->y = yBase + 24 * 2;
-
-		bOptions->x = (width - bOptions->width) / 2;
-		bOptions->y = yBase + 24 * 3 + 24;
-
-		bQuit->x = (width - bQuit->width) / 2;
-		bQuit->y = yBase + 24 * 4 + 24;
-
-	} else {
-		bContinue->width = bOptions->width = bQuit->width = /*bThirdPerson->w =*/ 160;
-		bQuitAndSaveLocally->width = bServerVisibility->width = 160;
-
-		bContinue->x = (width - bContinue->width) / 2;
-		bContinue->y = yBase + 32 * 1;
-
-		bOptions->x = (width - bOptions->width) / 2;
-		bOptions->y = yBase + 32 * 2;
-
-		bQuit->x = (width - bQuit->width) / 2;
-		bQuit->y = yBase + 32 * 3;
-
-#if APPLE_DEMO_PROMOTION
-		bQuit->y += 16;
-#endif
-
-		bQuitAndSaveLocally->x = bServerVisibility->x = (width - bQuitAndSaveLocally->width) / 2;
-		bQuitAndSaveLocally->y = bServerVisibility->y = yBase + 32 * 4;
+	int totalButtons = 3 + ((hasServerVis || hasQuitSave) ? 1 : 0);
+	int startY = height / 4 + 8;
+	if (startY + totalButtons * 24 > height - 10) {
+		startY = (height - totalButtons * 24) / 2;
 	}
 
+	int row = 0;
+	bContinue->x = (width - btnW) / 2;
+	bContinue->y = startY + (row++) * 24;
 
+	if (hasServerVis) {
+		bServerVisibility->x = (width - btnW) / 2;
+		bServerVisibility->y = startY + (row++) * 24;
+	} else if (hasQuitSave) {
+		bQuitAndSaveLocally->x = (width - btnW) / 2;
+		bQuitAndSaveLocally->y = startY + (row++) * 24;
+	}
 
-	// bSound.y = bThirdPerson.y = 8;
-	// bSound.x = 4;
-	// bThirdPerson.x = bSound.x + 4 + bSound.width;
-	// bHideGui.x = bThirdPerson.x + 4 + bThirdPerson.width;
+	bOptions->x = (width - btnW) / 2;
+	bOptions->y = startY + (row++) * 24;
 
-	//bThirdPerson->x = (width - bThirdPerson->w) / 2;
-	//bThirdPerson->y = yBase + 32 * 4;
+	bQuit->x = (width - btnW) / 2;
+	bQuit->y = startY + (row++) * 24;
 }
 
 void PauseScreen::tick() {
@@ -215,13 +151,7 @@ void PauseScreen::buttonClicked(Button* button) {
 		}
 	}
 
-	if (button->id == OptionButton::ButtonId) {
-		((OptionButton*)button)->toggle(&minecraft->options);
-	}
 
-	//if (button->id == bThirdPerson->id) {
-	//	minecraft->options.thirdPersonView = !minecraft->options.thirdPersonView;
-	//}
 }
 
 void PauseScreen::updateServerVisibilityText()

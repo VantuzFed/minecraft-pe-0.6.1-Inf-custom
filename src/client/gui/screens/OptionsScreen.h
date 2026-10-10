@@ -71,7 +71,7 @@ private:
 	Button bGraphics;
 	Button bSmoothLighting;
 	Button bShaders;
-	Button bMenuStyle;
+	Button bGuiScale;
 	Button bControls;
 	Button bAutoJump;
 	Button bCreditsBeta;

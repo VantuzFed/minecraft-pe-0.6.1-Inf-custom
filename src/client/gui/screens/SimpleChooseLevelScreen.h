@@ -3,9 +3,7 @@
 
 #include "ChooseLevelScreen.h"
 #include "../components/TextBox.h"
-#include "../components/Button.h"    // for Touch::THeader
-class Button;
-class ImageButton;
+#include "../components/Button.h"
 
 class SimpleChooseLevelScreen: public ChooseLevelScreen
 {
@@ -26,12 +24,11 @@ public:
 	virtual void mouseClicked(int x, int y, int buttonNum);
 
 private:
-	Touch::THeader* bHeader;
 	Button* bGamemode;
 	Button* bCheats;
 	Button* bWorldType;
-	ImageButton* bBack;
 	Button* bCreate;
+	Button* bCancel;
 	bool hasChosen;
 
 	std::string levelName;

@@ -74,7 +74,7 @@ OptionsScreen::OptionsScreen()
 	bGraphics(110, ""),
 	bSmoothLighting(111, ""),
 	bShaders(116, ""),
-	bMenuStyle(112, ""),
+	bGuiScale(112, ""),
 	bControls(113, ""),
 	bAutoJump(115, ""),
 	bCreditsBeta(114, ""),
@@ -86,7 +86,7 @@ OptionsScreen::OptionsScreen()
 }
 
 bool OptionsScreen::isBetaStyle() const {
-	return minecraft && minecraft->options.getIntValue(OPTIONS_MENU_STYLE) == 2;
+	return true;
 }
 
 void OptionsScreen::updateBetaButtonTexts() {
@@ -137,8 +137,15 @@ void OptionsScreen::updateBetaButtonTexts() {
 	bSmoothLighting.msg = I18n::get("options.ao") + ": " + (o.getIntValue(OPTIONS_AMBIENT_OCCLUSION) ? I18n::get("options.on") : I18n::get("options.off"));
 	bShaders.msg = I18n::get("options.shaders") + ": " + (o.getBooleanValue(OPTIONS_SHADERS) ? I18n::get("options.on") : I18n::get("options.off"));
 
-	int style = o.getIntValue(OPTIONS_MENU_STYLE);
-	bMenuStyle.msg = I18n::get("options.menuStyle") + ": " + (style == 2 ? I18n::get("options.menuStyle.java") : I18n::get("options.menuStyle.pocket"));
+	int gs = o.getIntValue(OPTIONS_GUI_SCALE);
+	std::string gsStr;
+	switch (gs) {
+		case 1: gsStr = I18n::get("options.guiScale.small"); break;
+		case 2: gsStr = I18n::get("options.guiScale.medium"); break;
+		case 3: gsStr = I18n::get("options.guiScale.large"); break;
+		default: gsStr = I18n::get("options.guiScale.auto"); break;
+	}
+	bGuiScale.msg = I18n::get("options.guiScale") + ": " + gsStr;
 
 	bControls.msg = I18n::get("options.controls") + "...";
 	bAutoJump.msg = I18n::get("options.autoJump") + ": " + (o.getBooleanValue(OPTIONS_AUTOJUMP) ? I18n::get("options.on") : I18n::get("options.off"));
@@ -199,8 +206,7 @@ void OptionsScreen::init() {
 		buttons.push_back(&bSmoothLighting);
 		buttons.push_back(&bShaders);
 		buttons.push_back(&bControls);
-		buttons.push_back(&bAutoJump);
-		buttons.push_back(&bMenuStyle);
+		buttons.push_back(&bGuiScale);
 		buttons.push_back(&bDone);
 
 		for (size_t i = 0; i < buttons.size(); i++) {
@@ -296,17 +302,20 @@ void OptionsScreen::setupPositions() {
 		bSmoothLighting.x = leftX; bSmoothLighting.y = startY + 5 * 24; bSmoothLighting.width = btnW; bSmoothLighting.height = btnH;
 		bShaders.x = rightX; bShaders.y = startY + 5 * 24; bShaders.width = btnW; bShaders.height = btnH;
 
-		// Row 6: Controls / Auto Jump
+		// Row 6: Controls / GUI Scale
 		bControls.x = leftX; bControls.y = startY + 6 * 24; bControls.width = btnW; bControls.height = btnH;
-		bAutoJump.x = rightX; bAutoJump.y = startY + 6 * 24; bAutoJump.width = btnW; bAutoJump.height = btnH;
+		bGuiScale.x = rightX; bGuiScale.y = startY + 6 * 24; bGuiScale.width = btnW; bGuiScale.height = btnH;
 
-		// Bottom row: UI Style / Done button
+		// Bottom row: Done button
 		int doneY = height - 26;
 		int minDoneY = startY + totalRows * 24 + 4;
 		if (doneY < minDoneY) doneY = minDoneY;
 
-		bMenuStyle.x = leftX; bMenuStyle.y = doneY; bMenuStyle.width = btnW; bMenuStyle.height = 20;
-		bDone.x = rightX; bDone.y = doneY; bDone.width = btnW; bDone.height = 20;
+		int doneW = Mth::Min(200, width - 20);
+		bDone.x = (width - doneW) / 2;
+		bDone.y = doneY;
+		bDone.width = doneW;
+		bDone.height = 20;
 
 		return;
 	}
@@ -362,10 +371,10 @@ void OptionsScreen::render(int xm, int ym, float a) {
 	if (isBetaStyle()) {
 		renderDirtBackground(0);
 
-		int totalRows = 6;
+		int totalRows = 7;
 		int totalH = totalRows * 24 + 32;
 		int startY = (height - totalH) / 2;
-		if (startY < 26) startY = 26;
+		if (startY < 24) startY = 24;
 		int titleY = startY > 20 ? (startY - 16) : 6;
 
 		drawCenteredString(minecraft->font, I18n::get("options.title"), width / 2, titleY, 0xffffffff);
@@ -446,18 +455,12 @@ void OptionsScreen::buttonClicked(Button* button) {
 			minecraft->options.set(OPTIONS_AMBIENT_OCCLUSION, !val);
 			minecraft->options.save();
 		}
-		else if (button->id == bMenuStyle.id) {
-			int cur = minecraft->options.getIntValue(OPTIONS_MENU_STYLE);
-			int next = (cur == 2) ? 0 : 2;
-			minecraft->options.set(OPTIONS_MENU_STYLE, next);
+		else if (button->id == bGuiScale.id) {
+			int gs = (minecraft->options.getIntValue(OPTIONS_GUI_SCALE) + 1) % 4;
+			minecraft->options.set(OPTIONS_GUI_SCALE, gs);
 			minecraft->options.save();
-			refreshOptions();
+			minecraft->setSize(minecraft->width, minecraft->height);
 			return;
-		}
-		else if (button->id == bAutoJump.id) {
-			bool val = minecraft->options.getBooleanValue(OPTIONS_AUTOJUMP);
-			minecraft->options.set(OPTIONS_AUTOJUMP, !val);
-			minecraft->options.save();
 		}
 		updateBetaButtonTexts();
 		return;

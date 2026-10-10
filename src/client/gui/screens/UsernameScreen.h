@@ -31,7 +31,7 @@ protected:
     virtual void buttonClicked(Button* button) override;
 
 private:
-    Touch::TButton _btnDone;
+    Button _btnDone;
     TextBox tUsername;
     std::string _input;
     int _cursorBlink;

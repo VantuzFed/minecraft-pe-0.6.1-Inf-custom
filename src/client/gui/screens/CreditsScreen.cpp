@@ -6,29 +6,21 @@
 #include "../components/ImageButton.h"
 #include "platform/input/Mouse.h"
 
+#include "../../../util/Mth.h"
+#include "../../../platform/input/Keyboard.h"
+
 CreditsScreen::CreditsScreen()
-: bHeader(NULL), btnBack(NULL)
+: btnDone(NULL)
 {}
 CreditsScreen::~CreditsScreen() {
-    if (bHeader) delete bHeader;
-    if (btnBack) delete btnBack;
+    if (btnDone) delete btnDone;
 }
 
 void CreditsScreen::init() {
-    bHeader = new Touch::THeader(0, "Credits");
-    btnBack = new ImageButton(1, "");
-    {
-        ImageDef def;
-        def.name = "gui/touchgui.png";
-        def.width = 34;
-        def.height = 26;
-        def.setSrc(IntRectangle(150, 0, (int)def.width, (int)def.height));
-        btnBack->setImageDef(def, true);
-    }
-    buttons.push_back(bHeader);
-    buttons.push_back(btnBack);
+    btnDone = new Button(1, "Done");
+    buttons.push_back(btnDone);
+    tabButtons.push_back(btnDone);
 
-    // TODO: rewrite it
     // prepare text lines
     _lines.clear();
     _lines.push_back("Minecraft: Pocket Edition");
@@ -50,18 +42,22 @@ void CreditsScreen::init() {
 }
 
 void CreditsScreen::setupPositions() {
-    int buttonHeight = btnBack->height;
-    btnBack->x = width - btnBack->width;
-    btnBack->y = 0;
-    if (bHeader) {
-        bHeader->x = 0;
-        bHeader->y = 0;
-        bHeader->width = width - btnBack->width;
-        bHeader->height = btnBack->height;
-    }
+    int doneW = Mth::Min(200, width - 20);
+    btnDone->width = doneW;
+    btnDone->height = 20;
+    btnDone->x = (width - doneW) / 2;
+    btnDone->y = height - 28;
 
     // reset scroll starting position when screen size changes
     _scrollY = height;
+}
+
+void CreditsScreen::keyPressed(int eventKey) {
+    if (eventKey == Keyboard::KEY_ESCAPE) {
+        minecraft->setScreen(new OptionsScreen());
+        return;
+    }
+    Screen::keyPressed(eventKey);
 }
 
 void CreditsScreen::tick() {

@@ -24,13 +24,8 @@ public:
 	}
 
 	void init() {
-		if (minecraft->useTouchscreen()) {
-			bOk  = new Touch::TButton(1, "Ok");
-			bBuy = new Touch::TButton(2, "Buy");
-		} else {
-			bOk  = new Button(1, "Ok");
-			bBuy = new Button(2, "Buy");
-		}
+		bOk  = new Button(1, "Ok");
+		bBuy = new Button(2, "Buy");
 
 		if (_hasBuyButton)
 			bOk->msg = "Quit";

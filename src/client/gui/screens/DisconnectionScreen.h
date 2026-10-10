@@ -21,15 +21,13 @@ public:
 	}
 
 	void init() {
-		if (/* minecraft->useTouchscreen() */ true)
-			_back = new Touch::TButton(1, "Ok");
-		else
-			_back = new Button(1, "Ok");
+		_back = new Button(1, "Ok");
 
 		buttons.push_back(_back);
 		tabButtons.push_back(_back);
 
-		_back->width = 128;
+		_back->width = Mth::Min(200, width - 20);
+		_back->height = 20;
 		_back->x = (width - _back->width) / 2;
 		_back->y = height / 2;
 	}

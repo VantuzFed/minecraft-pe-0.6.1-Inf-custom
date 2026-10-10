@@ -1299,18 +1299,10 @@ void Minecraft::releaseMouse()
 }
 
 bool Minecraft::useTouchscreen() {
-#if defined(TARGET_OS_IPHONE)
-	return true;
-#elif defined(RPI)
 	return false;
-#endif
-	if (platform() && platform()->supportsTouchscreen()) {
-		return options.getBooleanValue(OPTIONS_USE_TOUCHSCREEN);
-	}
-	return options.getBooleanValue(OPTIONS_USE_TOUCHSCREEN) && !_supportsNonTouchscreen;
 }
 bool Minecraft::supportNonTouchScreen() {
-	return _supportsNonTouchscreen;
+	return true;
 }
 void Minecraft::init()
 {
@@ -1434,22 +1426,10 @@ void Minecraft::_reloadInput() {
 #ifndef STANDALONE_SERVER
 	delete inputHolder;
 
-	const bool useTouchHolder = useTouchscreen();
-	if (useTouchHolder) {
-		inputHolder = new TouchInputHolder(this, &options);
-	} else {
-#if defined(ANDROID) || defined(__APPLE__) 
-		inputHolder = new CustomInputHolder(
-			new XperiaPlayInput(&options),
-			new ControllerTurnInput(2, ControllerTurnInput::MODE_DELTA),
-			new IBuildInput());
-#else
-		inputHolder = new CustomInputHolder(
-			new KeyboardInput(&options),
-			new MouseTurnInput(MouseTurnInput::MODE_DELTA, width/2, height/2),
-			new MouseBuildInput());
-#endif
-	}
+	inputHolder = new CustomInputHolder(
+		new KeyboardInput(&options),
+		new MouseTurnInput(MouseTurnInput::MODE_DELTA, width/2, height/2),
+		new MouseBuildInput());
 
 	mouseHandler.setTurnInput(inputHolder->getTurnInput());
 	if (level && player) {
