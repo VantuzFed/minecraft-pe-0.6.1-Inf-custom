@@ -1,5 +1,7 @@
 #include "ShadersScreen.h"
+#include "OptionsScreen.h"
 #include "../../renderer/shader/ShaderPipeline.h"
+#include "../../renderer/LevelRenderer.h"
 #include "../../Minecraft.h"
 #include "../../../locale/I18n.h"
 #include "../../../platform/input/Keyboard.h"
@@ -110,9 +112,8 @@ static void openShaderpacksFolder() {
 #endif
 }
 
-ShadersScreen::ShadersScreen(Screen* parent)
-	: m_parent(parent),
-	  m_packList(nullptr),
+ShadersScreen::ShadersScreen()
+	: m_packList(nullptr),
 	  m_btnOpenFolder(101, "Open shaderpacks folder"),
 	  m_btnDone(102, I18n::get("gui.done"))
 {}
@@ -171,23 +172,25 @@ void ShadersScreen::applySelectedPack(const std::string& packName) {
 	if (!minecraft) return;
 
 	if (packName == "(OFF)") {
-		g_shaderPipeline.setMode(SHADER_MODE_OFF);
-		minecraft->options.set(OPTIONS_SHADERS, false);
 		minecraft->options.set(OPTIONS_SHADERPACK, "(OFF)");
+		minecraft->options.set(OPTIONS_SHADERS, false);
+		g_shaderPipeline.setMode(SHADER_MODE_OFF);
 	} else if (packName == "(internal)" || packName == "Built-in") {
-		g_shaderPipeline.loadShaderPack("Built-in");
-		minecraft->options.set(OPTIONS_SHADERS, true);
 		minecraft->options.set(OPTIONS_SHADERPACK, "Built-in");
+		minecraft->options.set(OPTIONS_SHADERS, true);
+		g_shaderPipeline.loadShaderPack("Built-in");
 	} else {
-		if (g_shaderPipeline.loadShaderPack(packName)) {
-			minecraft->options.set(OPTIONS_SHADERS, true);
-			minecraft->options.set(OPTIONS_SHADERPACK, packName);
-		} else {
-			minecraft->options.set(OPTIONS_SHADERS, true);
+		minecraft->options.set(OPTIONS_SHADERPACK, packName);
+		minecraft->options.set(OPTIONS_SHADERS, true);
+		if (!g_shaderPipeline.loadShaderPack(packName)) {
 			minecraft->options.set(OPTIONS_SHADERPACK, "Built-in");
+			g_shaderPipeline.loadShaderPack("Built-in");
 		}
 	}
 	minecraft->options.save();
+	if (minecraft->levelRenderer) {
+		minecraft->levelRenderer->allChanged();
+	}
 }
 
 void ShadersScreen::buttonClicked(Button* button) {
@@ -199,14 +202,16 @@ void ShadersScreen::buttonClicked(Button* button) {
 			m_packList->refreshList();
 		}
 	} else if (button->id == m_btnDone.id) {
-		minecraft->setScreen(m_parent);
+		minecraft->options.save();
+		minecraft->setScreen(new OptionsScreen());
 	}
 }
 
 void ShadersScreen::keyPressed(int eventKey) {
 	if (eventKey == Keyboard::KEY_ESCAPE) {
 		if (minecraft) {
-			minecraft->setScreen(m_parent);
+			minecraft->options.save();
+			minecraft->setScreen(new OptionsScreen());
 		}
 		return;
 	}

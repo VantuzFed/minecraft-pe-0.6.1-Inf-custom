@@ -432,7 +432,7 @@ void OptionsScreen::buttonClicked(Button* button) {
 			minecraft->options.save();
 		}
 		else if (button->id == bShaders.id) {
-			minecraft->setScreen(new ShadersScreen(this));
+			minecraft->setScreen(new ShadersScreen());
 		}
 		else if (button->id == b3DAnaglyph.id) {
 			bool val = minecraft->options.getIntValue(OPTIONS_ANAGLYPH_3D) != 0;

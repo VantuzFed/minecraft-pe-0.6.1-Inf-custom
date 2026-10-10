@@ -34,7 +34,7 @@ private:
 
 class ShadersScreen : public Screen {
 public:
-	ShadersScreen(Screen* parent = nullptr);
+	ShadersScreen();
 	virtual ~ShadersScreen();
 
 	virtual void init() override;
@@ -47,7 +47,6 @@ public:
 	void applySelectedPack(const std::string& packName);
 
 private:
-	Screen* m_parent;
 	ShaderPackList* m_packList;
 
 	Button m_btnOpenFolder;
