@@ -2,7 +2,10 @@
 #define NET_MINECRAFT_CLIENT_RENDERER_SHADER_ShaderPass_H__
 
 #include <string>
+#include <vector>
 #include "ShaderUniforms.h"
+
+class ShaderPack;
 
 class ShaderPass {
 public:
@@ -11,6 +14,8 @@ public:
 
 	bool loadFromSource(const char* vsSrc, const char* fsSrc, const std::string& passName = "");
 	bool loadFromFiles(const std::string& vsPath, const std::string& fsPath);
+	bool loadFromPack(const ShaderPack& pack, const std::string& baseName);
+	bool loadWithFallback(const ShaderPack& pack, const std::vector<std::string>& candidates);
 	void destroy();
 
 	void bind(const ShaderUniformValues& vals, bool isCompositeOrFinal);

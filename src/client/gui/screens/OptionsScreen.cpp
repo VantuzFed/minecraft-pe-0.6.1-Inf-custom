@@ -7,6 +7,7 @@
 #include "../../../AppPlatform.h"
 #include "CreditsScreen.h"
 #include "ControlsScreen.h"
+#include "ShadersScreen.h"
 
 #include "../components/ImageButton.h"
 #include "../components/OptionsGroup.h"
@@ -135,7 +136,7 @@ void OptionsScreen::updateBetaButtonTexts() {
 
 	bGraphics.msg = I18n::get("options.graphics") + ": " + (o.getIntValue(OPTIONS_FANCY_GRAPHICS) ? I18n::get("options.graphics.fancy") : I18n::get("options.graphics.fast"));
 	bSmoothLighting.msg = I18n::get("options.ao") + ": " + (o.getIntValue(OPTIONS_AMBIENT_OCCLUSION) ? I18n::get("options.on") : I18n::get("options.off"));
-	bShaders.msg = I18n::get("options.shaders") + ": " + (o.getBooleanValue(OPTIONS_SHADERS) ? I18n::get("options.on") : I18n::get("options.off"));
+	bShaders.msg = I18n::get("options.shaders") + "...";
 
 	int gs = o.getIntValue(OPTIONS_GUI_SCALE);
 	std::string gsStr;
@@ -431,9 +432,7 @@ void OptionsScreen::buttonClicked(Button* button) {
 			minecraft->options.save();
 		}
 		else if (button->id == bShaders.id) {
-			bool val = minecraft->options.getBooleanValue(OPTIONS_SHADERS);
-			minecraft->options.set(OPTIONS_SHADERS, !val);
-			minecraft->options.save();
+			minecraft->setScreen(new ShadersScreen(this));
 		}
 		else if (button->id == b3DAnaglyph.id) {
 			bool val = minecraft->options.getIntValue(OPTIONS_ANAGLYPH_3D) != 0;

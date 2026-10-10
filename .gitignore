@@ -3,6 +3,8 @@ build/
 out/
 bin/
 lib/
+level/
+shaderpacks/*.zip
 build-apk/
 android-ndk-*/
 ndk.zip

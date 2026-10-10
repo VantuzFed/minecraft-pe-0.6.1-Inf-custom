@@ -60,6 +60,7 @@ public:
 	int u_colortex1;
 	int u_colortex2;
 	int u_depthtex0;
+	int u_gnormal;
 
 	// Backward-compatible built-ins
 	int u_layer;

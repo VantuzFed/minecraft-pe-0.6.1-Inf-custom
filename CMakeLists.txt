@@ -317,6 +317,7 @@ file(GLOB CLIENT_SOURCES
 
 if (${PLATFORM} STREQUAL "Desktop")
     list(APPEND CLIENT_SOURCES glad/src/glad.c)
+    list(APPEND CLIENT_SOURCES src/compat/minizip/ioapi.c src/compat/minizip/unzip.c)
     if (APPLE)
         list(APPEND CLIENT_SOURCES src/world/level/storage/MoveFolder.mm)
     endif()
@@ -348,6 +349,8 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC ${PLATFORM_CPP})
 target_include_directories(${PROJECT_NAME} PUBLIC 
     "${CMAKE_SOURCE_DIR}/glad/include/"
     "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/src/compat/minizip"
+    "${zlib_SOURCE_DIR}"
     "${openal_SOURCE_DIR}/include"
     "${glfw_SOURCE_DIR}/include"
     "lib/include"

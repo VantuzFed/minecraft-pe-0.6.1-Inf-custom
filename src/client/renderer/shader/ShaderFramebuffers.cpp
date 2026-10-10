@@ -7,14 +7,16 @@ ShaderFramebuffers::ShaderFramebuffers()
 	  m_height(0),
 	  m_ready(false),
 	  m_mainFbo(0),
+	  m_altFbo(0),
 	  m_colortex0(0),
 	  m_colortex1(0),
 	  m_colortex2(0),
-	  m_depthtex0(0)
+	  m_depthtex0(0),
+	  m_alt_colortex0(0)
 {}
 
 ShaderFramebuffers::~ShaderFramebuffers() {
-	destroy();
+	// Do not delete GL resources in destructor; context is already destroyed at process exit.
 }
 
 void ShaderFramebuffers::destroy() {
@@ -22,10 +24,15 @@ void ShaderFramebuffers::destroy() {
 		glDeleteFramebuffers(1, &m_mainFbo);
 		m_mainFbo = 0;
 	}
+	if (m_altFbo != 0 && glDeleteFramebuffers) {
+		glDeleteFramebuffers(1, &m_altFbo);
+		m_altFbo = 0;
+	}
 	if (m_colortex0 != 0) { glDeleteTextures(1, &m_colortex0); m_colortex0 = 0; }
 	if (m_colortex1 != 0) { glDeleteTextures(1, &m_colortex1); m_colortex1 = 0; }
 	if (m_colortex2 != 0) { glDeleteTextures(1, &m_colortex2); m_colortex2 = 0; }
 	if (m_depthtex0 != 0) { glDeleteTextures(1, &m_depthtex0); m_depthtex0 = 0; }
+	if (m_alt_colortex0 != 0) { glDeleteTextures(1, &m_alt_colortex0); m_alt_colortex0 = 0; }
 	m_ready = false;
 }
 
@@ -40,6 +47,7 @@ bool ShaderFramebuffers::init(int width, int height) {
 	m_width = width;
 	m_height = height;
 
+	// 1. Create Main FBO
 	glGenFramebuffers(1, &m_mainFbo);
 	glBindFramebuffer(GL_FRAMEBUFFER, m_mainFbo);
 
@@ -85,7 +93,29 @@ bool ShaderFramebuffers::init(int width, int height) {
 
 	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 	if (status != GL_FRAMEBUFFER_COMPLETE) {
-		printf("[ShaderFBO] Framebuffer incomplete! Status = 0x%x\n", status);
+		printf("[ShaderFBO] Main Framebuffer incomplete! Status = 0x%x\n", status);
+		destroy();
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		return false;
+	}
+
+	// 2. Create Alt FBO (for composite passes)
+	glGenFramebuffers(1, &m_altFbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, m_altFbo);
+
+	glGenTextures(1, &m_alt_colortex0);
+	glBindTexture(GL_TEXTURE_2D, m_alt_colortex0);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_alt_colortex0, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_depthtex0, 0);
+
+	status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	if (status != GL_FRAMEBUFFER_COMPLETE) {
+		printf("[ShaderFBO] Alt Framebuffer incomplete! Status = 0x%x\n", status);
 		destroy();
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		return false;
@@ -94,7 +124,7 @@ bool ShaderFramebuffers::init(int width, int height) {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	m_ready = true;
-	printf("[ShaderFBO] Initialized MRT Framebuffer (%dx%d) successfully\n", m_width, m_height);
+	printf("[ShaderFBO] Initialized MRT & Ping-Pong Framebuffers (%dx%d) successfully\n", m_width, m_height);
 	return true;
 }
 
@@ -119,12 +149,30 @@ void ShaderFramebuffers::unbind() {
 	}
 }
 
-void ShaderFramebuffers::bindTexturesForComposite() {
+void ShaderFramebuffers::bindComposite() {
+	if (!m_ready || !glBindFramebuffer) return;
+	glBindFramebuffer(GL_FRAMEBUFFER, m_altFbo);
+	glViewport(0, 0, m_width, m_height);
+
+	GLenum bufs[1] = { GL_COLOR_ATTACHMENT0 };
+	glDrawBuffers(1, bufs);
+
+	// Bind main textures as inputs
+	bindTexturesForComposite(false);
+}
+
+void ShaderFramebuffers::bindFinal(bool useAltColorAsInput) {
+	unbind();
+	glViewport(0, 0, m_width, m_height);
+	bindTexturesForComposite(useAltColorAsInput);
+}
+
+void ShaderFramebuffers::bindTexturesForComposite(bool useAltColorAsInput) {
 	if (!m_ready) return;
 
 	if (glActiveTexture) {
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, m_colortex0);
+		glBindTexture(GL_TEXTURE_2D, useAltColorAsInput ? m_alt_colortex0 : m_colortex0);
 
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, m_colortex1);
@@ -168,11 +216,13 @@ void ShaderFramebuffers::drawFullscreenQuad() {
 	glPopMatrix();
 }
 
-void ShaderFramebuffers::blitToScreen() {
+void ShaderFramebuffers::blitToScreen(bool fromAlt) {
 	if (!m_ready || !glBindFramebuffer) return;
 
+	GLuint srcFbo = fromAlt ? m_altFbo : m_mainFbo;
+
 	if (glBlitFramebuffer) {
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, m_mainFbo);
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, srcFbo);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 		glReadBuffer(GL_COLOR_ATTACHMENT0);
 		glBlitFramebuffer(0, 0, m_width, m_height, 0, 0, m_width, m_height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
@@ -180,7 +230,7 @@ void ShaderFramebuffers::blitToScreen() {
 	} else {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, m_colortex0);
+		glBindTexture(GL_TEXTURE_2D, fromAlt ? m_alt_colortex0 : m_colortex0);
 		drawFullscreenQuad();
 	}
 }

@@ -5,8 +5,8 @@
 #include "../../../world/entity/player/Player.h"
 #include "../../../world/level/material/Material.h"
 #include <cstdio>
-#include <sys/stat.h>
-#include <dirent.h>
+#include <cmath>
+#include <algorithm>
 
 ShaderPipeline g_shaderPipeline;
 
@@ -47,6 +47,7 @@ static const char* kBuiltinTerrainVS =
 static const char* kBuiltinTerrainFS =
 	"#version 120\n"
 	"uniform sampler2D texture;\n"
+	"uniform sampler2D lightmap;\n"
 	"uniform int u_layer;\n"
 	"uniform float frameTimeCounter;\n"
 	"uniform vec3 cameraPosition;\n"
@@ -116,7 +117,6 @@ static const char* kBuiltinFinalVS =
 static const char* kBuiltinFinalFS =
 	"#version 120\n"
 	"uniform sampler2D colortex0;\n"
-	"uniform sampler2D colortex1;\n"
 	"varying vec2 v_texCoord;\n"
 	"void main() {\n"
 	"    vec4 color = texture2D(colortex0, v_texCoord);\n"
@@ -130,11 +130,15 @@ static const char* kBuiltinFinalFS =
 ShaderPipeline::ShaderPipeline()
 	: m_initialized(false),
 	  m_sceneActive(false),
+	  m_mode(SHADER_MODE_BUILTIN),
 	  m_currentPack("Built-in"),
+	  m_lightmapTexture(0),
 	  m_activeStage(STAGE_NONE)
 {}
 
-ShaderPipeline::~ShaderPipeline() {}
+ShaderPipeline::~ShaderPipeline() {
+	// Do not delete GL resources in destructor; context is already destroyed at process exit.
+}
 
 bool ShaderPipeline::init(int width, int height) {
 	if (m_initialized) return true;
@@ -142,6 +146,16 @@ bool ShaderPipeline::init(int width, int height) {
 	if (!m_fbo.init(width, height)) {
 		printf("[ShaderPipeline] Failed to create framebuffers\n");
 		return false;
+	}
+
+	if (m_lightmapTexture == 0 && glGenTextures) {
+		glGenTextures(1, &m_lightmapTexture);
+		glBindTexture(GL_TEXTURE_2D, m_lightmapTexture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		updateLightmap(0.0f);
 	}
 
 	setupBuiltInShaders();
@@ -161,17 +175,73 @@ void ShaderPipeline::resize(int width, int height) {
 	m_uniforms.aspectRatio = (height > 0) ? ((float)width / (float)height) : 1.0f;
 }
 
+void ShaderPipeline::destroyPasses() {
+	m_passTerrain.destroy();
+	m_passWater.destroy();
+	m_passEntities.destroy();
+	m_passHand.destroy();
+	m_passSky.destroy();
+	m_passSkyTextured.destroy();
+	m_passClouds.destroy();
+	m_passWeather.destroy();
+	m_passComposite.destroy();
+	m_passFinal.destroy();
+}
+
 void ShaderPipeline::setupBuiltInShaders() {
+	destroyPasses();
 	m_passTerrain.loadFromSource(kBuiltinTerrainVS, kBuiltinTerrainFS, "gbuffers_terrain (built-in)");
 	m_passFinal.loadFromSource(kBuiltinFinalVS, kBuiltinFinalFS, "final (built-in)");
+	m_mode = SHADER_MODE_BUILTIN;
+	m_currentPack = "Built-in";
+}
+
+void ShaderPipeline::updateLightmap(float timeOfDay) {
+	if (m_lightmapTexture == 0) return;
+
+	unsigned char pixels[16 * 16 * 4];
+	float sunAngle = timeOfDay * 3.14159265f * 2.0f;
+	float sunHeight = std::sin(sunAngle);
+	float dayFactor = std::max(0.0f, std::min(1.0f, sunHeight * 2.0f + 0.5f));
+
+	for (int y = 0; y < 16; ++y) {
+		float skyFactor = std::pow((float)y / 15.0f, 1.2f) * dayFactor;
+		float nightFactor = std::pow((float)y / 15.0f, 1.2f) * (1.0f - dayFactor) * 0.15f;
+
+		for (int x = 0; x < 16; ++x) {
+			float blockFactor = std::pow((float)x / 15.0f, 1.5f);
+
+			float r = blockFactor * 1.00f + skyFactor * 1.00f + nightFactor * 0.35f;
+			float g = blockFactor * 0.82f + skyFactor * 0.98f + nightFactor * 0.45f;
+			float b = blockFactor * 0.60f + skyFactor * 0.90f + nightFactor * 0.75f;
+
+			int idx = (y * 16 + x) * 4;
+			pixels[idx + 0] = (unsigned char)(std::min(1.0f, r) * 255.0f);
+			pixels[idx + 1] = (unsigned char)(std::min(1.0f, g) * 255.0f);
+			pixels[idx + 2] = (unsigned char)(std::min(1.0f, b) * 255.0f);
+			pixels[idx + 3] = 255;
+		}
+	}
+
+	glBindTexture(GL_TEXTURE_2D, m_lightmapTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 16, 16, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 }
 
 bool ShaderPipeline::isEnabled() const {
-	return m_initialized;
+	return m_initialized && (m_mode != SHADER_MODE_OFF);
+}
+
+void ShaderPipeline::setMode(ShaderPipelineMode mode) {
+	m_mode = mode;
+	if (m_mode == SHADER_MODE_OFF) {
+		m_currentPack = "(OFF)";
+	} else if (m_mode == SHADER_MODE_BUILTIN) {
+		setupBuiltInShaders();
+	}
 }
 
 void ShaderPipeline::beginFrame(Minecraft* mc, double partialTicks) {
-	if (!m_initialized || !mc) return;
+	if (!m_initialized || !mc || m_mode == SHADER_MODE_OFF) return;
 
 	resize(mc->width, mc->height);
 
@@ -204,6 +274,8 @@ void ShaderPipeline::beginFrame(Minecraft* mc, double partialTicks) {
 		m_uniforms.moonPosition[0] = -m_uniforms.sunPosition[0];
 		m_uniforms.moonPosition[1] = -m_uniforms.sunPosition[1];
 		m_uniforms.moonPosition[2] = 0.0f;
+
+		updateLightmap(m_uniforms.timeOfDay);
 	}
 
 	// Read ModelView and Projection matrices directly from current OpenGL state
@@ -218,38 +290,78 @@ void ShaderPipeline::beginFrame(Minecraft* mc, double partialTicks) {
 }
 
 void ShaderPipeline::beginScene() {
-	if (!m_initialized) return;
+	if (!m_initialized || m_mode == SHADER_MODE_OFF) return;
 	m_fbo.bindScene();
 	m_sceneActive = true;
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void ShaderPipeline::bindPass(ShaderStage stage, int layer) {
-	if (!m_sceneActive) return;
+	if (!m_sceneActive || m_mode == SHADER_MODE_OFF) return;
 
 	m_uniforms.currentLayer = layer;
 	m_activeStage = stage;
 
+	// Bind lightmap texture to texture unit 1 for all gbuffers passes
+	if (glActiveTexture && m_lightmapTexture != 0) {
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, m_lightmapTexture);
+		glActiveTexture(GL_TEXTURE0);
+	}
+
 	switch (stage) {
 	case STAGE_GBUFFERS_TERRAIN:
+		if (layer == 1 && m_passWater.isValid()) {
+			m_passWater.bind(m_uniforms, false);
+		} else if (m_passTerrain.isValid()) {
+			m_passTerrain.bind(m_uniforms, false);
+		}
+		break;
 	case STAGE_GBUFFERS_WATER:
-		if (m_passTerrain.isValid()) {
+		if (m_passWater.isValid()) {
+			m_passWater.bind(m_uniforms, false);
+		} else if (m_passTerrain.isValid()) {
 			m_passTerrain.bind(m_uniforms, false);
 		}
 		break;
 	case STAGE_GBUFFERS_ENTITIES:
 		if (m_passEntities.isValid()) {
 			m_passEntities.bind(m_uniforms, false);
+		} else if (m_passTerrain.isValid()) {
+			m_passTerrain.bind(m_uniforms, false);
 		}
 		break;
 	case STAGE_GBUFFERS_HAND:
 		if (m_passHand.isValid()) {
 			m_passHand.bind(m_uniforms, false);
+		} else if (m_passEntities.isValid()) {
+			m_passEntities.bind(m_uniforms, false);
+		} else if (m_passTerrain.isValid()) {
+			m_passTerrain.bind(m_uniforms, false);
 		}
 		break;
 	case STAGE_GBUFFERS_SKYBASIC:
 		if (m_passSky.isValid()) {
 			m_passSky.bind(m_uniforms, false);
+		}
+		break;
+	case STAGE_GBUFFERS_SKYTEXTURED:
+		if (m_passSkyTextured.isValid()) {
+			m_passSkyTextured.bind(m_uniforms, false);
+		} else if (m_passSky.isValid()) {
+			m_passSky.bind(m_uniforms, false);
+		}
+		break;
+	case STAGE_GBUFFERS_CLOUDS:
+		if (m_passClouds.isValid()) {
+			m_passClouds.bind(m_uniforms, false);
+		} else if (m_passSky.isValid()) {
+			m_passSky.bind(m_uniforms, false);
+		}
+		break;
+	case STAGE_GBUFFERS_WEATHER:
+		if (m_passWeather.isValid()) {
+			m_passWeather.bind(m_uniforms, false);
 		}
 		break;
 	default:
@@ -265,95 +377,118 @@ void ShaderPipeline::unbindPass() {
 }
 
 void ShaderPipeline::endScene() {
-	if (!m_sceneActive) return;
+	if (!m_sceneActive || m_mode == SHADER_MODE_OFF) return;
 	unbindPass();
 	m_fbo.unbind();
 	m_sceneActive = false;
 
-	// Composite / Final Post-processing presentation pass
+	bool hadComposite = false;
+
+	// 1. Composite Pass (if present, renders to alt FBO)
+	if (m_passComposite.isValid()) {
+		m_fbo.bindComposite();
+		m_passComposite.bind(m_uniforms, true);
+		m_fbo.drawFullscreenQuad();
+		m_passComposite.unbind();
+		hadComposite = true;
+	}
+
+	// 2. Final Pass (renders to screen, sampling either alt FBO or main FBO)
 	if (m_passFinal.isValid()) {
-		m_fbo.bindTexturesForComposite();
+		m_fbo.bindFinal(hadComposite);
 		m_passFinal.bind(m_uniforms, true);
 		m_fbo.drawFullscreenQuad();
 		m_passFinal.unbind();
-		if (glActiveTexture) {
-			glActiveTexture(GL_TEXTURE0);
-		}
 	} else {
-		m_fbo.blitToScreen();
+		m_fbo.blitToScreen(hadComposite);
+	}
+
+	if (glActiveTexture) {
+		glActiveTexture(GL_TEXTURE0);
 	}
 }
 
-bool ShaderPipeline::loadShaderPack(const std::string& packPath) {
-	std::string basePath = packPath + "/shaders/";
-	struct stat st;
-	if (stat(basePath.c_str(), &st) != 0) {
-		basePath = packPath + "/";
-		if (stat(basePath.c_str(), &st) != 0) return false;
+bool ShaderPipeline::loadShaderPack(const std::string& packNameOrPath) {
+	if (packNameOrPath.empty() || packNameOrPath == "(OFF)" || packNameOrPath == "OFF") {
+		setMode(SHADER_MODE_OFF);
+		return true;
 	}
 
-	printf("[ShaderPipeline] Loading shaderpack from '%s'...\n", basePath.c_str());
+	if (packNameOrPath == "Built-in" || packNameOrPath == "(internal)" || packNameOrPath == "internal") {
+		setupBuiltInShaders();
+		return true;
+	}
+
+	ShaderPack pack;
+	if (!pack.open(packNameOrPath)) {
+		printf("[ShaderPipeline] Failed to open shaderpack '%s'\n", packNameOrPath.c_str());
+		setupBuiltInShaders();
+		return false;
+	}
+
+	printf("[ShaderPipeline] Loading shaderpack '%s'...\n", pack.getName().c_str());
+	destroyPasses();
 
 	bool loadedAny = false;
-	if (m_passTerrain.loadFromFiles(basePath + "gbuffers_terrain.vsh", basePath + "gbuffers_terrain.fsh")) {
+
+	// Load stages with standard OptiFine/Iris fallbacks
+	if (m_passTerrain.loadWithFallback(pack, { "gbuffers_terrain", "gbuffers_textured", "gbuffers_basic" })) {
 		loadedAny = true;
 	}
-	if (m_passWater.loadFromFiles(basePath + "gbuffers_water.vsh", basePath + "gbuffers_water.fsh")) {
+	if (m_passWater.loadWithFallback(pack, { "gbuffers_water", "gbuffers_terrain" })) {
 		loadedAny = true;
 	}
-	if (m_passEntities.loadFromFiles(basePath + "gbuffers_entities.vsh", basePath + "gbuffers_entities.fsh")) {
+	if (m_passEntities.loadWithFallback(pack, { "gbuffers_entities", "gbuffers_textured", "gbuffers_terrain" })) {
 		loadedAny = true;
 	}
-	if (m_passHand.loadFromFiles(basePath + "gbuffers_hand.vsh", basePath + "gbuffers_hand.fsh")) {
+	if (m_passHand.loadWithFallback(pack, { "gbuffers_hand", "gbuffers_entities", "gbuffers_textured" })) {
 		loadedAny = true;
 	}
-	if (m_passSky.loadFromFiles(basePath + "gbuffers_skybasic.vsh", basePath + "gbuffers_skybasic.fsh")) {
+	if (m_passSky.loadWithFallback(pack, { "gbuffers_skybasic", "gbuffers_basic" })) {
 		loadedAny = true;
 	}
-	if (m_passComposite.loadFromFiles(basePath + "composite.vsh", basePath + "composite.fsh")) {
+	if (m_passSkyTextured.loadWithFallback(pack, { "gbuffers_skytextured", "gbuffers_skybasic", "gbuffers_textured" })) {
 		loadedAny = true;
 	}
-	if (m_passFinal.loadFromFiles(basePath + "final.vsh", basePath + "final.fsh")) {
+	if (m_passClouds.loadWithFallback(pack, { "gbuffers_clouds", "gbuffers_skybasic", "gbuffers_textured" })) {
+		loadedAny = true;
+	}
+	if (m_passWeather.loadWithFallback(pack, { "gbuffers_weather", "gbuffers_textured" })) {
+		loadedAny = true;
+	}
+	if (m_passComposite.loadWithFallback(pack, { "composite", "composite0" })) {
+		loadedAny = true;
+	}
+	if (m_passFinal.loadWithFallback(pack, { "final" })) {
 		loadedAny = true;
 	}
 
 	if (loadedAny) {
-		m_currentPack = packPath;
-		printf("[ShaderPipeline] Shaderpack '%s' loaded successfully!\n", packPath.c_str());
+		m_mode = SHADER_MODE_CUSTOM;
+		m_currentPack = pack.getName();
+		printf("[ShaderPipeline] Shaderpack '%s' successfully loaded!\n", m_currentPack.c_str());
 		return true;
 	} else {
-		printf("[ShaderPipeline] No valid shader passes found in '%s', reverting to built-in\n", packPath.c_str());
+		printf("[ShaderPipeline] No valid shader passes in '%s', reverting to built-in\n", packNameOrPath.c_str());
 		setupBuiltInShaders();
-		m_currentPack = "Built-in";
 		return false;
 	}
 }
 
 void ShaderPipeline::reload() {
-	if (m_currentPack != "Built-in" && !m_currentPack.empty()) {
+	if (m_mode == SHADER_MODE_CUSTOM && !m_currentPack.empty()) {
 		loadShaderPack(m_currentPack);
-	} else {
+	} else if (m_mode == SHADER_MODE_BUILTIN) {
 		setupBuiltInShaders();
 	}
 }
 
 std::vector<std::string> ShaderPipeline::getAvailablePacks() const {
 	std::vector<std::string> packs;
-	packs.push_back("Built-in");
+	packs.push_back("(OFF)");
+	packs.push_back("(internal)");
 
-	DIR* dir = opendir("shaderpacks");
-	if (dir) {
-		struct dirent* entry;
-		while ((entry = readdir(dir)) != NULL) {
-			if (entry->d_name[0] == '.') continue;
-			std::string packName = entry->d_name;
-			std::string p = "shaderpacks/" + packName;
-			struct stat st;
-			if (stat(p.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
-				packs.push_back(packName);
-			}
-		}
-		closedir(dir);
-	}
+	std::vector<std::string> customPacks = ShaderPack::scanAvailablePacks("shaderpacks");
+	packs.insert(packs.end(), customPacks.begin(), customPacks.end());
 	return packs;
 }

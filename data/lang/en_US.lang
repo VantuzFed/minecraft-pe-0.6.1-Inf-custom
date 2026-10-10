@@ -201,6 +201,7 @@ options.renderDistance.far=Far
 options.viewBobbing=View Bobbing
 options.ao=Smooth Lighting
 options.shaders=Shaders
+options.shaders.folder=Shaders Folder
 options.anaglyph=3D Anaglyph
 options.framerateLimit=Performance
 options.limitFramerate=Limit Framerate

@@ -4,10 +4,17 @@
 #include <string>
 #include <vector>
 #include "ShaderPass.h"
+#include "ShaderPack.h"
 #include "ShaderFramebuffers.h"
 #include "ShaderUniforms.h"
 
 class Minecraft;
+
+enum ShaderPipelineMode {
+	SHADER_MODE_OFF = 0,
+	SHADER_MODE_BUILTIN,
+	SHADER_MODE_CUSTOM
+};
 
 enum ShaderStage {
 	STAGE_NONE = 0,
@@ -18,6 +25,7 @@ enum ShaderStage {
 	STAGE_GBUFFERS_ENTITIES,
 	STAGE_GBUFFERS_HAND,
 	STAGE_GBUFFERS_SKYBASIC,
+	STAGE_GBUFFERS_SKYTEXTURED,
 	STAGE_GBUFFERS_CLOUDS,
 	STAGE_GBUFFERS_WEATHER
 };
@@ -37,7 +45,10 @@ public:
 	void endScene();
 
 	bool isEnabled() const;
-	bool loadShaderPack(const std::string& packPath);
+	void setMode(ShaderPipelineMode mode);
+	ShaderPipelineMode getMode() const { return m_mode; }
+
+	bool loadShaderPack(const std::string& packNameOrPath);
 	void reload();
 
 	std::vector<std::string> getAvailablePacks() const;
@@ -45,20 +56,27 @@ public:
 
 private:
 	void setupBuiltInShaders();
+	void updateLightmap(float timeOfDay);
+	void destroyPasses();
 
 	bool m_initialized;
 	bool m_sceneActive;
+	ShaderPipelineMode m_mode;
 	std::string m_currentPack;
 
 	ShaderFramebuffers m_fbo;
 	ShaderUniformValues m_uniforms;
+	unsigned int m_lightmapTexture;
 
-	// Passes
+	// Shader Passes
 	ShaderPass m_passTerrain;
 	ShaderPass m_passWater;
 	ShaderPass m_passEntities;
 	ShaderPass m_passHand;
 	ShaderPass m_passSky;
+	ShaderPass m_passSkyTextured;
+	ShaderPass m_passClouds;
+	ShaderPass m_passWeather;
 	ShaderPass m_passComposite;
 	ShaderPass m_passFinal;
 

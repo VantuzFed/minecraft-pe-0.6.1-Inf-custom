@@ -202,6 +202,7 @@ options.renderDistance.far=Дальняя
 options.viewBobbing=Покачивание вида
 options.ao=Мягкое освещение
 options.shaders=Шейдеры
+options.shaders.folder=Папка с шейдерами
 options.anaglyph=3D анаглиф
 options.framerateLimit=Производительность
 options.limitFramerate=Ограничить FPS

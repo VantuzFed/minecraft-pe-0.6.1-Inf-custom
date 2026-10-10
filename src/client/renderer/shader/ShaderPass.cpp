@@ -1,4 +1,6 @@
 #include "ShaderPass.h"
+#include "ShaderPack.h"
+#include "ShaderPreprocessor.h"
 #include "../gles.h"
 #include <cstdio>
 #include <fstream>
@@ -10,7 +12,7 @@ ShaderPass::ShaderPass()
 {}
 
 ShaderPass::~ShaderPass() {
-	destroy();
+	// Do not delete GL resources in destructor; context is already destroyed at process exit.
 }
 
 void ShaderPass::destroy() {
@@ -19,6 +21,7 @@ void ShaderPass::destroy() {
 		m_program = 0;
 	}
 	m_valid = false;
+	m_name = "";
 }
 
 unsigned int ShaderPass::compileShader(unsigned int type, const char* source) {
@@ -32,10 +35,10 @@ unsigned int ShaderPass::compileShader(unsigned int type, const char* source) {
 	GLint status = 0;
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
 	if (!status) {
-		char log[1024];
+		char log[2048];
 		GLsizei len = 0;
 		glGetShaderInfoLog(shader, sizeof(log), &len, log);
-		printf("[ShaderPass %s] Compilation failed (%s): %s\n",
+		printf("[ShaderPass %s] Compilation failed (%s):\n%s\n",
 		       m_name.c_str(),
 		       (type == GL_VERTEX_SHADER ? "vertex" : "fragment"),
 		       log);
@@ -71,10 +74,10 @@ bool ShaderPass::loadFromSource(const char* vsSrc, const char* fsSrc, const std:
 	GLint linkStatus = 0;
 	glGetProgramiv(m_program, GL_LINK_STATUS, &linkStatus);
 	if (!linkStatus) {
-		char log[1024];
+		char log[2048];
 		GLsizei len = 0;
 		glGetProgramInfoLog(m_program, sizeof(log), &len, log);
-		printf("[ShaderPass %s] Link failed: %s\n", m_name.c_str(), log);
+		printf("[ShaderPass %s] Link failed:\n%s\n", m_name.c_str(), log);
 		destroy();
 		return false;
 	}
@@ -97,6 +100,39 @@ bool ShaderPass::loadFromFiles(const std::string& vsPath, const std::string& fsP
 	std::string fsSrc = readFileContent(fsPath);
 	if (vsSrc.empty() || fsSrc.empty()) return false;
 	return loadFromSource(vsSrc.c_str(), fsSrc.c_str(), vsPath);
+}
+
+bool ShaderPass::loadFromPack(const ShaderPack& pack, const std::string& baseName) {
+	std::string vsFile = baseName + ".vsh";
+	std::string fsFile = baseName + ".fsh";
+
+	if (!pack.hasFile(vsFile) || !pack.hasFile(fsFile)) {
+		return false;
+	}
+
+	std::string vsProcessed, fsProcessed, err;
+	if (!ShaderPreprocessor::process(pack, vsFile, vsProcessed, err)) {
+		printf("[ShaderPass] Preprocess error in %s: %s\n", vsFile.c_str(), err.c_str());
+		return false;
+	}
+
+	if (!ShaderPreprocessor::process(pack, fsFile, fsProcessed, err)) {
+		printf("[ShaderPass] Preprocess error in %s: %s\n", fsFile.c_str(), err.c_str());
+		return false;
+	}
+
+	return loadFromSource(vsProcessed.c_str(), fsProcessed.c_str(), baseName);
+}
+
+bool ShaderPass::loadWithFallback(const ShaderPack& pack, const std::vector<std::string>& candidates) {
+	for (const auto& candidate : candidates) {
+		if (loadFromPack(pack, candidate)) {
+			printf("[ShaderPass] Successfully loaded pass '%s' (for target '%s')\n",
+			       candidate.c_str(), candidates.front().c_str());
+			return true;
+		}
+	}
+	return false;
 }
 
 void ShaderPass::bind(const ShaderUniformValues& vals, bool isCompositeOrFinal) {

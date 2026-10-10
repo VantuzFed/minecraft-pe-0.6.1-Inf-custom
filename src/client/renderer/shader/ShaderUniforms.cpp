@@ -50,6 +50,7 @@ ShaderUniformLocations::ShaderUniformLocations()
 	  u_colortex1(-1),
 	  u_colortex2(-1),
 	  u_depthtex0(-1),
+	  u_gnormal(-1),
 	  u_layer(-1),
 	  u_time(-1),
 	  u_camPos(-1),
@@ -87,6 +88,7 @@ void ShaderUniformLocations::findLocations(unsigned int program) {
 	u_colortex1 = glGetUniformLocation(program, "colortex1");
 	u_colortex2 = glGetUniformLocation(program, "colortex2");
 	u_depthtex0 = glGetUniformLocation(program, "depthtex0");
+	u_gnormal = glGetUniformLocation(program, "gnormal");
 
 	u_layer = glGetUniformLocation(program, "u_layer");
 	u_time = glGetUniformLocation(program, "u_time");
@@ -135,5 +137,6 @@ void ShaderUniformLocations::apply(unsigned int program, const ShaderUniformValu
 		if (u_colortex1 >= 0) glUniform1i(u_colortex1, 1);
 		if (u_colortex2 >= 0) glUniform1i(u_colortex2, 2);
 		if (u_depthtex0 >= 0) glUniform1i(u_depthtex0, 3);
+		if (u_gnormal >= 0) glUniform1i(u_gnormal, 1);
 	}
 }

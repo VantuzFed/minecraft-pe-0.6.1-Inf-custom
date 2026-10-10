@@ -57,6 +57,7 @@
 #include "renderer/culling/AllowAllCuller.h"
 #include "renderer/entity/EntityRenderDispatcher.h"
 #include "renderer/Lighting.h"
+#include "renderer/shader/ShaderPipeline.h"
 #include <sys/stat.h>
 #include <sys/types.h>
 #ifdef _WIN32
@@ -1352,6 +1353,19 @@ void Minecraft::init()
 
 	setIsCreativeMode(false); // false means it's Survival Mode
 	reloadOptions();
+
+#ifndef STANDALONE_SERVER
+	if (options.getBooleanValue(OPTIONS_SHADERS)) {
+		std::string pack = options.getStringValue(OPTIONS_SHADERPACK);
+		if (!pack.empty() && pack != "(OFF)") {
+			g_shaderPipeline.loadShaderPack(pack);
+		} else {
+			g_shaderPipeline.loadShaderPack("Built-in");
+		}
+	} else {
+		g_shaderPipeline.setMode(SHADER_MODE_OFF);
+	}
+#endif
 }
 
 void Minecraft::setSize(int w, int h) {
@@ -1765,10 +1779,23 @@ void Minecraft::optionUpdated(OptionId option, bool value ) {
 		ss->allowIncomingConnections(value);
 	} else if (option == OPTIONS_USE_TOUCHSCREEN) {
 		_reloadInput();
+	} else if (option == OPTIONS_SHADERS) {
+#ifndef STANDALONE_SERVER
+		if (value) {
+			std::string pack = options.getStringValue(OPTIONS_SHADERPACK);
+			if (!pack.empty() && pack != "(OFF)") {
+				g_shaderPipeline.loadShaderPack(pack);
+			} else {
+				g_shaderPipeline.loadShaderPack("Built-in");
+			}
+		} else {
+			g_shaderPipeline.setMode(SHADER_MODE_OFF);
+		}
+#endif
+		if (levelRenderer) levelRenderer->allChanged();
 	} else if (option == OPTIONS_FANCY_GRAPHICS || option == OPTIONS_AMBIENT_OCCLUSION ||
 	           option == OPTIONS_FOLIAGE_TINT || option == OPTIONS_TINTED_SIDE ||
-	           option == OPTIONS_BETA_SKY || option == OPTIONS_BEAUTIFUL_SKY ||
-	           option == OPTIONS_SHADERS) {
+	           option == OPTIONS_BETA_SKY || option == OPTIONS_BEAUTIFUL_SKY) {
 		if (levelRenderer) levelRenderer->allChanged();
 	}
 }

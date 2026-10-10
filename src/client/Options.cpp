@@ -128,6 +128,7 @@ static int detectSystemLanguage() {
 OptionInt languageOpt("language", 1, 0, 1);
 OptionInt fovOpt("fov", 70, 70, 110);
 OptionBool shadersOpt("shaders", false);
+OptionString shaderPackOpt("shaderPack", "Built-in");
 
 void Options::initTable() {
     m_options[OPTIONS_DIFFICULTY] = &difficulty;
@@ -201,6 +202,7 @@ void Options::initTable() {
 	m_options[OPTIONS_LANGUAGE] = &languageOpt;
 	m_options[OPTIONS_FOV] = &fovOpt;
 	m_options[OPTIONS_SHADERS] = &shadersOpt;
+	m_options[OPTIONS_SHADERPACK] = &shaderPackOpt;
 
     m_options[OPTIONS_KEY_FORWARD] = &keyForward;
     m_options[OPTIONS_KEY_LEFT] = &keyLeft;
