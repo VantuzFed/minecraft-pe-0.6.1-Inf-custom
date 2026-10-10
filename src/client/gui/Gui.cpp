@@ -285,20 +285,6 @@ void Gui::getSlotPos(int slot, int& posX, int& posY) {
 		posY = screenHeight - 22;
 }
 
-RectangleArea Gui::getRectangleArea(int extendSide) {
-	const int Spacing = 3;
-	const float pCenterX   = 2.0f + (float)(minecraft->width / 2);
-	const float pHalfWidth = (1.0f + (getNumSlots() * 10 + Spacing)) * Gui::GuiScale;
-	const float pHeight    = (22 + Spacing) * Gui::GuiScale;
-
-	if (extendSide < 0)
-		return RectangleArea(0, (float)minecraft->height-pHeight, pCenterX+pHalfWidth+2, (float)minecraft->height);
-	if (extendSide > 0)
-		return RectangleArea(pCenterX-pHalfWidth, (float)minecraft->height-pHeight, (float)minecraft->width, (float)minecraft->height);
-
-	return RectangleArea(pCenterX-pHalfWidth, (float)minecraft->height-pHeight, pCenterX+pHalfWidth+2, (float)minecraft->height);
-}
-
 void Gui::handleClick(int button, int x, int y) {
 	if (button != MouseAction::ACTION_LEFT)	return;
 

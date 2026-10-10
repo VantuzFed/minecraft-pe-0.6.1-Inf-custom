@@ -2,7 +2,7 @@
 #define _MINECRAFT_INGAMEBLOCKSELECTIONSCREEN_H_
 
 #include "../Screen.h"
-#include "../../player/input/touchscreen/TouchAreaModel.h"
+#include "../RectangleArea.h"
 #include "../components/Button.h"
 
 class IngameBlockSelectionScreen : public Screen

@@ -11,7 +11,7 @@
 #include "../Gui.h"
 #include "../../renderer/Textures.h"
 #include "../../gamemode/GameMode.h"
-#include "ArmorScreen.h"
+#include "BetaInventoryScreen.h"
 #include "crafting/WorkbenchScreen.h"
 #include "../components/Button.h"
 
@@ -344,7 +344,7 @@ int IngameBlockSelectionScreen::getSlotHeight() {
 void IngameBlockSelectionScreen::buttonClicked( Button* button )
 {
 	if (button == &bArmor) {
-		minecraft->setScreen(new ArmorScreen());
+		minecraft->setScreen(new BetaInventoryScreen());
 	}
 	if (button == &bCrafting) {
 		minecraft->setScreen(new WorkbenchScreen(Recipe::SIZE_2X2));

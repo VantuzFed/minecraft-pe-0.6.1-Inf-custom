@@ -2,6 +2,7 @@
 #define NET_MINECRAFT_CLIENT_GUI_COMPONENTS__ImageButton_H__
 
 #include "Button.h"
+#include "../../../platform/input/Mouse.h"
 
 typedef struct IntRectangle {
 	IntRectangle()

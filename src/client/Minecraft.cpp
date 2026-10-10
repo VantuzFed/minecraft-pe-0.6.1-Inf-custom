@@ -30,7 +30,6 @@
 #include "world/level/chunk/ChunkSource.h"
 
 #ifndef STANDALONE_SERVER
-#include "player/input/touchscreen/TouchInputHolder.h"
 #include "particle/ParticleEngine.h"
 #include "gui/Screen.h"
 #include "gui/Font.h"
@@ -42,13 +41,11 @@
 #include "gui/screens/ConsoleScreen.h"
 #include "gui/screens/ChatScreen.h"
 #include "sound/SoundEngine.h"
-#include "player/input/touchscreen/TouchscreenInput.h"
 #include "renderer/Chunk.h"
 #include "gui/screens/PrerenderTilesScreen.h"
 #include "renderer/Textures.h"
 #include "gui/screens/DeathScreen.h"
 #include "gui/screens/FurnaceScreen.h"
-#include "gui/screens/ArmorScreen.h"
 #include "renderer/tileentity/TileEntityRenderDispatcher.h"
 #include "renderer/ptexture/DynamicTexture.h"
 #include "renderer/GameRenderer.h"
@@ -81,6 +78,7 @@ static std::thread s_screenshotThread;
 #include "player/LocalPlayer.h"
 #include "../platform/CThread.h"
 #include "../platform/input/Mouse.h"
+#include "../platform/input/Multitouch.h"
 #include "../AppPlatform.h"
 #include "../LicenseCodes.h"
 #include "../util/PerfTimer.h"
@@ -922,14 +920,6 @@ void Minecraft::tickInput() {
 
 			if (key == Keyboard::KEY_P) // Step forward in time
 				level->setTime( level->getTime() + 1000);
-
-			if (key == Keyboard::KEY_G) {
-				setScreen(new ArmorScreen());
-				/*
-				std::vector<AABB>& boxs = level->getCubes(NULL, AABB(128.1f, 73, 128.1f, 128.9f, 74.9f, 128.9f));
-				LOGI("boxes: %d\n", (int)boxs.size());
-				*/
-			}
 
 			if (key == Keyboard::KEY_Y) {
 				textures->reloadAll();

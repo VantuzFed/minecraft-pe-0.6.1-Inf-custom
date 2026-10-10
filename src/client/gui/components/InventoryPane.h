@@ -3,11 +3,11 @@
 
 #include "ScrollingPane.h"
 #include "ImageButton.h"
+#include "../RectangleArea.h"
 
 class Minecraft;
 class ItemInstance;
 class Font;
-class IArea;
 
 namespace Touch {
 
