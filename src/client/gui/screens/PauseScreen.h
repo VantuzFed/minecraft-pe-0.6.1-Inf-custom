@@ -34,12 +34,6 @@ private:
 	Button* bQuitAndSaveLocally;
 	Button* bServerVisibility;
 	Button* bOptions;
-
-	//	Button* bThirdPerson;
-
-	// OptionButton bSound;
-	OptionButton bThirdPerson;
-    OptionButton bHideGui;
 };
 
 #endif /*NET_MINECRAFT_CLIENT_GUI__PauseScreen_H__*/

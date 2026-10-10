@@ -37,17 +37,10 @@ StartMenuScreen::~StartMenuScreen()
 
 void StartMenuScreen::init()
 {
-	if (minecraft->options.getIntValue(OPTIONS_MENU_STYLE) == 2){
-		bHost = new Button(    2, 0, 0, 200, 20, I18n::get("menu.singleplayer"));
-		bJoin = new Button(    3, 0, 0, 200, 20, I18n::get("menu.multiplayer"));
-		bOptions = new Button( 4, 0, 0, 200, 20, I18n::get("menu.options"));
-		bQuit = new Button( 5, 0, 0, 200, 20, I18n::get("menu.quit"));
-	} else {
-		bHost = new Button(    2, 0, 0, 160, 24, "Start Game");
-		bJoin = new Button(    3, 0, 0, 160, 24, "Join Game");
-		bOptions = new Button( 4, 0, 0, 160, 24, "Options");
-		bQuit = new Button( 5, 0, 0, 160, 24, "Quit Game");
-	}
+	bHost = new Button(    2, 0, 0, 200, 20, I18n::get("menu.singleplayer"));
+	bJoin = new Button(    3, 0, 0, 200, 20, I18n::get("menu.multiplayer"));
+	bOptions = new Button( 4, 0, 0, 200, 20, I18n::get("menu.options"));
+	bQuit = new Button( 5, 0, 0, 200, 20, I18n::get("menu.quit"));
 	bJoin->active = bHost->active = bOptions->active = true;
 
 	if (minecraft->options.getStringValue(OPTIONS_USERNAME).empty()) {
@@ -56,17 +49,13 @@ void StartMenuScreen::init()
 
 	buttons.push_back(bHost);
 	buttons.push_back(bJoin);
-	//buttons.push_back(&bTest);
+	buttons.push_back(bOptions);
 	buttons.push_back(bQuit);
 
 	tabButtons.push_back(bHost);
 	tabButtons.push_back(bJoin);
+	tabButtons.push_back(bOptions);
 	tabButtons.push_back(bQuit);
-
-	#ifndef RPI
-		buttons.push_back(bOptions);
-		tabButtons.push_back(bOptions);
-	#endif
 
     //// add quit button (top right X icon) – match OptionsScreen style
     //{
@@ -107,20 +96,12 @@ void StartMenuScreen::init()
 }
 
 void StartMenuScreen::setupPositions() {
-	if (minecraft->options.getIntValue(OPTIONS_MENU_STYLE) == 2){
-		int yBase = (height / 2) - 20;
+	int yBase = (height / 2) - 20;
 
-		bHost->y =	 yBase;
-		bJoin->y =	 bHost->y + 24;
-		bOptions->y = bJoin->y + 24;
-		bQuit->y = bOptions->y + 24;
-	} else {
-		int yBase = height / 2;
-		bHost->y =	 yBase;
-		bJoin->y =	 bHost->y + 24 + 4;
-		bOptions->y = bJoin->y + 24 + 4;
-		bQuit->y = bOptions->y + 24 + 4;
-	}
+	bHost->y =	 yBase;
+	bJoin->y =	 bHost->y + 24;
+	bOptions->y = bJoin->y + 24;
+	bQuit->y = bOptions->y + 24;
 
 	int btnW = Mth::Min(200, width - 20);
 	if (btnW < 80) btnW = 80;

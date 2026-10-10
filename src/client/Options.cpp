@@ -66,7 +66,7 @@ OptionBool beautifulSky("beautifulSky", true);
 
 OptionBool useVignette("useVignette", true);
 
-OptionBool useTouchscreen("useTouchscreen", true);
+OptionBool useTouchscreen("useTouchscreen", false);
 
 OptionBool serverVisible("servervisible", true);
 
@@ -74,21 +74,21 @@ OptionBool foliageTint("foliagetint", true);
 
 OptionInt fogType("fogType", 0, 0, 2);
 
-OptionBool javaHud("javaHud", false);
+OptionBool javaHud("javaHud", true);
 
 OptionBool betaSky("betaSky", false);
 
 OptionBool tintedSide("tintedSide", false);
 
 // Block outline style: 0 = mobile white highlight, 1 = desktop black border.
-OptionInt blockOutline("blockOutline", 0, 0, 1);
+OptionInt blockOutline("blockOutline", 1, 0, 1);
 
 OptionBool restoredAnims("restoredAnims", true);
 
 OptionInt debugStyle("debugStyle", 0, 0, 1);
 OptionInt logLevel("logLevel", 0, 0, 2);
 
-OptionInt menuStyle("menuStyle",0, 0, 2);
+OptionInt menuStyle("menuStyle", 2, 0, 2);
 
 OptionBool windowScale("windowScale", false);
 

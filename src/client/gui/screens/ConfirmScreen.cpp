@@ -31,13 +31,8 @@ ConfirmScreen::~ConfirmScreen() {
 
 void ConfirmScreen::init()
 {
-	if (/* minecraft->useTouchscreen() */ true) {
-		yesButton = new Touch::TButton(0, 0, 0, yesButtonText),
-		noButton  = new Touch::TButton(1, 0, 0, noButtonText);
-	} else {
-		yesButton = new Button(0, 0, 0, yesButtonText),
-		noButton  = new Button(1, 0, 0, noButtonText);
-	}
+	yesButton = new Button(0, 0, 0, yesButtonText);
+	noButton  = new Button(1, 0, 0, noButtonText);
 
 	buttons.push_back(yesButton);
 	buttons.push_back(noButton);
@@ -47,14 +42,14 @@ void ConfirmScreen::init()
 }
 
 void ConfirmScreen::setupPositions() {
-	const int ButtonWidth = 120;
-	const int ButtonHeight = 24;
+	const int ButtonWidth = Mth::Min(120, (width - 24) / 2);
+	const int ButtonHeight = 20;
+	yesButton->width = noButton->width = ButtonWidth;
+	yesButton->height = noButton->height = ButtonHeight;
 	yesButton->x = width / 2 - ButtonWidth - 4;
 	yesButton->y = height / 6 + 72;
 	noButton->x = width / 2 + 4;
 	noButton->y = height / 6 + 72;
-	yesButton->width = noButton->width = ButtonWidth;
-	yesButton->height = noButton->height = ButtonHeight;
 }
 
 bool ConfirmScreen::handleBackEvent(bool isDown) {

@@ -17,21 +17,17 @@ InBedScreen::~InBedScreen() {
 }
 
 void InBedScreen::init() {
-	if (/* minecraft->useTouchscreen() */ true) {
-		bWakeUp = new Touch::TButton(1, "Leave Bed");
-	} else {
-		bWakeUp = new Button(1, "Leave Bed");
-	}
+	bWakeUp = new Button(1, "Leave Bed");
 	buttons.push_back(bWakeUp);
-
 	tabButtons.push_back(bWakeUp);
 }
 
 void InBedScreen::setupPositions() {
-	bWakeUp->width = width / 2;
-	bWakeUp->height = int(height * 0.2f);
-	bWakeUp->y = height - int(bWakeUp->height * 1.5);
-	bWakeUp->x = width/2 - bWakeUp->width/2;
+	bWakeUp->width = Mth::Min(200, width - 20);
+	bWakeUp->height = 20;
+	bWakeUp->x = (width - bWakeUp->width) / 2;
+	bWakeUp->y = height / 4 + 100;
+	if (bWakeUp->y > height - 30) bWakeUp->y = height - 30;
 }
 
 void InBedScreen::render( int xm, int ym, float a ) {

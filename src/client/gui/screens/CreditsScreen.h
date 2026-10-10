@@ -19,10 +19,10 @@ public:
     virtual void tick();
     void render(int xm, int ym, float a);
     void buttonClicked(Button* button);
+    virtual void keyPressed(int eventKey) override;
     virtual void mouseClicked(int x, int y, int buttonNum);
 private:
-    Touch::THeader* bHeader;
-    ImageButton* btnBack;
+    Button* btnDone;
 
     std::vector<std::string> _lines;
     float _scrollY;

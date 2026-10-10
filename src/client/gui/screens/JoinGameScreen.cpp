@@ -5,8 +5,9 @@
 #include "../../../network/RakNetInstance.h"
 
 JoinGameScreen::JoinGameScreen()
-:	bJoin(  2, "Join Game"),
-	bBack(  3, "Back"),
+:	bJoin(  2, "Join Server"),
+	bDirectConnect( 4, "Direct Connect"),
+	bBack(  3, "Cancel"),
 	gamesList(NULL)
 {
 	bJoin.active = false;
@@ -34,6 +35,11 @@ void JoinGameScreen::buttonClicked(Button* button)
 		}
 		//minecraft->locateMultiplayer();
 		//minecraft->setScreen(new JoinGameScreen());
+	}
+	if (button->id == bDirectConnect.id)
+	{
+		minecraft->cancelLocateMultiplayer();
+		minecraft->screenChooser.setScreen(SCREEN_JOINBYIP);
 	}
 	if (button->id == bBack.id)
 	{
@@ -105,31 +111,39 @@ void JoinGameScreen::tick()
 
 void JoinGameScreen::init()
 {
+	buttons.clear();
+	tabButtons.clear();
+
 	buttons.push_back(&bJoin);
+	buttons.push_back(&bDirectConnect);
 	buttons.push_back(&bBack);
+
+	tabButtons.push_back(&bJoin);
+	tabButtons.push_back(&bDirectConnect);
+	tabButtons.push_back(&bBack);
 
 	minecraft->raknetInstance->clearServerList();
 	gamesList = new AvailableGamesList(minecraft, width, height);
-
-#ifdef ANDROID
-	tabButtons.push_back(&bJoin);
-	tabButtons.push_back(&bBack);
-#endif
 }
 
 void JoinGameScreen::setupPositions() {
 	int yBase = height - 26;
 
-	//#ifdef ANDROID
-	bJoin.y =	yBase;
-	bBack.y =   yBase;
+	int btnW = 100;
+	if (btnW * 3 + 16 > width) {
+		btnW = (width - 16) / 3;
+	}
 
-	bBack.width = bJoin.width = 120;
-	//#endif
+	bJoin.width = bDirectConnect.width = bBack.width = btnW;
+	bJoin.height = bDirectConnect.height = bBack.height = 20;
 
-	// Center buttons
-	bJoin.x = width / 2 - 4 - bJoin.width;
-	bBack.x = width / 2 + 4;
+	bJoin.y = bDirectConnect.y = bBack.y = yBase;
+
+	int totalW = btnW * 3 + 12;
+	int startX = (width - totalW) / 2;
+	bJoin.x = startX;
+	bDirectConnect.x = startX + btnW + 6;
+	bBack.x = startX + (btnW + 6) * 2;
 
 	if (gamesList) {
 		gamesList->setSize(width, height, 0, width, 24, height - 32);

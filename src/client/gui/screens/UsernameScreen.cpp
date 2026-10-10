@@ -39,16 +39,15 @@ void UsernameScreen::setupPositions()
     int cx = width / 2;
     int cy = height / 2;
 
-    // Make the done button match the touch-style option tabs
-    _btnDone.width  = 66;
-    _btnDone.height = 26;
+    _btnDone.width  = 200;
+    _btnDone.height = 20;
     _btnDone.x = cx - (_btnDone.width / 2);
-    _btnDone.y = cy + 52;
+    _btnDone.y = cy + 30;
 
-    tUsername.width = 120;
+    tUsername.width = 200;
     tUsername.height = 20;
-    tUsername.x = (width - tUsername.width) / 2;
-    tUsername.y = _btnDone.y - 60;
+    tUsername.x = cx - (tUsername.width / 2);
+    tUsername.y = cy - 10;
 }
 
 void UsernameScreen::tick()

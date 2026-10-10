@@ -70,7 +70,7 @@ private:
 	Button bDifficulty;
 	Button bGraphics;
 	Button bSmoothLighting;
-	Button bMenuStyle;
+	Button bGuiScale;
 	Button bControls;
 	Button bAutoJump;
 	Button bCreditsBeta;

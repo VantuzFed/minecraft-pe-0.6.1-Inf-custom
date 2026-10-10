@@ -90,9 +90,9 @@ void BetaSlider::released(int mx, int my) {
 void BetaSlider::renderBg(Minecraft* mc, int xm, int ym) {
 	mc->textures->loadAndBindTexture("gui/gui.png");
 	glColor4f2(1, 1, 1, 1);
-	// Normal button background (disabled state, 1)
-	blit(x, y, 0, 46 + 1 * 20, width / 2, height, 0, 20);
-	blit(x + width / 2, y, 200 - width / 2, 46 + 1 * 20, width / 2, height, 0, 20);
+	// Normal button background (disabled state: row 0 at v=46)
+	blit(x, y, 0, 46, width / 2, height, 0, 20);
+	blit(x + width / 2, y, 200 - width / 2, 46, width / 2, height, 0, 20);
 
 	// Slider thumb (8 pixels wide, 20 pixels high)
 	int thumbX = x + (int)(value * (width - 8));

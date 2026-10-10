@@ -1,8 +1,8 @@
+#ifndef NET_MINECRAFT_CLIENT_GUI_SCREENS__JoinByIPScreen_H__
+#define NET_MINECRAFT_CLIENT_GUI_SCREENS__JoinByIPScreen_H__
 
 #include "../Screen.h"
 #include "../components/Button.h"
-#include "../../Minecraft.h"
-#include "../components/ImageButton.h"
 #include "../components/TextBox.h"
 
 class JoinByIPScreen: public Screen
@@ -15,14 +15,15 @@ public:
 	void setupPositions();
 
 	virtual void tick();
-    void render(int xm, int ym, float a);
+	void render(int xm, int ym, float a);
 
 	virtual void keyPressed(int eventKey);
 	void buttonClicked(Button* button);
-    virtual bool handleBackEvent(bool isDown);
+	virtual bool handleBackEvent(bool isDown);
 private:
-    TextBox tIP;
-    Touch::THeader bHeader;
-	Touch::TButton bJoin;
-	ImageButton bBack;
+	TextBox tIP;
+	Button bJoin;
+	Button bBack;
 };
+
+#endif /*NET_MINECRAFT_CLIENT_GUI_SCREENS__JoinByIPScreen_H__*/
