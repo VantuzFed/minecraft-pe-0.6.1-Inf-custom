@@ -12,7 +12,7 @@ public:
 
 	void bindScene();
 	void unbind();
-	void bindComposite();
+	void bindComposite(bool readFromAlt = false);
 	void bindFinal(bool useAltColorAsInput);
 	void bindTexturesForComposite(bool useAltColorAsInput = false);
 	void drawFullscreenQuad();

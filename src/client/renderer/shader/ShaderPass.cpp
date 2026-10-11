@@ -124,14 +124,14 @@ bool ShaderPass::loadFromPack(const ShaderPack& pack, const std::string& baseNam
 				printf("[ShaderPass] Preprocess error in %s: %s\n", vsFile.c_str(), err.c_str());
 				continue;
 			}
-		} else if (baseName.rfind("composite", 0) == 0 || baseName == "final") {
+		} else if (baseName.rfind("composite", 0) == 0 || baseName.rfind("deferred", 0) == 0 || baseName == "final") {
 			// Fallback to default fullscreen quad vertex shader (OptiFine/Iris standard)
 			vsProcessed =
 				"#version 120\n"
 				"varying vec2 v_texCoord;\n"
 				"void main() {\n"
 				"    v_texCoord = gl_MultiTexCoord0.xy;\n"
-				"    gl_Position = vec4(gl_Vertex.xy, 0.0, 1.0);\n"
+				"    gl_Position = vec4(gl_Vertex.xy * 2.0 - 1.0, 0.0, 1.0);\n"
 				"}\n";
 		} else {
 			continue;

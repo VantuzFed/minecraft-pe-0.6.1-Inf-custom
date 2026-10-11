@@ -28,6 +28,10 @@ ShaderUniformValues::ShaderUniformValues()
 	moonDirView[0] = 0.0f; moonDirView[1] = -1.0f; moonDirView[2] = 0.0f;
 	upDirView[0] = 0.0f; upDirView[1] = 1.0f; upDirView[2] = 0.0f;
 	daytime[0] = 0.0f; daytime[1] = 1.0f; daytime[2] = 0.0f; daytime[3] = 0.0f;
+	eyeBrightness[0] = 0; eyeBrightness[1] = 240;
+	eyeBrightnessSmooth[0] = 0.0f; eyeBrightnessSmooth[1] = 240.0f;
+	fogColor[0] = 0.7f; fogColor[1] = 0.7f; fogColor[2] = 0.8f;
+	skyColor[0] = 0.5f; skyColor[1] = 0.7f; skyColor[2] = 1.0f;
 }
 
 ShaderUniformLocations::ShaderUniformLocations()
@@ -89,7 +93,11 @@ ShaderUniformLocations::ShaderUniformLocations()
 	  u_layer(-1),
 	  u_time(-1),
 	  u_camPos(-1),
-	  u_timeOfDay(-1)
+	  u_timeOfDay(-1),
+	  u_sunAngle(-1),
+	  u_shadowLightPosition(-1),
+	  u_fogColor(-1),
+	  u_skyColor(-1)
 {}
 
 void ShaderUniformLocations::findLocations(unsigned int program) {
@@ -159,6 +167,10 @@ void ShaderUniformLocations::findLocations(unsigned int program) {
 	u_time = glGetUniformLocation(program, "u_time");
 	u_camPos = glGetUniformLocation(program, "u_camPos");
 	u_timeOfDay = glGetUniformLocation(program, "u_timeOfDay");
+	u_sunAngle = glGetUniformLocation(program, "sunAngle");
+	u_shadowLightPosition = glGetUniformLocation(program, "shadowLightPosition");
+	u_fogColor = glGetUniformLocation(program, "fogColor");
+	u_skyColor = glGetUniformLocation(program, "skyColor");
 }
 
 void ShaderUniformLocations::apply(unsigned int program, const ShaderUniformValues& vals, bool isCompositeOrFinal) const {
@@ -192,8 +204,18 @@ void ShaderUniformLocations::apply(unsigned int program, const ShaderUniformValu
 	if (u_viewSize >= 0) glUniform2f(u_viewSize, vals.viewWidth, vals.viewHeight);
 	if (u_pixelSize >= 0) glUniform2f(u_pixelSize, (vals.viewWidth > 0 ? 1.0f / vals.viewWidth : 0.0f), (vals.viewHeight > 0 ? 1.0f / vals.viewHeight : 0.0f));
 
-	if (u_eyeBrightness >= 0) glUniform2i(u_eyeBrightness, 240, 240);
-	if (u_eyeBrightnessSmooth >= 0) glUniform2i(u_eyeBrightnessSmooth, 240, 240);
+	if (u_eyeBrightness >= 0) glUniform2i(u_eyeBrightness, vals.eyeBrightness[0], vals.eyeBrightness[1]);
+	if (u_eyeBrightnessSmooth >= 0) glUniform2i(u_eyeBrightnessSmooth, (int)vals.eyeBrightnessSmooth[0], (int)vals.eyeBrightnessSmooth[1]);
+	if (u_fogColor >= 0) glUniform3fv(u_fogColor, 1, vals.fogColor);
+	if (u_skyColor >= 0) glUniform3fv(u_skyColor, 1, vals.skyColor);
+	if (u_sunAngle >= 0) glUniform1f(u_sunAngle, vals.timeOfDay);
+	if (u_shadowLightPosition >= 0) {
+		if (vals.sunDir[1] >= 0.0f) {
+			glUniform3fv(u_shadowLightPosition, 1, vals.sunPosition);
+		} else {
+			glUniform3fv(u_shadowLightPosition, 1, vals.moonPosition);
+		}
+	}
 
 	if (u_sunDir >= 0) glUniform3f(u_sunDir, vals.sunDir[0], vals.sunDir[1], vals.sunDir[2]);
 	if (u_moonDir >= 0) glUniform3f(u_moonDir, vals.moonDir[0], vals.moonDir[1], vals.moonDir[2]);

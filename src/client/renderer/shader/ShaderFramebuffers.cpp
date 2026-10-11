@@ -149,16 +149,16 @@ void ShaderFramebuffers::unbind() {
 	}
 }
 
-void ShaderFramebuffers::bindComposite() {
+void ShaderFramebuffers::bindComposite(bool readFromAlt) {
 	if (!m_ready || !glBindFramebuffer) return;
-	glBindFramebuffer(GL_FRAMEBUFFER, m_altFbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, readFromAlt ? m_mainFbo : m_altFbo);
 	glViewport(0, 0, m_width, m_height);
 
 	GLenum bufs[1] = { GL_COLOR_ATTACHMENT0 };
 	glDrawBuffers(1, bufs);
 
-	// Bind main textures as inputs
-	bindTexturesForComposite(false);
+	// Bind textures as inputs
+	bindTexturesForComposite(readFromAlt);
 }
 
 void ShaderFramebuffers::bindFinal(bool useAltColorAsInput) {
@@ -191,7 +191,7 @@ void ShaderFramebuffers::drawFullscreenQuad() {
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 	glLoadIdentity();
-	glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+	glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
@@ -205,10 +205,10 @@ void ShaderFramebuffers::drawFullscreenQuad() {
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
 	glBegin(GL_QUADS);
-	glTexCoord2f(0.0f, 0.0f); glVertex2f(-1.0f, -1.0f);
-	glTexCoord2f(1.0f, 0.0f); glVertex2f( 1.0f, -1.0f);
-	glTexCoord2f(1.0f, 1.0f); glVertex2f( 1.0f,  1.0f);
-	glTexCoord2f(0.0f, 1.0f); glVertex2f(-1.0f,  1.0f);
+	glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0f, 0.0f);
+	glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0f, 0.0f);
+	glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0f, 1.0f);
+	glTexCoord2f(0.0f, 1.0f); glVertex2f(0.0f, 1.0f);
 	glEnd();
 
 	glDepthMask(GL_TRUE);

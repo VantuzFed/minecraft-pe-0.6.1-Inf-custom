@@ -2,6 +2,7 @@
 #include "../gles.h"
 #include "../../Minecraft.h"
 #include "../../../world/level/Level.h"
+#include "../../../world/level/LightLayer.h"
 #include "../../../world/entity/player/Player.h"
 #include "../../../world/level/material/Material.h"
 #include <cstdio>
@@ -110,7 +111,7 @@ static const char* kBuiltinFinalVS =
 	"varying vec2 v_texCoord;\n"
 	"void main() {\n"
 	"    v_texCoord = gl_MultiTexCoord0.xy;\n"
-	"    gl_Position = vec4(gl_Vertex.xy, 0.0, 1.0);\n"
+	"    gl_Position = vec4(gl_Vertex.xy * 2.0 - 1.0, 0.0, 1.0);\n"
 	"}\n";
 
 // Built-in Final Postprocessing Fragment Shader (Vibrance & Tone Mapping)
@@ -199,6 +200,7 @@ void ShaderPipeline::destroyPasses() {
 	m_passSkyTextured.destroy();
 	m_passClouds.destroy();
 	m_passWeather.destroy();
+	m_passDeferred.destroy();
 	m_passComposite.destroy();
 	m_passFinal.destroy();
 }
@@ -281,20 +283,42 @@ void ShaderPipeline::beginFrame(Minecraft* mc, double partialTicks) {
 	}
 
 	if (mc->level) {
-		m_uniforms.timeOfDay = mc->level->getTimeOfDay(partialTicks);
+		m_uniforms.timeOfDay = mc->level->getTimeOfDay((float)partialTicks);
 		m_uniforms.worldTime = (int)mc->level->getTime();
 		m_uniforms.rainStrength = 0.0f;
 
+		// Query player eye brightness (Iris / OptiFine standard)
+		int blockLight = 0;
+		int skyLight = 15;
+		if (mc->cameraTargetPlayer) {
+			Mob* p = mc->cameraTargetPlayer;
+			int px = (int)std::floor(p->x);
+			int py = (int)std::floor(p->y + p->getHeadHeight());
+			int pz = (int)std::floor(p->z);
+			blockLight = mc->level->getBrightness(LightLayer::Block, px, py, pz);
+			skyLight = mc->level->getBrightness(LightLayer::Sky, px, py, pz);
+		}
+		m_uniforms.eyeBrightness[0] = blockLight * 16;
+		m_uniforms.eyeBrightness[1] = skyLight * 16;
+		m_uniforms.eyeBrightnessSmooth[0] += ((float)m_uniforms.eyeBrightness[0] - m_uniforms.eyeBrightnessSmooth[0]) * 0.15f;
+		m_uniforms.eyeBrightnessSmooth[1] += ((float)m_uniforms.eyeBrightness[1] - m_uniforms.eyeBrightnessSmooth[1]) * 0.15f;
+
+		// Sky & Fog colors
+		Vec3 sc = mc->level->getSkyColor(mc->cameraTargetPlayer, (float)partialTicks);
+		m_uniforms.skyColor[0] = (float)sc.x;
+		m_uniforms.skyColor[1] = (float)sc.y;
+		m_uniforms.skyColor[2] = (float)sc.z;
+
+		Vec3 fc = mc->level->getFogColor((float)partialTicks);
+		m_uniforms.fogColor[0] = (float)fc.x;
+		m_uniforms.fogColor[1] = (float)fc.y;
+		m_uniforms.fogColor[2] = (float)fc.z;
+
+		// Celestial world directions:
+		// In Minecraft: East is +X, Up is +Y, West is -X.
+		// Sun rises in east (+X), noon overhead (+Y), sets in west (-X).
 		float angle = m_uniforms.timeOfDay * 3.14159265f * 2.0f;
-		m_uniforms.sunPosition[0] = std::sin(angle) * 100.0f;
-		m_uniforms.sunPosition[1] = std::cos(angle) * 100.0f;
-		m_uniforms.sunPosition[2] = 0.0f;
-
-		m_uniforms.moonPosition[0] = -m_uniforms.sunPosition[0];
-		m_uniforms.moonPosition[1] = -m_uniforms.sunPosition[1];
-		m_uniforms.moonPosition[2] = 0.0f;
-
-		m_uniforms.sunDir[0] = std::sin(angle);
+		m_uniforms.sunDir[0] = -std::sin(angle);
 		m_uniforms.sunDir[1] = std::cos(angle);
 		m_uniforms.sunDir[2] = 0.0f;
 
@@ -307,27 +331,25 @@ void ShaderPipeline::beginFrame(Minecraft* mc, double partialTicks) {
 		m_uniforms.upDir[2] = 0.0f;
 
 		float sunHeight = m_uniforms.sunDir[1];
-		float dayFactor = std::max(0.0f, std::min(1.0f, sunHeight * 2.0f + 0.5f));
-		float nightFactor = 1.0f - dayFactor;
-		float sunriseFactor = 0.0f;
-		float sunsetFactor = 0.0f;
-
-		if (std::abs(sunHeight) < 0.35f) {
-			float twilight = 1.0f - std::abs(sunHeight) / 0.35f;
+		float dayWeight = std::max(0.0f, std::min(1.0f, sunHeight * 4.0f + 0.5f));
+		float nightWeight = 1.0f - dayWeight;
+		float twilight = std::max(0.0f, 1.0f - std::abs(sunHeight) / 0.25f);
+		float sunriseWeight = 0.0f;
+		float sunsetWeight = 0.0f;
+		if (twilight > 0.0f) {
 			if (m_uniforms.sunDir[0] > 0.0f) {
-				sunriseFactor = twilight;
+				sunriseWeight = twilight;
 			} else {
-				sunsetFactor = twilight;
+				sunsetWeight = twilight;
 			}
 		}
-
-		float noonFactor = std::max(0.0f, dayFactor - (sunriseFactor + sunsetFactor));
-		float sum = sunriseFactor + noonFactor + sunsetFactor + nightFactor;
+		float noonWeight = std::max(0.0f, dayWeight - (sunriseWeight + sunsetWeight));
+		float sum = sunriseWeight + noonWeight + sunsetWeight + nightWeight;
 		if (sum > 0.0001f) {
-			m_uniforms.daytime[0] = sunriseFactor / sum;
-			m_uniforms.daytime[1] = noonFactor / sum;
-			m_uniforms.daytime[2] = sunsetFactor / sum;
-			m_uniforms.daytime[3] = nightFactor / sum;
+			m_uniforms.daytime[0] = sunriseWeight / sum;
+			m_uniforms.daytime[1] = noonWeight / sum;
+			m_uniforms.daytime[2] = sunsetWeight / sum;
+			m_uniforms.daytime[3] = nightWeight / sum;
 		} else {
 			m_uniforms.daytime[0] = 0.0f;
 			m_uniforms.daytime[1] = 1.0f;
@@ -335,7 +357,7 @@ void ShaderPipeline::beginFrame(Minecraft* mc, double partialTicks) {
 			m_uniforms.daytime[3] = 0.0f;
 		}
 
-		if (nightFactor > 0.5f) {
+		if (nightWeight > 0.5f) {
 			m_uniforms.lightDir[0] = m_uniforms.moonDir[0];
 			m_uniforms.lightDir[1] = m_uniforms.moonDir[1];
 			m_uniforms.lightDir[2] = m_uniforms.moonDir[2];
@@ -361,17 +383,43 @@ void ShaderPipeline::updateCameraMatrices() {
 	m_uniforms.gbufferProjection = Matrix4(pr);
 	m_uniforms.gbufferProjectionInverse = m_uniforms.gbufferProjection.inverse();
 
-	m_uniforms.upDirView[0] = mv[1];
-	m_uniforms.upDirView[1] = mv[5];
-	m_uniforms.upDirView[2] = mv[9];
+	// Iris / OptiFine standard: sunPosition, moonPosition, upPosition in VIEW SPACE (transformed by gbufferModelView)
+	float angle = m_uniforms.timeOfDay * 3.14159265f * 2.0f;
+	float worldSun[3] = { -std::sin(angle) * 100.0f, std::cos(angle) * 100.0f, 0.0f };
 
-	m_uniforms.sunDirView[0] = mv[0] * m_uniforms.sunDir[0] + mv[4] * m_uniforms.sunDir[1] + mv[8] * m_uniforms.sunDir[2];
-	m_uniforms.sunDirView[1] = mv[1] * m_uniforms.sunDir[0] + mv[5] * m_uniforms.sunDir[1] + mv[9] * m_uniforms.sunDir[2];
-	m_uniforms.sunDirView[2] = mv[2] * m_uniforms.sunDir[0] + mv[6] * m_uniforms.sunDir[1] + mv[10] * m_uniforms.sunDir[2];
+	m_uniforms.sunPosition[0] = mv[0] * worldSun[0] + mv[4] * worldSun[1] + mv[8] * worldSun[2];
+	m_uniforms.sunPosition[1] = mv[1] * worldSun[0] + mv[5] * worldSun[1] + mv[9] * worldSun[2];
+	m_uniforms.sunPosition[2] = mv[2] * worldSun[0] + mv[6] * worldSun[1] + mv[10] * worldSun[2];
+
+	m_uniforms.moonPosition[0] = -m_uniforms.sunPosition[0];
+	m_uniforms.moonPosition[1] = -m_uniforms.sunPosition[1];
+	m_uniforms.moonPosition[2] = -m_uniforms.sunPosition[2];
+
+	m_uniforms.upPosition[0] = mv[4] * 100.0f;
+	m_uniforms.upPosition[1] = mv[5] * 100.0f;
+	m_uniforms.upPosition[2] = mv[6] * 100.0f;
+
+	float sunLen = std::sqrt(m_uniforms.sunPosition[0]*m_uniforms.sunPosition[0] +
+	                         m_uniforms.sunPosition[1]*m_uniforms.sunPosition[1] +
+	                         m_uniforms.sunPosition[2]*m_uniforms.sunPosition[2]);
+	if (sunLen > 1e-6f) {
+		m_uniforms.sunDirView[0] = m_uniforms.sunPosition[0] / sunLen;
+		m_uniforms.sunDirView[1] = m_uniforms.sunPosition[1] / sunLen;
+		m_uniforms.sunDirView[2] = m_uniforms.sunPosition[2] / sunLen;
+	}
 
 	m_uniforms.moonDirView[0] = -m_uniforms.sunDirView[0];
 	m_uniforms.moonDirView[1] = -m_uniforms.sunDirView[1];
 	m_uniforms.moonDirView[2] = -m_uniforms.sunDirView[2];
+
+	float upLen = std::sqrt(m_uniforms.upPosition[0]*m_uniforms.upPosition[0] +
+	                        m_uniforms.upPosition[1]*m_uniforms.upPosition[1] +
+	                        m_uniforms.upPosition[2]*m_uniforms.upPosition[2]);
+	if (upLen > 1e-6f) {
+		m_uniforms.upDirView[0] = m_uniforms.upPosition[0] / upLen;
+		m_uniforms.upDirView[1] = m_uniforms.upPosition[1] / upLen;
+		m_uniforms.upDirView[2] = m_uniforms.upPosition[2] / upLen;
+	}
 }
 
 void ShaderPipeline::beginScene() {
@@ -387,20 +435,32 @@ void ShaderPipeline::bindPass(ShaderStage stage, int layer) {
 	m_uniforms.currentLayer = layer;
 	m_activeStage = stage;
 
-	// Bind lightmap texture to texture unit 1 and setup texture matrix (1/256 scaling for vanilla shaders)
+	// Bind lightmap texture to texture unit 1 and setup texture matrix matching Iris BuiltinReplacementUniforms
 	if (glActiveTexture && m_lightmapTexture != 0) {
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, m_lightmapTexture);
 		glMatrixMode(GL_TEXTURE);
 		glLoadIdentity();
+		glTranslatef(0.03125f, 0.03125f, 0.0f);
 		glScalef(1.0f / 256.0f, 1.0f / 256.0f, 1.0f);
 		glMatrixMode(GL_MODELVIEW);
 		glActiveTexture(GL_TEXTURE0);
 	}
+
+	float blockCoord = 0.0f;
+	float skyCoord = 240.0f;
+	if (stage == STAGE_GBUFFERS_HAND || stage == STAGE_GBUFFERS_ENTITIES) {
+		blockCoord = (float)m_uniforms.eyeBrightness[0];
+		skyCoord = (float)m_uniforms.eyeBrightness[1];
+	} else if (stage == STAGE_GBUFFERS_TERRAIN || stage == STAGE_GBUFFERS_WATER) {
+		blockCoord = 0.0f;
+		skyCoord = (float)std::max(16, m_uniforms.eyeBrightness[1]);
+	}
+
 	if (glMultiTexCoord2f) {
-		glMultiTexCoord2f(GL_TEXTURE1, 240.0f, 240.0f);
+		glMultiTexCoord2f(GL_TEXTURE1, blockCoord, skyCoord);
 	} else if (glMultiTexCoord2fARB) {
-		glMultiTexCoord2fARB(GL_TEXTURE1, 240.0f, 240.0f);
+		glMultiTexCoord2fARB(GL_TEXTURE1, blockCoord, skyCoord);
 	}
 
 	switch (stage) {
@@ -484,25 +544,34 @@ void ShaderPipeline::endScene() {
 	m_fbo.unbind();
 	m_sceneActive = false;
 
-	bool hadComposite = false;
+	bool currentInAlt = false;
 
-	// 1. Composite Pass (if present, renders to alt FBO)
+	// 1. Deferred Pass (if present)
+	if (m_passDeferred.isValid()) {
+		m_fbo.bindComposite(currentInAlt);
+		m_passDeferred.bind(m_uniforms, true);
+		m_fbo.drawFullscreenQuad();
+		m_passDeferred.unbind();
+		currentInAlt = !currentInAlt;
+	}
+
+	// 2. Composite Pass (if present)
 	if (m_passComposite.isValid()) {
-		m_fbo.bindComposite();
+		m_fbo.bindComposite(currentInAlt);
 		m_passComposite.bind(m_uniforms, true);
 		m_fbo.drawFullscreenQuad();
 		m_passComposite.unbind();
-		hadComposite = true;
+		currentInAlt = !currentInAlt;
 	}
 
-	// 2. Final Pass (renders to screen, sampling either alt FBO or main FBO)
+	// 3. Final Pass (renders to screen, sampling current buffer)
 	if (m_passFinal.isValid()) {
-		m_fbo.bindFinal(hadComposite);
+		m_fbo.bindFinal(currentInAlt);
 		m_passFinal.bind(m_uniforms, true);
 		m_fbo.drawFullscreenQuad();
 		m_passFinal.unbind();
 	} else {
-		m_fbo.blitToScreen(hadComposite);
+		m_fbo.blitToScreen(currentInAlt);
 	}
 
 	if (glActiveTexture) {
@@ -556,6 +625,9 @@ bool ShaderPipeline::loadShaderPack(const std::string& packNameOrPath) {
 		loadedAny = true;
 	}
 	if (m_passWeather.loadWithFallback(pack, { "gbuffers_weather", "gbuffers_textured" })) {
+		loadedAny = true;
+	}
+	if (m_passDeferred.loadWithFallback(pack, { "deferred", "deferred0" })) {
 		loadedAny = true;
 	}
 	if (m_passComposite.loadWithFallback(pack, { "composite", "composite0" })) {

@@ -78,6 +78,7 @@ private:
 	ShaderPass m_passSkyTextured;
 	ShaderPass m_passClouds;
 	ShaderPass m_passWeather;
+	ShaderPass m_passDeferred;
 	ShaderPass m_passComposite;
 	ShaderPass m_passFinal;
 

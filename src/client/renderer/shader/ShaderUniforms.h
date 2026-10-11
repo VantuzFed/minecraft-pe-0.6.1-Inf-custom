@@ -33,6 +33,10 @@ struct ShaderUniformValues {
 	int isEyeInWater;
 	float timeOfDay;
 	int currentLayer;
+	int eyeBrightness[2];
+	float eyeBrightnessSmooth[2];
+	float fogColor[3];
+	float skyColor[3];
 
 	ShaderUniformValues();
 };
@@ -106,6 +110,10 @@ public:
 	int u_time;
 	int u_camPos;
 	int u_timeOfDay;
+	int u_sunAngle;
+	int u_shadowLightPosition;
+	int u_fogColor;
+	int u_skyColor;
 
 	ShaderUniformLocations();
 	void findLocations(unsigned int program);

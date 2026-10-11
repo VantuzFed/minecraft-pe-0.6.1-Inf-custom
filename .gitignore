@@ -5,6 +5,7 @@ bin/
 lib/
 level/
 shaderpacks/*.zip
+iris/
 build-apk/
 android-ndk-*/
 ndk.zip
