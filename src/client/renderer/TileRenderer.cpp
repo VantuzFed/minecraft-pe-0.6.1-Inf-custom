@@ -18,6 +18,17 @@
 #include "../../world/Facing.h"
 #include "tileentity/TileEntityRenderer.h"
 #include "EntityTileRenderer.h"
+#ifndef STANDALONE_SERVER
+#include "shader/ShaderPipeline.h"
+extern ShaderPipeline g_shaderPipeline;
+static inline bool isCustomShadersActive() {
+	return g_shaderPipeline.hasCustomShaders();
+}
+#else
+static inline bool isCustomShadersActive() {
+	return false;
+}
+#endif
 
 bool TileRenderer::sideTinting = false;
 
@@ -27,7 +38,8 @@ TileRenderer::TileRenderer(LevelSource* level /* = NULL */ )
 	xFlipTexture(false),
 	noCulling(false),
 	blsmooth(1),
-	applyAmbienceOcclusion(false)
+	applyAmbienceOcclusion(false),
+	c1a(1.0f), c2a(1.0f), c3a(1.0f), c4a(1.0f)
 {
 }
 
@@ -87,10 +99,15 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 	float b3 = c3 * b;
 
 	float centerBrightness = tt->getBrightness(level, x, y, z);
+	bool customShaders = isCustomShadersActive();
 
 	if (noCulling || tt->shouldRenderFace(level, x, y - 1, z, Facing::DOWN)) {
 		float br = tt->getBrightness(level, x, y - 1, z);
-		t.color(r10 * br, g10 * br, b10 * br);
+		if (customShaders) {
+			t.color(r, g, b, 1.0f);
+		} else {
+			t.color(r10 * br, g10 * br, b10 * br);
+		}
 		renderFaceDown(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 0));
 		changed = true;
 	}
@@ -98,7 +115,11 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 	if (noCulling || tt->shouldRenderFace(level, x, y + 1, z, Facing::UP)) {
 		float br = tt->getBrightness(level, x, y + 1, z);
 		if (tt->yy1 != 1 && !tt->material->isLiquid()) br = centerBrightness;
-		t.color(r11 * br, g11 * br, b11 * br);
+		if (customShaders) {
+			t.color(r11 / c11, g11 / c11, b11 / c11, 1.0f);
+		} else {
+			t.color(r11 * br, g11 * br, b11 * br);
+		}
 		renderFaceUp(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 1));
 		changed = true;
 	}
@@ -106,10 +127,18 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 	if (noCulling || tt->shouldRenderFace(level, x, y, z - 1, Facing::NORTH)) {
 		float br = tt->getBrightness(level, x, y, z - 1);
 		if (tt->zz0 > 0) br = centerBrightness;
-		t.color(r2 * br, g2 * br, b2 * br);
+		if (customShaders) {
+			t.color(r, g, b, 1.0f);
+		} else {
+			t.color(r2 * br, g2 * br, b2 * br);
+		}
 		renderNorth(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 2));
 		if ((tt->getTexture(level, x, y, z, 2) == 3) && sideTinting && (!level || !level->isAlphaWorld())) { // checking if the texture from terrain.png is the normal grass side texture
-			t.color(c2 * br * biomeR, c2 * br * biomeG, c2 * br * biomeB);
+			if (customShaders) {
+				t.color(biomeR, biomeG, biomeB, 1.0f);
+			} else {
+				t.color(c2 * br * biomeR, c2 * br * biomeG, c2 * br * biomeB);
+			}
 			renderNorth(tt, xf, yf, zf, 38); // rendering an extra face over the side of the cube that is a grayscale grass fringe tinted by t.color using biome colors, kinda inefficient
 		}
 		changed = true;
@@ -118,10 +147,18 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 	if (noCulling || tt->shouldRenderFace(level, x, y, z + 1, Facing::SOUTH)) {
 		float br = tt->getBrightness(level, x, y, z + 1);
 		if (tt->zz1 < 1) br = centerBrightness;
-		t.color(r2 * br, g2 * br, b2 * br);
+		if (customShaders) {
+			t.color(r, g, b, 1.0f);
+		} else {
+			t.color(r2 * br, g2 * br, b2 * br);
+		}
 		renderSouth(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 3));
 		if ((tt->getTexture(level, x, y, z, 3) == 3) && sideTinting && (!level || !level->isAlphaWorld())){ // checking if the texture from terrain.png is the normal grass side texture
-			t.color(c2 * br * biomeR, c2 * br * biomeG, c2 * br * biomeB);
+			if (customShaders) {
+				t.color(biomeR, biomeG, biomeB, 1.0f);
+			} else {
+				t.color(c2 * br * biomeR, c2 * br * biomeG, c2 * br * biomeB);
+			}
 			renderSouth(tt, xf, yf, zf, 38); // rendering an extra face over the side of the cube that is a grayscale grass fringe tinted by t.color using biome colors, kinda inefficient
 		}
 		changed = true;
@@ -130,10 +167,18 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 	if (noCulling || tt->shouldRenderFace(level, x - 1, y, z, Facing::WEST)) {
 		float br = tt->getBrightness(level, x - 1, y, z);
 		if (tt->xx0 > 0) br = centerBrightness;
-		t.color(r3 * br, g3 * br, b3 * br);
+		if (customShaders) {
+			t.color(r, g, b, 1.0f);
+		} else {
+			t.color(r3 * br, g3 * br, b3 * br);
+		}
 		renderWest(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 4));
 		if ((tt->getTexture(level, x, y, z, 4) == 3) && sideTinting && (!level || !level->isAlphaWorld())) { // checking if the texture from terrain.png is the normal grass side texture
-			t.color(c2 * br * biomeR, c2 * br * biomeG, c2 * br * biomeB);
+			if (customShaders) {
+				t.color(biomeR, biomeG, biomeB, 1.0f);
+			} else {
+				t.color(c2 * br * biomeR, c2 * br * biomeG, c2 * br * biomeB);
+			}
 			renderWest(tt, xf, yf, zf, 38); // rendering an extra face over the side of the cube that is a grayscale grass fringe tinted by t.color using biome colors, kinda inefficient
 		}
 		changed = true;
@@ -142,10 +187,18 @@ bool TileRenderer::tesselateBlockInWorld( Tile* tt, int x, int y, int z, float r
 	if (noCulling || tt->shouldRenderFace(level, x + 1, y, z, Facing::EAST)) {
 		float br = tt->getBrightness(level, x + 1, y, z);
 		if (tt->xx1 < 1) br = centerBrightness;
-		t.color(r3 * br, g3 * br, b3 * br);
+		if (customShaders) {
+			t.color(r, g, b, 1.0f);
+		} else {
+			t.color(r3 * br, g3 * br, b3 * br);
+		}
 		renderEast(tt, xf, yf, zf, tt->getTexture(level, x, y, z, 5));
 		if ((tt->getTexture(level, x, y, z, 5) == 3) && sideTinting && (!level || !level->isAlphaWorld())) { // checking if the texture from terrain.png is the normal grass side texture
-			t.color(c2 * br * biomeR, c2 * br * biomeG, c2 * br * biomeB);
+			if (customShaders) {
+				t.color(biomeR, biomeG, biomeB, 1.0f);
+			} else {
+				t.color(c2 * br * biomeR, c2 * br * biomeG, c2 * br * biomeB);
+			}
 			renderEast(tt, xf, yf, zf, 38); // rendering an extra face over the side of the cube that is a grayscale grass fringe tinted by t.color using biome colors, kinda inefficient
 		}
 		changed = true;
@@ -225,9 +278,13 @@ bool TileRenderer::tesselateTorchInWorld( Tile* tt, int x, int y, int z )
 
 	Tesselator& t = Tesselator::instance;
 
-	float br = tt->getBrightness(level, x, y, z);
-	if (Tile::lightEmission[tt->id] > 0) br = 1.0f;
-	t.color(br, br, br);
+	if (isCustomShadersActive()) {
+		t.color(1.0f, 1.0f, 1.0f, 1.0f);
+	} else {
+		float br = tt->getBrightness(level, x, y, z);
+		if (Tile::lightEmission[tt->id] > 0) br = 1.0f;
+		t.color(br, br, br);
+	}
 
 	float r = 0.40f;
 	float r2 = 0.5f - r;
@@ -256,8 +313,12 @@ bool TileRenderer::tesselateFireInWorld( Tile* tt, int x, int y, int z )
 
 	if (fixedTexture >= 0) tex = fixedTexture;
 
-	float br = tt->getBrightness( level, x, y, z );
-	t.color( br, br, br );
+	if (isCustomShadersActive()) {
+		t.color( 1.0f, 1.0f, 1.0f, 1.0f );
+	} else {
+		float br = tt->getBrightness( level, x, y, z );
+		t.color( br, br, br );
+	}
 
 	int xt = ((tex & 0xf) << 4);
 	int yt = tex & 0xf0;
@@ -526,8 +587,12 @@ bool TileRenderer::tesselateLadderInWorld( Tile* tt, int x, int y, int z )
 
 	if (fixedTexture >= 0) tex = fixedTexture;
 
-	float br = tt->getBrightness(level, x, y, z);
-	t.color(br, br, br);
+	if (isCustomShadersActive()) {
+		t.color(1.0f, 1.0f, 1.0f, 1.0f);
+	} else {
+		float br = tt->getBrightness(level, x, y, z);
+		t.color(br, br, br);
+	}
 	int xt = ((tex & 0xf) << 4);
 	int yt = tex & 0xf0;
 
@@ -577,7 +642,11 @@ bool TileRenderer::tesselateCrossInWorld( Tile* tt, int x, int y, int z )
 	float r = ((col >> 16) & 0xff) / 255.0f;
 	float g = ((col >> 8) & 0xff) / 255.0f;
 	float b = ((col) & 0xff) / 255.0f;
-	t.color(br * r, br * g, br * b);
+	if (isCustomShadersActive()) {
+		t.color(r, g, b, 1.0f);
+	} else {
+		t.color(br * r, br * g, br * b);
+	}
 
 	float xt = float(x);
 	float yt = float(y);
@@ -614,7 +683,11 @@ bool TileRenderer::tesselateStemInWorld( Tile* _tt, int x, int y, int z ) {
 	float g = ((col >> 8) & 0xff) / 255.0f;
 	float b = ((col) & 0xff) / 255.0f;
 
-	t.color(br * r, br * g, br * b);
+	if (isCustomShadersActive()) {
+		t.color(r, g, b, 1.0f);
+	} else {
+		t.color(br * r, br * g, br * b);
+	}
 
 	tt->updateShape(level, x, y, z);
 	int dir = tt->getConnectDir(level, x, y, z);
@@ -838,6 +911,8 @@ bool TileRenderer::tesselateWaterInWorld( Tile* tt, int x, int y, int z )
 	float h2 = getWaterHeight(x + 1, y, z + 1, m);
 	float h3 = getWaterHeight(x + 1, y, z, m);
 
+	bool customShaders = isCustomShadersActive();
+
 	// renderFaceUp(tt, x, y, z, tt->getTexture(0));
 	if (noCulling || up) {
 		changed = true;
@@ -860,8 +935,13 @@ bool TileRenderer::tesselateWaterInWorld( Tile* tt, int x, int y, int z )
 		float s = (Mth::sin(angle) * 8) / 256.5f; // @attn: to get rid of "jitter" (caused
 		float c = (Mth::cos(angle) * 8) / 256.5f; //  of fp rounding errors) in big oceans)
 
-		float br = tt->getBrightness(level, x, y, z);
-		t.color(c11 * br, c11 * br, c11 * br);
+		t.normal(0.0f, 1.0f, 0.0f);
+		if (customShaders) {
+			t.color(1.0f, 1.0f, 1.0f, 1.0f);
+		} else {
+			float br = tt->getBrightness(level, x, y, z);
+			t.color(c11 * br, c11 * br, c11 * br);
+		}
 		t.vertexUV((float)x + 0, (float)y + h0, (float)z + 0, uc - c - s, vc - c + s);
 		t.vertexUV((float)x + 0, (float)y + h1, (float)z + 1, uc - c + s, vc + c + s);
 		t.vertexUV((float)x + 1, (float)y + h2, (float)z + 1, uc + c + s, vc + c - s);
@@ -869,8 +949,13 @@ bool TileRenderer::tesselateWaterInWorld( Tile* tt, int x, int y, int z )
 	}
 
 	if (noCulling || down) {
-		float br = tt->getBrightness(level, x, y - 1, z);
-		t.color(c10 * br, c10 * br, c10 * br);
+		t.normal(0.0f, -1.0f, 0.0f);
+		if (customShaders) {
+			t.color(1.0f, 1.0f, 1.0f, 1.0f);
+		} else {
+			float br = tt->getBrightness(level, x, y - 1, z);
+			t.color(c10 * br, c10 * br, c10 * br);
+		}
 		renderFaceDown(tt, (float)x, (float)y, (float)z, tt->getTexture(0));
 		changed = true;
 	}
@@ -931,12 +1016,20 @@ bool TileRenderer::tesselateWaterInWorld( Tile* tt, int x, int y, int z )
 			float v02 = (yTex + (1 - hh1) * 16) / 256.0f;
 			float v1 = (yTex + 1 * 16 - 0.01f) / 256.0f;
 
-			float br = tt->getBrightness(level, xt, yt, zt);
-			if (face < 2) br *= c2;
-			else br *= c3;
+			if (face == 0) t.normal(0.0f, 0.0f, -1.0f);
+			else if (face == 1) t.normal(0.0f, 0.0f, 1.0f);
+			else if (face == 2) t.normal(-1.0f, 0.0f, 0.0f);
+			else t.normal(1.0f, 0.0f, 0.0f);
 
 			float yf = (float)y;
-			t.color(c11 * br, c11 * br, c11 * br);
+			if (customShaders) {
+				t.color(1.0f, 1.0f, 1.0f, 1.0f);
+			} else {
+				float br = tt->getBrightness(level, xt, yt, zt);
+				if (face < 2) br *= c2;
+				else br *= c3;
+				t.color(c11 * br, c11 * br, c11 * br);
+			}
 			t.vertexUV(x0, yf + hh0, z0, u0, v01);
 			t.vertexUV(x1, yf + hh1, z1, u1, v02);
 			t.vertexUV(x1, yf + 0, z1, u1, v1);
@@ -1061,6 +1154,8 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 
 	if (tt->tex == 3) tint0 = tint2 = tint3 = tint4 = tint5 = false;
 
+	bool customShaders = isCustomShadersActive();
+
 	if ((noCulling) || (tt->shouldRenderFace(level, pX, pY - 1, pZ, 0))) {
 		if (blsmooth > 0) {
 			pY--;
@@ -1097,21 +1192,22 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 			ll3 = (ll0y0 + ll0yz + llXy0 + llXyz) / 4.0f;
 			ll2 = (llxy0 + llxyz + ll0y0 + ll0yz) / 4.0f;
 		} else ll1 = ll2 = ll3 = ll4 = ll0y0;
-		c1r = c2r = c3r = c4r = (tint0 ? pBaseRed : 1.0f) * 0.5f;
-		c1g = c2g = c3g = c4g = (tint0 ? pBaseGreen : 1.0f) * 0.5f;
-		c1b = c2b = c3b = c4b = (tint0 ? pBaseBlue : 1.0f) * 0.5f;
-		c1r *= ll1;
-		c1g *= ll1;
-		c1b *= ll1;
-		c2r *= ll2;
-		c2g *= ll2;
-		c2b *= ll2;
-		c3r *= ll3;
-		c3g *= ll3;
-		c3b *= ll3;
-		c4r *= ll4;
-		c4g *= ll4;
-		c4b *= ll4;
+
+		if (customShaders) {
+			c1r = c2r = c3r = c4r = (tint0 ? pBaseRed : 1.0f);
+			c1g = c2g = c3g = c4g = (tint0 ? pBaseGreen : 1.0f);
+			c1b = c2b = c3b = c4b = (tint0 ? pBaseBlue : 1.0f);
+			c1a = ll1; c2a = ll2; c3a = ll3; c4a = ll4;
+		} else {
+			c1r = c2r = c3r = c4r = (tint0 ? pBaseRed : 1.0f) * 0.5f;
+			c1g = c2g = c3g = c4g = (tint0 ? pBaseGreen : 1.0f) * 0.5f;
+			c1b = c2b = c3b = c4b = (tint0 ? pBaseBlue : 1.0f) * 0.5f;
+			c1r *= ll1; c1g *= ll1; c1b *= ll1;
+			c2r *= ll2; c2g *= ll2; c2b *= ll2;
+			c3r *= ll3; c3g *= ll3; c3b *= ll3;
+			c4r *= ll4; c4g *= ll4; c4b *= ll4;
+			c1a = c2a = c3a = c4a = 1.0f;
+		}
 
 		renderFaceDown(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 0));
 		i = true;
@@ -1152,21 +1248,22 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 			ll2 = (ll0Y0 + ll0Yz + llXY0 + llXYz) / 4.0f;
 			ll3 = (llxY0 + llxYz + ll0Y0 + ll0Yz) / 4.0f;
 		} else ll1 = ll2 = ll3 = ll4 = ll0Y0;
-		c1r = c2r = c3r = c4r = (tint1 ? pBaseRed : 1.0f);
-		c1g = c2g = c3g = c4g = (tint1 ? pBaseGreen : 1.0f);
-		c1b = c2b = c3b = c4b = (tint1 ? pBaseBlue : 1.0f);
-		c1r *= ll1;
-		c1g *= ll1;
-		c1b *= ll1;
-		c2r *= ll2;
-		c2g *= ll2;
-		c2b *= ll2;
-		c3r *= ll3;
-		c3g *= ll3;
-		c3b *= ll3;
-		c4r *= ll4;
-		c4g *= ll4;
-		c4b *= ll4;
+
+		if (customShaders) {
+			c1r = c2r = c3r = c4r = (tint1 ? pBaseRed : 1.0f);
+			c1g = c2g = c3g = c4g = (tint1 ? pBaseGreen : 1.0f);
+			c1b = c2b = c3b = c4b = (tint1 ? pBaseBlue : 1.0f);
+			c1a = ll1; c2a = ll2; c3a = ll3; c4a = ll4;
+		} else {
+			c1r = c2r = c3r = c4r = (tint1 ? pBaseRed : 1.0f);
+			c1g = c2g = c3g = c4g = (tint1 ? pBaseGreen : 1.0f);
+			c1b = c2b = c3b = c4b = (tint1 ? pBaseBlue : 1.0f);
+			c1r *= ll1; c1g *= ll1; c1b *= ll1;
+			c2r *= ll2; c2g *= ll2; c2b *= ll2;
+			c3r *= ll3; c3g *= ll3; c3b *= ll3;
+			c4r *= ll4; c4g *= ll4; c4b *= ll4;
+			c1a = c2a = c3a = c4a = 1.0f;
+		}
 		renderFaceUp(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 1));
 		i = true;
 	}
@@ -1204,28 +1301,35 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 			ll3 = (ll0yz + ll00z + llXyz + llX0z) / 4.0f;
 			ll4 = (llxyz + llx0z + ll0yz + ll00z) / 4.0f;
 		} else ll1 = ll2 = ll3 = ll4 = ll00z;
-		c1r = c2r = c3r = c4r = (tint2 ? pBaseRed : 1.0f) * 0.8f;
-		c1g = c2g = c3g = c4g = (tint2 ? pBaseGreen : 1.0f) * 0.8f;
-		c1b = c2b = c3b = c4b = (tint2 ? pBaseBlue : 1.0f) * 0.8f;
-		c1r *= ll1;
-		c1g *= ll1;
-		c1b *= ll1;
-		c2r *= ll2;
-		c2g *= ll2;
-		c2b *= ll2;
-		c3r *= ll3;
-		c3g *= ll3;
-		c3b *= ll3;
-		c4r *= ll4;
-		c4g *= ll4;
-		c4b *= ll4;
+
+		if (customShaders) {
+			c1r = c2r = c3r = c4r = (tint2 ? pBaseRed : 1.0f);
+			c1g = c2g = c3g = c4g = (tint2 ? pBaseGreen : 1.0f);
+			c1b = c2b = c3b = c4b = (tint2 ? pBaseBlue : 1.0f);
+			c1a = ll1; c2a = ll2; c3a = ll3; c4a = ll4;
+		} else {
+			c1r = c2r = c3r = c4r = (tint2 ? pBaseRed : 1.0f) * 0.8f;
+			c1g = c2g = c3g = c4g = (tint2 ? pBaseGreen : 1.0f) * 0.8f;
+			c1b = c2b = c3b = c4b = (tint2 ? pBaseBlue : 1.0f) * 0.8f;
+			c1r *= ll1; c1g *= ll1; c1b *= ll1;
+			c2r *= ll2; c2g *= ll2; c2b *= ll2;
+			c3r *= ll3; c3g *= ll3; c3b *= ll3;
+			c4r *= ll4; c4g *= ll4; c4b *= ll4;
+			c1a = c2a = c3a = c4a = 1.0f;
+		}
 		renderNorth(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 2));
 		if (tt->getTexture(level, pX, pY, pZ, 2) == 3 && sideTinting && (!level || !level->isAlphaWorld())) 
 		{
-			c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
-			c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
-			c3r *= pBaseRed; c3g *= pBaseGreen; c3b *= pBaseBlue;
-			c4r *= pBaseRed; c4g *= pBaseGreen; c4b *= pBaseBlue;
+			if (customShaders) {
+				c1r = c2r = c3r = c4r = pBaseRed;
+				c1g = c2g = c3g = c4g = pBaseGreen;
+				c1b = c2b = c3b = c4b = pBaseBlue;
+			} else {
+				c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
+				c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
+				c3r *= pBaseRed; c3g *= pBaseGreen; c3b *= pBaseBlue;
+				c4r *= pBaseRed; c4g *= pBaseGreen; c4b *= pBaseBlue;
+			}
 
 			renderNorth(tt, (float) pX, (float) pY, (float) pZ, 38);
 		}
@@ -1266,28 +1370,35 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 			ll3 = (ll0yZ + ll00Z + llXyZ + llX0Z) / 4.0f;
 			ll2 = (llxyZ + llx0Z + ll0yZ + ll00Z) / 4.0f;
 		} else ll1 = ll2 = ll3 = ll4 = ll00Z;
-		c1r = c2r = c3r = c4r = (tint3 ? pBaseRed : 1.0f) * 0.8f;
-		c1g = c2g = c3g = c4g = (tint3 ? pBaseGreen : 1.0f) * 0.8f;
-		c1b = c2b = c3b = c4b = (tint3 ? pBaseBlue : 1.0f) * 0.8f;
-		c1r *= ll1;
-		c1g *= ll1;
-		c1b *= ll1;
-		c2r *= ll2;
-		c2g *= ll2;
-		c2b *= ll2;
-		c3r *= ll3;
-		c3g *= ll3;
-		c3b *= ll3;
-		c4r *= ll4;
-		c4g *= ll4;
-		c4b *= ll4;
+
+		if (customShaders) {
+			c1r = c2r = c3r = c4r = (tint3 ? pBaseRed : 1.0f);
+			c1g = c2g = c3g = c4g = (tint3 ? pBaseGreen : 1.0f);
+			c1b = c2b = c3b = c4b = (tint3 ? pBaseBlue : 1.0f);
+			c1a = ll1; c2a = ll2; c3a = ll3; c4a = ll4;
+		} else {
+			c1r = c2r = c3r = c4r = (tint3 ? pBaseRed : 1.0f) * 0.8f;
+			c1g = c2g = c3g = c4g = (tint3 ? pBaseGreen : 1.0f) * 0.8f;
+			c1b = c2b = c3b = c4b = (tint3 ? pBaseBlue : 1.0f) * 0.8f;
+			c1r *= ll1; c1g *= ll1; c1b *= ll1;
+			c2r *= ll2; c2g *= ll2; c2b *= ll2;
+			c3r *= ll3; c3g *= ll3; c3b *= ll3;
+			c4r *= ll4; c4g *= ll4; c4b *= ll4;
+			c1a = c2a = c3a = c4a = 1.0f;
+		}
 		renderSouth(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 3));
 		if (tt->getTexture(level, pX, pY, pZ, 3) == 3 && sideTinting && (!level || !level->isAlphaWorld())) 
 		{
-			c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
-			c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
-			c3r *= pBaseRed; c3g *= pBaseGreen; c3b *= pBaseBlue;
-			c4r *= pBaseRed; c4g *= pBaseGreen; c4b *= pBaseBlue;
+			if (customShaders) {
+				c1r = c2r = c3r = c4r = pBaseRed;
+				c1g = c2g = c3g = c4g = pBaseGreen;
+				c1b = c2b = c3b = c4b = pBaseBlue;
+			} else {
+				c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
+				c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
+				c3r *= pBaseRed; c3g *= pBaseGreen; c3b *= pBaseBlue;
+				c4r *= pBaseRed; c4g *= pBaseGreen; c4b *= pBaseBlue;
+			}
 
 			renderSouth(tt, (float) pX, (float) pY, (float) pZ, 38);
 		}
@@ -1309,7 +1420,7 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 			if (llTransx0Z || llTransxy0) {
 				llxyZ = tt->getBrightness(level, pX, pY - 1, pZ + 1);
 			} else {
-				llxyZ = llx0Z;
+				llxyZ = llx0z;
 			}
 			if (llTransx0z || llTransxY0) {
 				llxYz = tt->getBrightness(level, pX, pY + 1, pZ - 1);
@@ -1327,28 +1438,35 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 			ll2 = (llx0z + llx00 + llxYz + llxY0) / 4.0f;
 			ll3 = (llxyz + llxy0 + llx0z + llx00) / 4.0f;
 		} else ll1 = ll2 = ll3 = ll4 = llx00;
-		c1r = c2r = c3r = c4r = (tint4 ? pBaseRed : 1.0f) * 0.6f;
-		c1g = c2g = c3g = c4g = (tint4 ? pBaseGreen : 1.0f) * 0.6f;
-		c1b = c2b = c3b = c4b = (tint4 ? pBaseBlue : 1.0f) * 0.6f;
-		c1r *= ll1;
-		c1g *= ll1;
-		c1b *= ll1;
-		c2r *= ll2;
-		c2g *= ll2;
-		c2b *= ll2;
-		c3r *= ll3;
-		c3g *= ll3;
-		c3b *= ll3;
-		c4r *= ll4;
-		c4g *= ll4;
-		c4b *= ll4;
+
+		if (customShaders) {
+			c1r = c2r = c3r = c4r = (tint4 ? pBaseRed : 1.0f);
+			c1g = c2g = c3g = c4g = (tint4 ? pBaseGreen : 1.0f);
+			c1b = c2b = c3b = c4b = (tint4 ? pBaseBlue : 1.0f);
+			c1a = ll1; c2a = ll2; c3a = ll3; c4a = ll4;
+		} else {
+			c1r = c2r = c3r = c4r = (tint4 ? pBaseRed : 1.0f) * 0.6f;
+			c1g = c2g = c3g = c4g = (tint4 ? pBaseGreen : 1.0f) * 0.6f;
+			c1b = c2b = c3b = c4b = (tint4 ? pBaseBlue : 1.0f) * 0.6f;
+			c1r *= ll1; c1g *= ll1; c1b *= ll1;
+			c2r *= ll2; c2g *= ll2; c2b *= ll2;
+			c3r *= ll3; c3g *= ll3; c3b *= ll3;
+			c4r *= ll4; c4g *= ll4; c4b *= ll4;
+			c1a = c2a = c3a = c4a = 1.0f;
+		}
 		renderWest(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 4));
 		if (tt->getTexture(level, pX, pY, pZ, 4) == 3 && sideTinting && (!level || !level->isAlphaWorld())) 
 		{
-			c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
-			c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
-			c3r *= pBaseRed; c3g *= pBaseGreen; c3b *= pBaseBlue;
-			c4r *= pBaseRed; c4g *= pBaseGreen; c4b *= pBaseBlue;
+			if (customShaders) {
+				c1r = c2r = c3r = c4r = pBaseRed;
+				c1g = c2g = c3g = c4g = pBaseGreen;
+				c1b = c2b = c3b = c4b = pBaseBlue;
+			} else {
+				c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
+				c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
+				c3r *= pBaseRed; c3g *= pBaseGreen; c3b *= pBaseBlue;
+				c4r *= pBaseRed; c4g *= pBaseGreen; c4b *= pBaseBlue;
+			}
 
 			renderWest(tt, (float) pX, (float) pY, (float) pZ, 38);
 		}
@@ -1388,29 +1506,36 @@ bool TileRenderer::tesselateBlockInWorldWithAmbienceOcclusion( Tile* tt, int pX,
 			ll3 = (llX0z + llX00 + llXYz + llXY0) / 4.0f;
 			ll2 = (llXyz + llXy0 + llX0z + llX00) / 4.0f;
 		} else ll1 = ll2 = ll3 = ll4 = llX00;
-		c1r = c2r = c3r = c4r = (tint5 ? pBaseRed : 1.0f) * 0.6f;
-		c1g = c2g = c3g = c4g = (tint5 ? pBaseGreen : 1.0f) * 0.6f;
-		c1b = c2b = c3b = c4b = (tint5 ? pBaseBlue : 1.0f) * 0.6f;
-		c1r *= ll1;
-		c1g *= ll1;
-		c1b *= ll1;
-		c2r *= ll2;
-		c2g *= ll2;
-		c2b *= ll2;
-		c3r *= ll3;
-		c3g *= ll3;
-		c3b *= ll3;
-		c4r *= ll4;
-		c4g *= ll4;
-		c4b *= ll4;
+
+		if (customShaders) {
+			c1r = c2r = c3r = c4r = (tint5 ? pBaseRed : 1.0f);
+			c1g = c2g = c3g = c4g = (tint5 ? pBaseGreen : 1.0f);
+			c1b = c2b = c3b = c4b = (tint5 ? pBaseBlue : 1.0f);
+			c1a = ll1; c2a = ll2; c3a = ll3; c4a = ll4;
+		} else {
+			c1r = c2r = c3r = c4r = (tint5 ? pBaseRed : 1.0f) * 0.6f;
+			c1g = c2g = c3g = c4g = (tint5 ? pBaseGreen : 1.0f) * 0.6f;
+			c1b = c2b = c3b = c4b = (tint5 ? pBaseBlue : 1.0f) * 0.6f;
+			c1r *= ll1; c1g *= ll1; c1b *= ll1;
+			c2r *= ll2; c2g *= ll2; c2b *= ll2;
+			c3r *= ll3; c3g *= ll3; c3b *= ll3;
+			c4r *= ll4; c4g *= ll4; c4b *= ll4;
+			c1a = c2a = c3a = c4a = 1.0f;
+		}
 
 		renderEast(tt, (float) pX, (float) pY, (float) pZ, tt->getTexture(level, pX, pY, pZ, 5));
 		if (tt->getTexture(level, pX, pY, pZ, 5) == 3 && sideTinting && (!level || !level->isAlphaWorld())) 
 		{
-			c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
-			c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
-			c3r *= pBaseRed; c3g *= pBaseGreen; c3b *= pBaseBlue;
-			c4r *= pBaseRed; c4g *= pBaseGreen; c4b *= pBaseBlue;
+			if (customShaders) {
+				c1r = c2r = c3r = c4r = pBaseRed;
+				c1g = c2g = c3g = c4g = pBaseGreen;
+				c1b = c2b = c3b = c4b = pBaseBlue;
+			} else {
+				c1r *= pBaseRed; c1g *= pBaseGreen; c1b *= pBaseBlue;
+				c2r *= pBaseRed; c2g *= pBaseGreen; c2b *= pBaseBlue;
+				c3r *= pBaseRed; c3g *= pBaseGreen; c3b *= pBaseBlue;
+				c4r *= pBaseRed; c4g *= pBaseGreen; c4b *= pBaseBlue;
+			}
 
 			renderEast(tt, (float) pX, (float) pY, (float) pZ, 38);
 		}
@@ -1432,6 +1557,7 @@ bool TileRenderer::tesselateCactusInWorld(Tile* tt, int x, int y, int z, float r
 	Tesselator& t = Tesselator::instance;
 
 	bool changed = false;
+	bool customShaders = isCustomShadersActive();
 	float c10 = 0.5f;
 	float c11 = 1;
 	float c2 = 0.8f;
@@ -1461,9 +1587,11 @@ bool TileRenderer::tesselateCactusInWorld(Tile* tt, int x, int y, int z, float r
 
 	if (noCulling || tt->shouldRenderFace(level, x, y - 1, z, 0)) {
 		float br = tt->getBrightness(level, x, y - 1, z);
-		// if (Tile::lightEmission[tt->id] > br*Level.MAX_BRIGHTNESS) br =
-		// Tile::lightEmission[tt->id]/Level.MAX_BRIGHTNESS;
-		t.color(r10 * br, g10 * br, b10 * br);
+		if (customShaders) {
+			t.color(r, g, b, 1.0f);
+		} else {
+			t.color(r10 * br, g10 * br, b10 * br);
+		}
 		renderFaceDown(tt, X, Y, Z, tt->getTexture(level, x, y, z, 0));
 		changed = true;
 	}
@@ -1471,9 +1599,11 @@ bool TileRenderer::tesselateCactusInWorld(Tile* tt, int x, int y, int z, float r
 	if (noCulling || tt->shouldRenderFace(level, x, y + 1, z, 1)) {
 		float br = tt->getBrightness(level, x, y + 1, z);
 		if (tt->yy1 != 1 && !tt->material->isLiquid()) br = centerBrightness;
-		// if (Tile::lightEmission[tt->id] > br*Level.MAX_BRIGHTNESS) br =
-		// Tile::lightEmission[tt->id]/Level.MAX_BRIGHTNESS;
-		t.color(r11 * br, g11 * br, b11 * br);
+		if (customShaders) {
+			t.color(r, g, b, 1.0f);
+		} else {
+			t.color(r11 * br, g11 * br, b11 * br);
+		}
 		renderFaceUp(tt, X, Y, Z, tt->getTexture(level, x, y, z, 1));
 		changed = true;
 	}
@@ -1481,9 +1611,11 @@ bool TileRenderer::tesselateCactusInWorld(Tile* tt, int x, int y, int z, float r
 	if (noCulling || tt->shouldRenderFace(level, x, y, z - 1, 2)) {
 		float br = tt->getBrightness(level, x, y, z - 1);
 		if (tt->zz0 > 0) br = centerBrightness;
-		// if (Tile::lightEmission[tt->id] > br*Level.MAX_BRIGHTNESS) br =
-		// Tile::lightEmission[tt->id]/Level.MAX_BRIGHTNESS;
-		t.color(r2 * br, g2 * br, b2 * br);
+		if (customShaders) {
+			t.color(r, g, b, 1.0f);
+		} else {
+			t.color(r2 * br, g2 * br, b2 * br);
+		}
 		t.addOffset(0, 0, s);
 		renderNorth(tt, X, Y, Z, tt->getTexture(level, x, y, z, 2));
 		t.addOffset(0, 0, -s);
@@ -1493,9 +1625,11 @@ bool TileRenderer::tesselateCactusInWorld(Tile* tt, int x, int y, int z, float r
 	if (noCulling || tt->shouldRenderFace(level, x, y, z + 1, 3)) {
 		float br = tt->getBrightness(level, x, y, z + 1);
 		if (tt->zz1 < 1) br = centerBrightness;
-		// if (Tile::lightEmission[tt->id] > br*Level.MAX_BRIGHTNESS) br =
-		// Tile::lightEmission[tt->id]/Level.MAX_BRIGHTNESS;
-		t.color(r2 * br, g2 * br, b2 * br);
+		if (customShaders) {
+			t.color(r, g, b, 1.0f);
+		} else {
+			t.color(r2 * br, g2 * br, b2 * br);
+		}
 		t.addOffset(0, 0, -s);
 		renderSouth(tt, X, Y, Z, tt->getTexture(level, x, y, z, 3));
 		t.addOffset(0, 0, s);
@@ -1505,9 +1639,11 @@ bool TileRenderer::tesselateCactusInWorld(Tile* tt, int x, int y, int z, float r
 	if (noCulling || tt->shouldRenderFace(level, x - 1, y, z, 4)) {
 		float br = tt->getBrightness(level, x - 1, y, z);
 		if (tt->xx0 > 0) br = centerBrightness;
-		// if (Tile::lightEmission[tt->id] > br*Level.MAX_BRIGHTNESS) br =
-		// Tile::lightEmission[tt->id]/Level.MAX_BRIGHTNESS;
-		t.color(r3 * br, g3 * br, b3 * br);
+		if (customShaders) {
+			t.color(r, g, b, 1.0f);
+		} else {
+			t.color(r3 * br, g3 * br, b3 * br);
+		}
 		t.addOffset(s, 0, 0);
 		renderWest(tt, X, Y, Z, tt->getTexture(level, x, y, z, 4));
 		t.addOffset(-s, 0, 0);
@@ -1517,9 +1653,11 @@ bool TileRenderer::tesselateCactusInWorld(Tile* tt, int x, int y, int z, float r
 	if (noCulling || tt->shouldRenderFace(level, x + 1, y, z, 5)) {
 		float br = tt->getBrightness(level, x + 1, y, z);
 		if (tt->xx1 < 1) br = centerBrightness;
-		// if (Tile::lightEmission[tt->id] > br*Level.MAX_BRIGHTNESS) br =
-		// Tile::lightEmission[tt->id]/Level.MAX_BRIGHTNESS;
-		t.color(r3 * br, g3 * br, b3 * br);
+		if (customShaders) {
+			t.color(r, g, b, 1.0f);
+		} else {
+			t.color(r3 * br, g3 * br, b3 * br);
+		}
 		t.addOffset(-s, 0, 0);
 		renderEast(tt, X, Y, Z, tt->getTexture(level, x, y, z, 5));
 		t.addOffset(s, 0, 0);
@@ -1979,6 +2117,7 @@ bool TileRenderer::tesselateDoorInWorld( Tile* tt, int x, int y, int z )
 	DoorTile* dt = (DoorTile*) tt;
 
 	bool changed = false;
+	bool customShaders = isCustomShadersActive();
 	float c10 = 0.5f;
 	float c11 = 1;
 	float c2 = 0.8f;
@@ -1990,7 +2129,8 @@ bool TileRenderer::tesselateDoorInWorld( Tile* tt, int x, int y, int z )
 		float br = tt->getBrightness(level, x, y - 1, z);
 		if (dt->yy0 > 0) br = centerBrightness;
 		if (Tile::lightEmission[tt->id] > 0) br = 1.0f;
-		t.color(c10 * br, c10 * br, c10 * br);
+		if (customShaders) t.color(1.0f, 1.0f, 1.0f, 1.0f);
+		else t.color(c10 * br, c10 * br, c10 * br);
 		renderFaceDown(tt, (float)x, (float)y, (float)z, tt->getTexture(level, x, y, z, 0));
 		changed = true;
 	}
@@ -1999,7 +2139,8 @@ bool TileRenderer::tesselateDoorInWorld( Tile* tt, int x, int y, int z )
 		float br = tt->getBrightness(level, x, y + 1, z);
 		if (dt->yy1 < 1) br = centerBrightness;
 		if (Tile::lightEmission[tt->id] > 0) br = 1.0f;
-		t.color(c11 * br, c11 * br, c11 * br);
+		if (customShaders) t.color(1.0f, 1.0f, 1.0f, 1.0f);
+		else t.color(c11 * br, c11 * br, c11 * br);
 		renderFaceUp(tt, (float)x, (float)y, (float)z, tt->getTexture(level, x, y, z, 1));
 		changed = true;
 	}
@@ -2008,7 +2149,8 @@ bool TileRenderer::tesselateDoorInWorld( Tile* tt, int x, int y, int z )
 		float br = tt->getBrightness(level, x, y, z - 1);
 		if (dt->zz0 > 0) br = centerBrightness;
 		if (Tile::lightEmission[tt->id] > 0) br = 1.0f;
-		t.color(c2 * br, c2 * br, c2 * br);
+		if (customShaders) t.color(1.0f, 1.0f, 1.0f, 1.0f);
+		else t.color(c2 * br, c2 * br, c2 * br);
 		int tex = tt->getTexture(level, x, y, z, 2);
 		if (tex < 0) {
 			xFlipTexture = true;
@@ -2023,7 +2165,8 @@ bool TileRenderer::tesselateDoorInWorld( Tile* tt, int x, int y, int z )
 		float br = tt->getBrightness(level, x, y, z + 1);
 		if (dt->zz1 < 1) br = centerBrightness;
 		if (Tile::lightEmission[tt->id] > 0) br = 1.0f;
-		t.color(c2 * br, c2 * br, c2 * br);
+		if (customShaders) t.color(1.0f, 1.0f, 1.0f, 1.0f);
+		else t.color(c2 * br, c2 * br, c2 * br);
 		int tex = tt->getTexture(level, x, y, z, 3);
 		if (tex < 0) {
 			xFlipTexture = true;
@@ -2038,7 +2181,8 @@ bool TileRenderer::tesselateDoorInWorld( Tile* tt, int x, int y, int z )
 		float br = tt->getBrightness(level, x - 1, y, z);
 		if (dt->xx0 > 0) br = centerBrightness;
 		if (Tile::lightEmission[tt->id] > 0) br = 1.0f;
-		t.color(c3 * br, c3 * br, c3 * br);
+		if (customShaders) t.color(1.0f, 1.0f, 1.0f, 1.0f);
+		else t.color(c3 * br, c3 * br, c3 * br);
 		int tex = tt->getTexture(level, x, y, z, 4);
 		if (tex < 0) {
 			xFlipTexture = true;
@@ -2053,7 +2197,8 @@ bool TileRenderer::tesselateDoorInWorld( Tile* tt, int x, int y, int z )
 		float br = tt->getBrightness(level, x + 1, y, z);
 		if (dt->xx1 < 1) br = centerBrightness;
 		if (Tile::lightEmission[tt->id] > 0) br = 1.0f;
-		t.color(c3 * br, c3 * br, c3 * br);
+		if (customShaders) t.color(1.0f, 1.0f, 1.0f, 1.0f);
+		else t.color(c3 * br, c3 * br, c3 * br);
 		int tex = tt->getTexture(level, x, y, z, 5);
 		if (tex < 0) {
 			xFlipTexture = true;
@@ -2069,8 +2214,12 @@ bool TileRenderer::tesselateDoorInWorld( Tile* tt, int x, int y, int z )
 
 bool TileRenderer::tesselateRowInWorld( Tile* tt, int x, int y, int z ) {
 	Tesselator& t = Tesselator::instance;
-	float br = tt->getBrightness(level, x, y, z);
-	t.color(br, br, br);
+	if (isCustomShadersActive()) {
+		t.color(1.0f, 1.0f, 1.0f, 1.0f);
+	} else {
+		float br = tt->getBrightness(level, x, y, z);
+		t.color(br, br, br);
+	}
 	tesselateRowTexture(tt, level->getData(x, y, z), float(x), y - 1 / 16.0f, float(z));
 	return true;
 }
@@ -2078,6 +2227,7 @@ bool TileRenderer::tesselateRowInWorld( Tile* tt, int x, int y, int z ) {
 void TileRenderer::renderFaceDown( Tile* tt, double x, double y, double z, int tex )
 {
 	Tesselator& t = Tesselator::instance;
+	t.normal(0.0f, -1.0f, 0.0f);
 
 	if (fixedTexture >= 0) tex = fixedTexture;
 	int xt = (tex & 0xf) << 4;
@@ -2104,13 +2254,13 @@ void TileRenderer::renderFaceDown( Tile* tt, double x, double y, double z, int t
 	double z1 = z + tt->zz1;
 
 	if (applyAmbienceOcclusion) {
-		t.color(c1r, c1g, c1b);
+		t.color(c1r, c1g, c1b, c1a);
 		t.vertexUV(x0, y0, z1, u0, v1);
-		t.color(c2r, c2g, c2b);
+		t.color(c2r, c2g, c2b, c2a);
 		t.vertexUV(x0, y0, z0, u0, v0);
-		t.color(c3r, c3g, c3b);
+		t.color(c3r, c3g, c3b, c3a);
 		t.vertexUV(x1, y0, z0, u1, v0);
-		t.color(c4r, c4g, c4b);
+		t.color(c4r, c4g, c4b, c4a);
 		t.vertexUV(x1, y0, z1, u1, v1);
 	} else {
 		t.vertexUV(x0, y0, z1, u0, v1);
@@ -2123,6 +2273,7 @@ void TileRenderer::renderFaceDown( Tile* tt, double x, double y, double z, int t
 void TileRenderer::renderFaceUp( Tile* tt, double x, double y, double z, int tex )
 {
 	Tesselator& t = Tesselator::instance;
+	t.normal(0.0f, 1.0f, 0.0f);
 
 	if (fixedTexture >= 0) tex = fixedTexture;
 	int xt = (tex & 0xf) << 4;
@@ -2149,13 +2300,13 @@ void TileRenderer::renderFaceUp( Tile* tt, double x, double y, double z, int tex
 	double z1 = z + tt->zz1;
 
 	if (applyAmbienceOcclusion) {
-		t.color(c1r, c1g, c1b);
+		t.color(c1r, c1g, c1b, c1a);
 		t.vertexUV(x1, y1, z1, u1, v1);
-		t.color(c2r, c2g, c2b);
+		t.color(c2r, c2g, c2b, c2a);
 		t.vertexUV(x1, y1, z0, u1, v0);
-		t.color(c3r, c3g, c3b);
+		t.color(c3r, c3g, c3b, c3a);
 		t.vertexUV(x0, y1, z0, u0, v0);
-		t.color(c4r, c4g, c4b);
+		t.color(c4r, c4g, c4b, c4a);
 		t.vertexUV(x0, y1, z1, u0, v1);
 	} else {
 		t.vertexUV(x1, y1, z1, u1, v1);
@@ -2168,6 +2319,7 @@ void TileRenderer::renderFaceUp( Tile* tt, double x, double y, double z, int tex
 void TileRenderer::renderNorth( Tile* tt, double x, double y, double z, int tex )
 {
 	Tesselator& t = Tesselator::instance;
+	t.normal(0.0f, 0.0f, -1.0f);
 
 	if (fixedTexture >= 0) tex = fixedTexture;
 	int xt = (tex & 0xf) << 4;
@@ -2198,13 +2350,13 @@ void TileRenderer::renderNorth( Tile* tt, double x, double y, double z, int tex 
 	double z0 = z + tt->zz0;
 
 	if (applyAmbienceOcclusion) {
-		t.color(c1r, c1g, c1b);
+		t.color(c1r, c1g, c1b, c1a);
 		t.vertexUV(x0, y1, z0, u1, v0);
-		t.color(c2r, c2g, c2b);
+		t.color(c2r, c2g, c2b, c2a);
 		t.vertexUV(x1, y1, z0, u0, v0);
-		t.color(c3r, c3g, c3b);
+		t.color(c3r, c3g, c3b, c3a);
 		t.vertexUV(x1, y0, z0, u0, v1);
-		t.color(c4r, c4g, c4b);
+		t.color(c4r, c4g, c4b, c4a);
 		t.vertexUV(x0, y0, z0, u1, v1);
 	} else {
 		t.vertexUV(x0, y1, z0, u1, v0);
@@ -2217,6 +2369,7 @@ void TileRenderer::renderNorth( Tile* tt, double x, double y, double z, int tex 
 void TileRenderer::renderSouth( Tile* tt, double x, double y, double z, int tex )
 {
 	Tesselator& t = Tesselator::instance;
+	t.normal(0.0f, 0.0f, 1.0f);
 
 	if (fixedTexture >= 0) tex = fixedTexture;
 	int xt = (tex & 0xf) << 4;
@@ -2248,13 +2401,13 @@ void TileRenderer::renderSouth( Tile* tt, double x, double y, double z, int tex 
 	double z1 = z + tt->zz1;
 
 	if (applyAmbienceOcclusion) {
-		t.color(c1r, c1g, c1b);
+		t.color(c1r, c1g, c1b, c1a);
 		t.vertexUV(x0, y1, z1, u0, v0);
-		t.color(c2r, c2g, c2b);
+		t.color(c2r, c2g, c2b, c2a);
 		t.vertexUV(x0, y0, z1, u0, v1);
-		t.color(c3r, c3g, c3b);
+		t.color(c3r, c3g, c3b, c3a);
 		t.vertexUV(x1, y0, z1, u1, v1);
-		t.color(c4r, c4g, c4b);
+		t.color(c4r, c4g, c4b, c4a);
 		t.vertexUV(x1, y1, z1, u1, v0);
 	} else {
 		t.vertexUV(x0, y1, z1, u0, v0);
@@ -2267,6 +2420,7 @@ void TileRenderer::renderSouth( Tile* tt, double x, double y, double z, int tex 
 void TileRenderer::renderWest( Tile* tt, double x, double y, double z, int tex )
 {
 	Tesselator& t = Tesselator::instance;
+	t.normal(-1.0f, 0.0f, 0.0f);
 
 	if (fixedTexture >= 0) tex = fixedTexture;
 	int xt = (tex & 0xf) << 4;
@@ -2298,13 +2452,13 @@ void TileRenderer::renderWest( Tile* tt, double x, double y, double z, int tex )
 	double z1 = z + tt->zz1;
 
 	if (applyAmbienceOcclusion) {
-		t.color(c1r, c1g, c1b);
+		t.color(c1r, c1g, c1b, c1a);
 		t.vertexUV(x0, y1, z1, u1, v0);
-		t.color(c2r, c2g, c2b);
+		t.color(c2r, c2g, c2b, c2a);
 		t.vertexUV(x0, y1, z0, u0, v0);
-		t.color(c3r, c3g, c3b);
+		t.color(c3r, c3g, c3b, c3a);
 		t.vertexUV(x0, y0, z0, u0, v1);
-		t.color(c4r, c4g, c4b);
+		t.color(c4r, c4g, c4b, c4a);
 		t.vertexUV(x0, y0, z1, u1, v1);
 	} else {
 		t.vertexUV(x0, y1, z1, u1, v0);
@@ -2317,6 +2471,7 @@ void TileRenderer::renderWest( Tile* tt, double x, double y, double z, int tex )
 void TileRenderer::renderEast( Tile* tt, double x, double y, double z, int tex )
 {
 	Tesselator& t = Tesselator::instance;
+	t.normal(1.0f, 0.0f, 0.0f);
 
 	if (fixedTexture >= 0) tex = fixedTexture;
 	int xt = (tex & 0xf) << 4;
@@ -2348,13 +2503,13 @@ void TileRenderer::renderEast( Tile* tt, double x, double y, double z, int tex )
 	double z1 = z + tt->zz1;
 
 	if (applyAmbienceOcclusion) {
-		t.color(c1r, c1g, c1b);
+		t.color(c1r, c1g, c1b, c1a);
 		t.vertexUV(x1, y0, z1, u0, v1);
-		t.color(c2r, c2g, c2b);
+		t.color(c2r, c2g, c2b, c2a);
 		t.vertexUV(x1, y0, z0, u1, v1);
-		t.color(c3r, c3g, c3b);
+		t.color(c3r, c3g, c3b, c3a);
 		t.vertexUV(x1, y1, z0, u1, v0);
-		t.color(c4r, c4g, c4b);
+		t.color(c4r, c4g, c4b, c4a);
 		t.vertexUV(x1, y1, z1, u0, v0);
 	} else {
 		t.vertexUV(x1, y0, z1, u0, v1);

@@ -84,6 +84,7 @@ private:
 	float c1r, c2r, c3r, c4r;
 	float c1g, c2g, c3g, c4g;
 	float c1b, c2b, c3b, c4b;
+	float c1a, c2a, c3a, c4a;
 	bool llTrans0Yz, llTransXY0, llTransxY0, llTrans0YZ;
 	bool llTransx0z, llTransX0Z, llTransx0Z, llTransX0z;
 	bool llTrans0yz, llTransXy0, llTransxy0, llTrans0yZ;

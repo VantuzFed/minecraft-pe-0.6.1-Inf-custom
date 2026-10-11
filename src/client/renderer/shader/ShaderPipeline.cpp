@@ -450,9 +450,8 @@ void ShaderPipeline::updateCameraMatrices() {
 
 void ShaderPipeline::beginScene() {
 	if (!m_initialized || m_mode == SHADER_MODE_OFF) return;
-	m_fbo.bindScene();
 	m_sceneActive = true;
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	m_fbo.clearSceneBuffers();
 }
 
 void ShaderPipeline::bindPass(ShaderStage stage, int layer) {
@@ -479,7 +478,7 @@ void ShaderPipeline::bindPass(ShaderStage stage, int layer) {
 		blockCoord = (float)m_uniforms.eyeBrightness[0];
 		skyCoord = (float)m_uniforms.eyeBrightness[1];
 	} else if (stage == STAGE_GBUFFERS_TERRAIN || stage == STAGE_GBUFFERS_WATER) {
-		blockCoord = 0.0f;
+		blockCoord = (float)m_uniforms.eyeBrightness[0];
 		skyCoord = 240.0f;
 	}
 

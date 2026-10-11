@@ -11,6 +11,7 @@ public:
 	void resize(int width, int height);
 
 	void bindScene();
+	void clearSceneBuffers();
 	void unbind();
 	void bindComposite(bool readFromAlt = false);
 	void bindFinal(bool useAltColorAsInput);

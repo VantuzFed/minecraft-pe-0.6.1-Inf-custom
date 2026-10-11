@@ -55,10 +55,13 @@ bool ShaderFramebuffers::init(int width, int height) {
 	glGenFramebuffers(1, &m_mainFbo);
 	glBindFramebuffer(GL_FRAMEBUFFER, m_mainFbo);
 
+	GLenum colorInternalFormat = GL_RGBA16F;
+	GLenum colorType = GL_FLOAT;
+
 	// colortex0 (Main diffuse / color)
 	glGenTextures(1, &m_colortex0);
 	glBindTexture(GL_TEXTURE_2D, m_colortex0);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, colorInternalFormat, m_width, m_height, 0, GL_RGBA, colorType, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -68,7 +71,7 @@ bool ShaderFramebuffers::init(int width, int height) {
 	// colortex1 (Normals / specular / light levels)
 	glGenTextures(1, &m_colortex1);
 	glBindTexture(GL_TEXTURE_2D, m_colortex1);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, colorInternalFormat, m_width, m_height, 0, GL_RGBA, colorType, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -78,7 +81,7 @@ bool ShaderFramebuffers::init(int width, int height) {
 	// colortex2 (Extra data / material IDs)
 	glGenTextures(1, &m_colortex2);
 	glBindTexture(GL_TEXTURE_2D, m_colortex2);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, colorInternalFormat, m_width, m_height, 0, GL_RGBA, colorType, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -88,7 +91,7 @@ bool ShaderFramebuffers::init(int width, int height) {
 	// colortex3 (Bloom / auxiliary HDR / transparency)
 	glGenTextures(1, &m_colortex3);
 	glBindTexture(GL_TEXTURE_2D, m_colortex3);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, colorInternalFormat, m_width, m_height, 0, GL_RGBA, colorType, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -98,7 +101,7 @@ bool ShaderFramebuffers::init(int width, int height) {
 	// colortex4 (Extra auxiliary data)
 	glGenTextures(1, &m_colortex4);
 	glBindTexture(GL_TEXTURE_2D, m_colortex4);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, colorInternalFormat, m_width, m_height, 0, GL_RGBA, colorType, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -117,10 +120,26 @@ bool ShaderFramebuffers::init(int width, int height) {
 
 	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 	if (status != GL_FRAMEBUFFER_COMPLETE) {
-		printf("[ShaderFBO] Main Framebuffer incomplete! Status = 0x%x\n", status);
-		destroy();
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		return false;
+		printf("[ShaderFBO] Main Framebuffer with RGBA16F incomplete (0x%x), retrying RGBA8...\n", status);
+		colorInternalFormat = GL_RGBA8;
+		colorType = GL_UNSIGNED_BYTE;
+		glBindTexture(GL_TEXTURE_2D, m_colortex0);
+		glTexImage2D(GL_TEXTURE_2D, 0, colorInternalFormat, m_width, m_height, 0, GL_RGBA, colorType, NULL);
+		glBindTexture(GL_TEXTURE_2D, m_colortex1);
+		glTexImage2D(GL_TEXTURE_2D, 0, colorInternalFormat, m_width, m_height, 0, GL_RGBA, colorType, NULL);
+		glBindTexture(GL_TEXTURE_2D, m_colortex2);
+		glTexImage2D(GL_TEXTURE_2D, 0, colorInternalFormat, m_width, m_height, 0, GL_RGBA, colorType, NULL);
+		glBindTexture(GL_TEXTURE_2D, m_colortex3);
+		glTexImage2D(GL_TEXTURE_2D, 0, colorInternalFormat, m_width, m_height, 0, GL_RGBA, colorType, NULL);
+		glBindTexture(GL_TEXTURE_2D, m_colortex4);
+		glTexImage2D(GL_TEXTURE_2D, 0, colorInternalFormat, m_width, m_height, 0, GL_RGBA, colorType, NULL);
+		status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		if (status != GL_FRAMEBUFFER_COMPLETE) {
+			printf("[ShaderFBO] Main Framebuffer incomplete! Status = 0x%x\n", status);
+			destroy();
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			return false;
+		}
 	}
 
 	// 2. Create Alt FBO (for composite passes)
@@ -129,7 +148,7 @@ bool ShaderFramebuffers::init(int width, int height) {
 
 	glGenTextures(1, &m_alt_colortex0);
 	glBindTexture(GL_TEXTURE_2D, m_alt_colortex0);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, colorInternalFormat, m_width, m_height, 0, GL_RGBA, colorType, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -169,6 +188,29 @@ void ShaderFramebuffers::bindScene() {
 
 	GLenum bufs[5] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4 };
 	glDrawBuffers(5, bufs);
+}
+
+void ShaderFramebuffers::clearSceneBuffers() {
+	if (!m_ready || !glBindFramebuffer) return;
+	glBindFramebuffer(GL_FRAMEBUFFER, m_mainFbo);
+
+	// 1. Clear attachment 0 (sky color) and depth
+	GLenum buf0 = GL_COLOR_ATTACHMENT0;
+	glDrawBuffers(1, &buf0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	// 2. Clear auxiliary attachments 1, 2, 3, 4 with zero
+	GLenum auxBufs[4] = { GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4 };
+	glDrawBuffers(4, auxBufs);
+	float prevClear[4];
+	glGetFloatv(GL_COLOR_CLEAR_VALUE, prevClear);
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glClearColor(prevClear[0], prevClear[1], prevClear[2], prevClear[3]);
+
+	// 3. Restore all 5 draw buffers for gbuffer rendering
+	GLenum allBufs[5] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4 };
+	glDrawBuffers(5, allBufs);
 }
 
 void ShaderFramebuffers::unbind() {

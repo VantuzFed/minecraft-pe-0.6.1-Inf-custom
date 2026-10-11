@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <algorithm>
+#include <cmath>
 
 Tesselator Tesselator::instance(sizeof(GLfloat) * MAX_FLOATS); // max size in bytes
 
@@ -159,6 +160,10 @@ void Tesselator::begin( int mode )
 	hasColor = false;
 	hasTexture = false;
 	_noColor = false;
+	_color = 0xFFFFFFFF;
+	_nx = 0.0f;
+	_ny = 1.0f;
+	_nz = 0.0f;
 }
 
 void Tesselator::begin()
@@ -277,11 +282,17 @@ void Tesselator::vertex( double x, double y, double z )
 			}
 			if (hasColor) {
 				dst.color = src.color;
+			} else {
+				dst.color = 0xFFFFFFFF;
 			}
 			if (hasNormal) {
 				dst.nx = src.nx;
 				dst.ny = src.ny;
 				dst.nz = src.nz;
+			} else {
+				dst.nx = 0.0f;
+				dst.ny = 1.0f;
+				dst.nz = 0.0f;
 			}
 
 			dst.x = src.x;
@@ -302,11 +313,17 @@ void Tesselator::vertex( double x, double y, double z )
 	}
 	if (hasColor) {
 		vertex.color = _color;
+	} else {
+		vertex.color = 0xFFFFFFFF;
 	}
 	if (hasNormal) {
 		vertex.nx = (GLfloat)_nx;
 		vertex.ny = (GLfloat)_ny;
 		vertex.nz = (GLfloat)_nz;
+	} else {
+		vertex.nx = 0.0f;
+		vertex.ny = 1.0f;
+		vertex.nz = 0.0f;
 	}
 
 	vertex.x = (GLfloat)(_sx * (x + xo));
@@ -315,6 +332,33 @@ void Tesselator::vertex( double x, double y, double z )
 
 	++p;
 	++vertices;
+
+	// When a quad is completed, if hasNormal was false, compute the geometric face normal
+	if (mode == GL_QUADS && (count & 3) == 0 && p >= 6) {
+		if (!hasNormal) {
+			const int p_base = p - 6;
+			float dx1 = _varray[p_base + 1].x - _varray[p_base + 0].x;
+			float dy1 = _varray[p_base + 1].y - _varray[p_base + 0].y;
+			float dz1 = _varray[p_base + 1].z - _varray[p_base + 0].z;
+			float dx2 = _varray[p_base + 2].x - _varray[p_base + 0].x;
+			float dy2 = _varray[p_base + 2].y - _varray[p_base + 0].y;
+			float dz2 = _varray[p_base + 2].z - _varray[p_base + 0].z;
+			float cnx = dy1 * dz2 - dz1 * dy2;
+			float cny = dz1 * dx2 - dx1 * dz2;
+			float cnz = dx1 * dy2 - dy1 * dx2;
+			float len = std::sqrt(cnx * cnx + cny * cny + cnz * cnz);
+			if (len > 1e-6f) {
+				cnx /= len; cny /= len; cnz /= len;
+			} else {
+				cnx = 0.0f; cny = 1.0f; cnz = 0.0f;
+			}
+			for (int vi = 0; vi < 6; ++vi) {
+				_varray[p_base + vi].nx = cnx;
+				_varray[p_base + vi].ny = cny;
+				_varray[p_base + vi].nz = cnz;
+			}
+		}
+	}
 
 	if ((vertices & 3) == 0 && p >= maxVertices-1) {
 		for (int i = 0; i < 3; ++i)

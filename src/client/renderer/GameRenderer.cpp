@@ -282,9 +282,9 @@ void GameRenderer::renderLevel(double a) {
 		bool useShaders = mc->options.getBooleanValue(OPTIONS_SHADERS);
 		if (useShaders) {
 			g_shaderPipeline.beginScene();
+		} else {
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		}
-
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glEnable2(GL_CULL_FACE);
 
 		TIMER_POP_PUSH("camera");

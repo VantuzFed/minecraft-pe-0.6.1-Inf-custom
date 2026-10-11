@@ -46,6 +46,7 @@ public:
 	void endScene();
 
 	bool isEnabled() const;
+	bool hasCustomShaders() const { return m_mode == SHADER_MODE_CUSTOM && m_initialized; }
 	void setMode(ShaderPipelineMode mode);
 	ShaderPipelineMode getMode() const { return m_mode; }
 
