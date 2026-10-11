@@ -278,12 +278,31 @@ void loop() {
 #endif
 }
 
-int main(void) {
+#ifndef STANDALONE_SERVER
+#include "client/renderer/LevelRenderer.h"
+
+int main(int argc, char** argv) {
+	for (int i = 1; i < argc; ++i) {
+		std::string arg = argv[i];
+		if ((arg == "--render-distance" || arg == "-rd" || arg == "--distance" || arg == "-d") && i + 1 < argc) {
+			g_forcedRenderDistanceChunks = std::atoi(argv[++i]);
+			printf("[Startup] Forced render distance set to %d chunks (%d blocks)\n",
+			       g_forcedRenderDistanceChunks, g_forcedRenderDistanceChunks * LevelRenderer::CHUNK_SIZE);
+		} else if (arg.rfind("--render-distance=", 0) == 0) {
+			g_forcedRenderDistanceChunks = std::atoi(arg.substr(18).c_str());
+			printf("[Startup] Forced render distance set to %d chunks (%d blocks)\n",
+			       g_forcedRenderDistanceChunks, g_forcedRenderDistanceChunks * LevelRenderer::CHUNK_SIZE);
+		} else if (arg.rfind("-rd=", 0) == 0) {
+			g_forcedRenderDistanceChunks = std::atoi(arg.substr(4).c_str());
+			printf("[Startup] Forced render distance set to %d chunks (%d blocks)\n",
+			       g_forcedRenderDistanceChunks, g_forcedRenderDistanceChunks * LevelRenderer::CHUNK_SIZE);
+		}
+	}
+
 	AppContext appContext;
 	memset(&appContext, 0, sizeof(appContext));
 	appContext.doRender = true;
 
-#ifndef STANDALONE_SERVER
 	// Platform init.
 	appContext.platform = new AppPlatform_glfw();
 #if defined(__EMSCRIPTEN__)
@@ -391,15 +410,12 @@ int main(void) {
 	while(!glfwWindowShouldClose(platform->window) && !app->wantToQuit()) {
 		loop();
 	}
-#endif
 
 	delete app;
 
-#ifndef STANDALONE_SERVER
 	// Exit.
 	glfwDestroyWindow(platform->window);
 	glfwTerminate();
-#endif
 
 	appContext.platform->finish();
 	
@@ -407,5 +423,6 @@ int main(void) {
 
 	return 0;
 }
+#endif /* STANDALONE_SERVER */
 
 #endif /*MAIN_GLFW_H__*/

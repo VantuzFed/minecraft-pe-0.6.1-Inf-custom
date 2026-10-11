@@ -29,6 +29,8 @@
 #include "Lighting.h"
 #include "shader/ShaderPipeline.h"
 
+int g_forcedRenderDistanceChunks = 0;
+
 #ifdef GFX_SMALLER_CHUNKS
 /* static */ const int LevelRenderer::CHUNK_SIZE = 8;
 #else
@@ -71,6 +73,9 @@ LevelRenderer::LevelRenderer( Minecraft* mc)
 {
 #ifdef OPENGL_ES
 	int maxChunksWidth = 2 * LEVEL_WIDTH / CHUNK_SIZE + 1;
+	if (g_forcedRenderDistanceChunks > maxChunksWidth) {
+		maxChunksWidth = g_forcedRenderDistanceChunks;
+	}
 	numListsOrBuffers = maxChunksWidth * maxChunksWidth * (128/CHUNK_SIZE) * 3;
 	chunkBuffers = new GLuint[numListsOrBuffers];
 	glGenBuffers2(numListsOrBuffers, chunkBuffers);
@@ -207,11 +212,30 @@ void LevelRenderer::allChanged()
 	/*
 	* if (Minecraft.FLYBY_MODE) { dist = 512 - CHUNK_SIZE * 2; }
 	*/
-	xChunks = (dist / LevelRenderer::CHUNK_SIZE) + 1;
+	if (g_forcedRenderDistanceChunks > 0) {
+		xChunks = g_forcedRenderDistanceChunks;
+		zChunks = g_forcedRenderDistanceChunks;
+		dist = g_forcedRenderDistanceChunks * LevelRenderer::CHUNK_SIZE;
+	} else {
+		xChunks = (dist / LevelRenderer::CHUNK_SIZE) + 1;
+		zChunks = (dist / LevelRenderer::CHUNK_SIZE) + 1;
+	}
 	yChunks = (128 /  LevelRenderer::CHUNK_SIZE);
-	zChunks = (dist / LevelRenderer::CHUNK_SIZE) + 1;
 	chunksLength = xChunks * yChunks * zChunks;
-	LOGI("chunksLength: %d. Distance: %d\n", chunksLength, dist);
+	LOGI("chunksLength: %d. Distance: %d (forced chunks: %d)\n", chunksLength, dist, g_forcedRenderDistanceChunks);
+
+#ifdef OPENGL_ES
+	if (chunksLength * 3 > numListsOrBuffers) {
+		if (chunkBuffers != NULL) {
+			glDeleteBuffers(numListsOrBuffers, chunkBuffers);
+			delete[] chunkBuffers;
+		}
+		numListsOrBuffers = chunksLength * 3;
+		chunkBuffers = new GLuint[numListsOrBuffers];
+		glGenBuffers2(numListsOrBuffers, chunkBuffers);
+		LOGI("Reallocated chunkBuffers: %d\n", numListsOrBuffers);
+	}
+#endif
 
 	chunks = new Chunk*[chunksLength];
 	sortedChunks = new Chunk*[chunksLength];

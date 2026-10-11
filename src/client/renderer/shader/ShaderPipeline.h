@@ -68,6 +68,7 @@ private:
 	ShaderFramebuffers m_fbo;
 	ShaderUniformValues m_uniforms;
 	unsigned int m_lightmapTexture;
+	unsigned int m_noiseTexture;
 
 	// Shader Passes
 	ShaderPass m_passTerrain;
@@ -78,8 +79,8 @@ private:
 	ShaderPass m_passSkyTextured;
 	ShaderPass m_passClouds;
 	ShaderPass m_passWeather;
-	ShaderPass m_passDeferred;
-	ShaderPass m_passComposite;
+	std::vector<ShaderPass> m_deferredPasses;
+	std::vector<ShaderPass> m_compositePasses;
 	ShaderPass m_passFinal;
 
 	ShaderStage m_activeStage;

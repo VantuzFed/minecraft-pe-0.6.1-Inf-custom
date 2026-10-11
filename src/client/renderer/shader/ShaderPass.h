@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include "ShaderUniforms.h"
+#include "../gles.h"
 
 class ShaderPack;
 
@@ -24,6 +25,8 @@ public:
 	bool isValid() const { return m_valid; }
 	unsigned int getProgram() const { return m_program; }
 	const std::string& getName() const { return m_name; }
+	const std::vector<GLenum>& getDrawBuffers() const { return m_drawBuffers; }
+	bool hasDrawBuffers() const { return !m_drawBuffers.empty(); }
 
 private:
 	unsigned int compileShader(unsigned int type, const char* source);
@@ -32,6 +35,7 @@ private:
 	unsigned int m_program;
 	bool m_valid;
 	ShaderUniformLocations m_uniforms;
+	std::vector<GLenum> m_drawBuffers;
 };
 
 #endif /* NET_MINECRAFT_CLIENT_RENDERER_SHADER_ShaderPass_H__ */

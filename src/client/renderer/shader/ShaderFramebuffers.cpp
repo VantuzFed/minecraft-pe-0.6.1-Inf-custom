@@ -11,6 +11,8 @@ ShaderFramebuffers::ShaderFramebuffers()
 	  m_colortex0(0),
 	  m_colortex1(0),
 	  m_colortex2(0),
+	  m_colortex3(0),
+	  m_colortex4(0),
 	  m_depthtex0(0),
 	  m_alt_colortex0(0)
 {}
@@ -31,6 +33,8 @@ void ShaderFramebuffers::destroy() {
 	if (m_colortex0 != 0) { glDeleteTextures(1, &m_colortex0); m_colortex0 = 0; }
 	if (m_colortex1 != 0) { glDeleteTextures(1, &m_colortex1); m_colortex1 = 0; }
 	if (m_colortex2 != 0) { glDeleteTextures(1, &m_colortex2); m_colortex2 = 0; }
+	if (m_colortex3 != 0) { glDeleteTextures(1, &m_colortex3); m_colortex3 = 0; }
+	if (m_colortex4 != 0) { glDeleteTextures(1, &m_colortex4); m_colortex4 = 0; }
 	if (m_depthtex0 != 0) { glDeleteTextures(1, &m_depthtex0); m_depthtex0 = 0; }
 	if (m_alt_colortex0 != 0) { glDeleteTextures(1, &m_alt_colortex0); m_alt_colortex0 = 0; }
 	m_ready = false;
@@ -81,6 +85,26 @@ bool ShaderFramebuffers::init(int width, int height) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_colortex2, 0);
 
+	// colortex3 (Bloom / auxiliary HDR / transparency)
+	glGenTextures(1, &m_colortex3);
+	glBindTexture(GL_TEXTURE_2D, m_colortex3);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, m_colortex3, 0);
+
+	// colortex4 (Extra auxiliary data)
+	glGenTextures(1, &m_colortex4);
+	glBindTexture(GL_TEXTURE_2D, m_colortex4);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_width, m_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT4, GL_TEXTURE_2D, m_colortex4, 0);
+
 	// depthtex0 (Scene Depth Buffer)
 	glGenTextures(1, &m_depthtex0);
 	glBindTexture(GL_TEXTURE_2D, m_depthtex0);
@@ -111,6 +135,10 @@ bool ShaderFramebuffers::init(int width, int height) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_alt_colortex0, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_colortex1, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_colortex2, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, m_colortex3, 0);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT4, GL_TEXTURE_2D, m_colortex4, 0);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_depthtex0, 0);
 
 	status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -139,8 +167,8 @@ void ShaderFramebuffers::bindScene() {
 	glBindFramebuffer(GL_FRAMEBUFFER, m_mainFbo);
 	glViewport(0, 0, m_width, m_height);
 
-	GLenum bufs[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-	glDrawBuffers(3, bufs);
+	GLenum bufs[5] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4 };
+	glDrawBuffers(5, bufs);
 }
 
 void ShaderFramebuffers::unbind() {
@@ -181,6 +209,12 @@ void ShaderFramebuffers::bindTexturesForComposite(bool useAltColorAsInput) {
 		glBindTexture(GL_TEXTURE_2D, m_colortex2);
 
 		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, m_colortex3);
+
+		glActiveTexture(GL_TEXTURE4);
+		glBindTexture(GL_TEXTURE_2D, m_colortex4);
+
+		glActiveTexture(GL_TEXTURE5);
 		glBindTexture(GL_TEXTURE_2D, m_depthtex0);
 
 		glActiveTexture(GL_TEXTURE0);

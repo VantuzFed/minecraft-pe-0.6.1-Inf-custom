@@ -25,6 +25,8 @@ public:
 	unsigned int getColorTex0() const { return m_colortex0; }
 	unsigned int getColorTex1() const { return m_colortex1; }
 	unsigned int getColorTex2() const { return m_colortex2; }
+	unsigned int getColorTex3() const { return m_colortex3; }
+	unsigned int getColorTex4() const { return m_colortex4; }
 	unsigned int getDepthTex0() const { return m_depthtex0; }
 	unsigned int getAltColorTex0() const { return m_alt_colortex0; }
 
@@ -38,6 +40,8 @@ private:
 	unsigned int m_colortex0;
 	unsigned int m_colortex1;
 	unsigned int m_colortex2;
+	unsigned int m_colortex3;
+	unsigned int m_colortex4;
 	unsigned int m_depthtex0;
 	unsigned int m_alt_colortex0;
 };

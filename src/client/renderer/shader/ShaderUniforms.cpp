@@ -251,13 +251,13 @@ void ShaderUniformLocations::apply(unsigned int program, const ShaderUniformValu
 		if (u_colortex0 >= 0) glUniform1i(u_colortex0, 0);
 		if (u_colortex1 >= 0) glUniform1i(u_colortex1, 1);
 		if (u_colortex2 >= 0) glUniform1i(u_colortex2, 2);
-		if (u_colortex3 >= 0) glUniform1i(u_colortex3, 0);
-		if (u_colortex4 >= 0) glUniform1i(u_colortex4, 1);
-		if (u_depthtex0 >= 0) glUniform1i(u_depthtex0, 3);
-		if (u_depthtex1 >= 0) glUniform1i(u_depthtex1, 3);
-		if (u_depthtex2 >= 0) glUniform1i(u_depthtex2, 3);
-		if (u_gdepthtex >= 0) glUniform1i(u_gdepthtex, 3);
+		if (u_colortex3 >= 0) glUniform1i(u_colortex3, 3);
+		if (u_colortex4 >= 0) glUniform1i(u_colortex4, 4);
+		if (u_depthtex0 >= 0) glUniform1i(u_depthtex0, 5);
+		if (u_depthtex1 >= 0) glUniform1i(u_depthtex1, 5);
+		if (u_depthtex2 >= 0) glUniform1i(u_depthtex2, 5);
+		if (u_gdepthtex >= 0) glUniform1i(u_gdepthtex, 5);
 		if (u_gnormal >= 0) glUniform1i(u_gnormal, 1);
-		if (u_noisetex >= 0) glUniform1i(u_noisetex, 2);
+		if (u_noisetex >= 0) glUniform1i(u_noisetex, 6);
 	}
 }

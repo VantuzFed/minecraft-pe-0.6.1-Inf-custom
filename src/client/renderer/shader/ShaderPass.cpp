@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <fstream>
 #include <sstream>
+#include <unordered_set>
 
 ShaderPass::ShaderPass()
 	: m_program(0),
@@ -22,6 +23,7 @@ void ShaderPass::destroy() {
 	}
 	m_valid = false;
 	m_name = "";
+	m_drawBuffers.clear();
 }
 
 unsigned int ShaderPass::compileShader(unsigned int type, const char* source) {
@@ -46,6 +48,118 @@ unsigned int ShaderPass::compileShader(unsigned int type, const char* source) {
 		return 0;
 	}
 	return shader;
+}
+
+static std::vector<GLenum> parseDrawBuffers(const char* fsSrc) {
+	std::vector<GLenum> buffers;
+	if (!fsSrc) return buffers;
+
+	std::istringstream stream(fsSrc);
+	std::string line;
+	std::vector<bool> conditionStack;
+	std::unordered_set<std::string> defines;
+	defines.insert("MC_VERSION");
+	defines.insert("IS_IRIS");
+	defines.insert("MC_NORMAL_MAP");
+	defines.insert("MC_SPECULAR_MAP");
+
+	std::string matchedDirective;
+
+	while (std::getline(stream, line)) {
+		size_t first = line.find_first_not_of(" \t\r\n");
+		if (first == std::string::npos) continue;
+		std::string trimmed = line.substr(first);
+
+		if (trimmed.rfind("#define", 0) == 0) {
+			std::string rest = trimmed.substr(7);
+			size_t symStart = rest.find_first_not_of(" \t");
+			if (symStart != std::string::npos) {
+				size_t symEnd = rest.find_first_of(" \t\r\n", symStart);
+				std::string sym = rest.substr(symStart, (symEnd == std::string::npos ? rest.size() - symStart : symEnd - symStart));
+				defines.insert(sym);
+			}
+			continue;
+		} else if (trimmed.rfind("#undef", 0) == 0) {
+			std::string rest = trimmed.substr(6);
+			size_t symStart = rest.find_first_not_of(" \t");
+			if (symStart != std::string::npos) {
+				size_t symEnd = rest.find_first_of(" \t\r\n", symStart);
+				std::string sym = rest.substr(symStart, (symEnd == std::string::npos ? rest.size() - symStart : symEnd - symStart));
+				defines.erase(sym);
+			}
+			continue;
+		} else if (trimmed.rfind("#ifdef", 0) == 0) {
+			std::string rest = trimmed.substr(6);
+			size_t symStart = rest.find_first_not_of(" \t");
+			bool cond = false;
+			if (symStart != std::string::npos) {
+				size_t symEnd = rest.find_first_of(" \t\r\n", symStart);
+				std::string sym = rest.substr(symStart, (symEnd == std::string::npos ? rest.size() - symStart : symEnd - symStart));
+				cond = (defines.find(sym) != defines.end());
+			}
+			bool parentActive = conditionStack.empty() || conditionStack.back();
+			conditionStack.push_back(parentActive && cond);
+			continue;
+		} else if (trimmed.rfind("#ifndef", 0) == 0) {
+			std::string rest = trimmed.substr(7);
+			size_t symStart = rest.find_first_not_of(" \t");
+			bool cond = false;
+			if (symStart != std::string::npos) {
+				size_t symEnd = rest.find_first_of(" \t\r\n", symStart);
+				std::string sym = rest.substr(symStart, (symEnd == std::string::npos ? rest.size() - symStart : symEnd - symStart));
+				cond = (defines.find(sym) == defines.end());
+			}
+			bool parentActive = conditionStack.empty() || conditionStack.back();
+			conditionStack.push_back(parentActive && cond);
+			continue;
+		} else if (trimmed.rfind("#if", 0) == 0 && trimmed.rfind("#ifdef", 0) != 0 && trimmed.rfind("#ifndef", 0) != 0) {
+			bool cond = false;
+			if (trimmed.find("MC_VERSION") != std::string::npos) {
+				if (trimmed.find("<") != std::string::npos) cond = true;
+				else if (trimmed.find(">") != std::string::npos) cond = false;
+			}
+			bool parentActive = conditionStack.empty() || conditionStack.back();
+			conditionStack.push_back(parentActive && cond);
+			continue;
+		} else if (trimmed.rfind("#else", 0) == 0) {
+			if (!conditionStack.empty()) {
+				bool current = conditionStack.back();
+				conditionStack.pop_back();
+				bool parentActive = conditionStack.empty() || conditionStack.back();
+				conditionStack.push_back(parentActive && !current);
+			}
+			continue;
+		} else if (trimmed.rfind("#endif", 0) == 0) {
+			if (!conditionStack.empty()) {
+				conditionStack.pop_back();
+			}
+			continue;
+		}
+
+		bool isActive = conditionStack.empty() || conditionStack.back();
+		if (!isActive) continue;
+
+		size_t dbPos = trimmed.find("DRAWBUFFERS");
+		if (dbPos != std::string::npos) {
+			size_t colon = trimmed.find(':', dbPos);
+			if (colon != std::string::npos) {
+				size_t endComment = trimmed.find("*/", colon);
+				if (endComment != std::string::npos) {
+					matchedDirective = trimmed.substr(colon + 1, endComment - (colon + 1));
+				}
+			}
+		}
+	}
+
+	for (char c : matchedDirective) {
+		if (c >= '0' && c <= '7') {
+			buffers.push_back(GL_COLOR_ATTACHMENT0 + (c - '0'));
+		} else if (c == 'N' || c == 'n') {
+			buffers.push_back(GL_NONE);
+		}
+	}
+
+	return buffers;
 }
 
 bool ShaderPass::loadFromSource(const char* vsSrc, const char* fsSrc, const std::string& passName) {
@@ -83,6 +197,10 @@ bool ShaderPass::loadFromSource(const char* vsSrc, const char* fsSrc, const std:
 	}
 
 	m_uniforms.findLocations(m_program);
+	m_drawBuffers = parseDrawBuffers(fsSrc);
+	if (!m_drawBuffers.empty()) {
+		printf("[ShaderPass %s] Parsed DRAWBUFFERS (count = %zu)\n", m_name.c_str(), m_drawBuffers.size());
+	}
 	m_valid = true;
 	return true;
 }
@@ -165,6 +283,20 @@ void ShaderPass::bind(const ShaderUniformValues& vals, bool isCompositeOrFinal) 
 	if (!m_valid || m_program == 0 || !glUseProgram) return;
 	glUseProgram(m_program);
 	m_uniforms.apply(m_program, vals, isCompositeOrFinal);
+
+	GLint currentFbo = 0;
+	if (glGetIntegerv) {
+		glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFbo);
+	}
+
+	if (currentFbo != 0 && glDrawBuffers) {
+		if (!m_drawBuffers.empty()) {
+			glDrawBuffers((GLsizei)m_drawBuffers.size(), m_drawBuffers.data());
+		} else if (isCompositeOrFinal) {
+			GLenum buf = GL_COLOR_ATTACHMENT0;
+			glDrawBuffers(1, &buf);
+		}
+	}
 }
 
 void ShaderPass::unbind() {

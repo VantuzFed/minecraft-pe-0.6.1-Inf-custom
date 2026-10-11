@@ -1,5 +1,6 @@
 #include "ShaderPipeline.h"
 #include "../gles.h"
+#include "../GameRenderer.h"
 #include "../../Minecraft.h"
 #include "../../../world/level/Level.h"
 #include "../../../world/level/LightLayer.h"
@@ -134,6 +135,7 @@ ShaderPipeline::ShaderPipeline()
 	  m_mode(SHADER_MODE_BUILTIN),
 	  m_currentPack("Built-in"),
 	  m_lightmapTexture(0),
+	  m_noiseTexture(0),
 	  m_activeStage(STAGE_NONE)
 {}
 
@@ -162,6 +164,24 @@ bool ShaderPipeline::init(int width, int height) {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		updateLightmap(0.0f);
+	}
+
+	if (m_noiseTexture == 0 && glGenTextures) {
+		glGenTextures(1, &m_noiseTexture);
+		glBindTexture(GL_TEXTURE_2D, m_noiseTexture);
+		std::vector<unsigned char> noisePixels(256 * 256 * 4);
+		for (size_t i = 0; i < noisePixels.size(); i += 4) {
+			noisePixels[i + 0] = (unsigned char)(rand() % 256);
+			noisePixels[i + 1] = (unsigned char)(rand() % 256);
+			noisePixels[i + 2] = (unsigned char)(rand() % 256);
+			noisePixels[i + 3] = 255;
+		}
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 256, 0, GL_RGBA, GL_UNSIGNED_BYTE, noisePixels.data());
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 
 	m_initialized = true;
@@ -200,8 +220,10 @@ void ShaderPipeline::destroyPasses() {
 	m_passSkyTextured.destroy();
 	m_passClouds.destroy();
 	m_passWeather.destroy();
-	m_passDeferred.destroy();
-	m_passComposite.destroy();
+	for (auto& p : m_deferredPasses) p.destroy();
+	m_deferredPasses.clear();
+	for (auto& p : m_compositePasses) p.destroy();
+	m_compositePasses.clear();
 	m_passFinal.destroy();
 }
 
@@ -370,6 +392,10 @@ void ShaderPipeline::beginFrame(Minecraft* mc, double partialTicks) {
 		updateLightmap(m_uniforms.timeOfDay);
 	}
 
+	if (mc->gameRenderer) {
+		m_uniforms.farPlane = (float)std::max(256.0, mc->gameRenderer->getRenderDistance() * 2.0);
+	}
+
 	updateCameraMatrices();
 }
 
@@ -454,7 +480,13 @@ void ShaderPipeline::bindPass(ShaderStage stage, int layer) {
 		skyCoord = (float)m_uniforms.eyeBrightness[1];
 	} else if (stage == STAGE_GBUFFERS_TERRAIN || stage == STAGE_GBUFFERS_WATER) {
 		blockCoord = 0.0f;
-		skyCoord = (float)std::max(16, m_uniforms.eyeBrightness[1]);
+		skyCoord = 240.0f;
+	}
+
+	if (glActiveTexture && m_noiseTexture != 0) {
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, m_noiseTexture);
+		glActiveTexture(GL_TEXTURE0);
 	}
 
 	if (glMultiTexCoord2f) {
@@ -544,34 +576,57 @@ void ShaderPipeline::endScene() {
 	m_fbo.unbind();
 	m_sceneActive = false;
 
-	bool currentInAlt = false;
+	static auto passWritesToBuffer0 = [](const ShaderPass& p) {
+		if (!p.hasDrawBuffers()) return true;
+		for (GLenum b : p.getDrawBuffers()) {
+			if (b == GL_COLOR_ATTACHMENT0) return true;
+		}
+		return false;
+	};
 
-	// 1. Deferred Pass (if present)
-	if (m_passDeferred.isValid()) {
-		m_fbo.bindComposite(currentInAlt);
-		m_passDeferred.bind(m_uniforms, true);
-		m_fbo.drawFullscreenQuad();
-		m_passDeferred.unbind();
-		currentInAlt = !currentInAlt;
+	bool flipped0 = false;
+
+	// Bind noise texture to unit 6
+	if (glActiveTexture && m_noiseTexture != 0) {
+		glActiveTexture(GL_TEXTURE6);
+		glBindTexture(GL_TEXTURE_2D, m_noiseTexture);
+		glActiveTexture(GL_TEXTURE0);
 	}
 
-	// 2. Composite Pass (if present)
-	if (m_passComposite.isValid()) {
-		m_fbo.bindComposite(currentInAlt);
-		m_passComposite.bind(m_uniforms, true);
-		m_fbo.drawFullscreenQuad();
-		m_passComposite.unbind();
-		currentInAlt = !currentInAlt;
+	// 1. Deferred Passes
+	for (auto& pass : m_deferredPasses) {
+		if (pass.isValid()) {
+			m_fbo.bindComposite(flipped0);
+			pass.bind(m_uniforms, true);
+			m_fbo.drawFullscreenQuad();
+			pass.unbind();
+			if (passWritesToBuffer0(pass)) {
+				flipped0 = !flipped0;
+			}
+		}
+	}
+
+	// 2. Composite Passes
+	for (auto& pass : m_compositePasses) {
+		if (pass.isValid()) {
+			m_fbo.bindComposite(flipped0);
+			pass.bind(m_uniforms, true);
+			m_fbo.drawFullscreenQuad();
+			pass.unbind();
+			if (passWritesToBuffer0(pass)) {
+				flipped0 = !flipped0;
+			}
+		}
 	}
 
 	// 3. Final Pass (renders to screen, sampling current buffer)
 	if (m_passFinal.isValid()) {
-		m_fbo.bindFinal(currentInAlt);
+		m_fbo.bindFinal(flipped0);
 		m_passFinal.bind(m_uniforms, true);
 		m_fbo.drawFullscreenQuad();
 		m_passFinal.unbind();
 	} else {
-		m_fbo.blitToScreen(currentInAlt);
+		m_fbo.blitToScreen(flipped0);
 	}
 
 	if (glActiveTexture) {
@@ -627,12 +682,35 @@ bool ShaderPipeline::loadShaderPack(const std::string& packNameOrPath) {
 	if (m_passWeather.loadWithFallback(pack, { "gbuffers_weather", "gbuffers_textured" })) {
 		loadedAny = true;
 	}
-	if (m_passDeferred.loadWithFallback(pack, { "deferred", "deferred0" })) {
-		loadedAny = true;
+
+	// Deferred passes (0 to 99)
+	for (int i = 0; i < 100; ++i) {
+		std::string name = "deferred" + (i == 0 ? "" : std::to_string(i));
+		std::vector<std::string> cands;
+		cands.push_back(name);
+		if (i == 0) cands.push_back("deferred0");
+
+		ShaderPass pass;
+		if (pass.loadWithFallback(pack, cands)) {
+			m_deferredPasses.push_back(pass);
+			loadedAny = true;
+		}
 	}
-	if (m_passComposite.loadWithFallback(pack, { "composite", "composite0" })) {
-		loadedAny = true;
+
+	// Composite passes (0 to 99)
+	for (int i = 0; i < 100; ++i) {
+		std::string name = "composite" + (i == 0 ? "" : std::to_string(i));
+		std::vector<std::string> cands;
+		cands.push_back(name);
+		if (i == 0) cands.push_back("composite0");
+
+		ShaderPass pass;
+		if (pass.loadWithFallback(pack, cands)) {
+			m_compositePasses.push_back(pass);
+			loadedAny = true;
+		}
 	}
+
 	if (m_passFinal.loadWithFallback(pack, { "final" })) {
 		loadedAny = true;
 	}
