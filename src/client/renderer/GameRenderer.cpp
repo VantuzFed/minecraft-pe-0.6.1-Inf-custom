@@ -90,7 +90,12 @@ void renderCursor(float x, float y, Minecraft* minecraft) {
 
 /*private*/
 void GameRenderer::setupCamera(double a, int eye) {
-	renderDistance = (double) (16 * 16 >> (mc->options.getIntValue(OPTIONS_VIEW_DISTANCE)));
+	extern int g_forcedRenderDistanceChunks;
+	if (g_forcedRenderDistanceChunks > 0) {
+		renderDistance = (double)(g_forcedRenderDistanceChunks * 16);
+	} else {
+		renderDistance = (double) (16 * 16 >> (mc->options.getIntValue(OPTIONS_VIEW_DISTANCE)));
+	}
 #if defined(ANDROID)
 	if (mc->isPowerVR() && mc->options.getIntValue(OPTIONS_VIEW_DISTANCE) <= 2)
 		renderDistance *= 0.8;

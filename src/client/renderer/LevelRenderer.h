@@ -21,6 +21,8 @@ class HitResult;
 class AABB;
 class TripodCamera;
 
+extern int g_forcedRenderDistanceChunks;
+
 class LevelRenderer: public LevelListener
 {
 	friend class Minecraft;

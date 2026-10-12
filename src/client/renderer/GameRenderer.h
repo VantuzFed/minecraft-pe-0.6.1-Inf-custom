@@ -53,6 +53,7 @@ private:
 
 public:
 	ItemInHandRenderer* itemInHandRenderer;
+	double getRenderDistance() const { return renderDistance; }
 
 private:
 	Minecraft* mc;
