@@ -36,7 +36,18 @@ double	EntityRenderDispatcher::xOff = 0,
 		EntityRenderDispatcher::zOff = 0;
 
 EntityRenderDispatcher::EntityRenderDispatcher()
-:	itemInHandRenderer(NULL)
+:	itemInHandRenderer(NULL),
+	textures(NULL),
+	level(NULL),
+	minecraft(NULL),
+	cameraEntity(NULL),
+	playerRotY(0.0f),
+	playerRotX(0.0f),
+	options(NULL),
+	xPlayer(0.0),
+	yPlayer(0.0),
+	zPlayer(0.0),
+	_font(NULL)
 {
 	//@note: The Models (model/armor) will be deleted by resp. MobRenderer
 	assign( ER_ITEM_RENDERER,       new ItemRenderer());
@@ -161,6 +172,7 @@ EntityRenderer* EntityRenderDispatcher::getRenderer( EntityRendererId rendererId
 void EntityRenderDispatcher::setLevel( Level* level )
 {
 	this->level = level;
+	this->cameraEntity = NULL;
 }
 
 void EntityRenderDispatcher::setMinecraft( Minecraft* minecraft )

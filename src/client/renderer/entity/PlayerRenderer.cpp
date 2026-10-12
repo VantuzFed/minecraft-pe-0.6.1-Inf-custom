@@ -68,7 +68,9 @@ bool PlayerRenderer::isModernPlayerSkin(Mob* mob) {
 }
 
 void PlayerRenderer::renderHand() {
-	Mob* mob = entityRenderDispatcher ? (entityRenderDispatcher->cameraEntity ? (Mob*)entityRenderDispatcher->cameraEntity : (Mob*)entityRenderDispatcher->minecraft->player) : nullptr;
+	Mob* mob = (entityRenderDispatcher && entityRenderDispatcher->minecraft && entityRenderDispatcher->minecraft->player)
+		? (Mob*)entityRenderDispatcher->minecraft->player
+		: (entityRenderDispatcher ? entityRenderDispatcher->cameraEntity : nullptr);
 	HumanoidModel* desired = (mob && isModernPlayerSkin(mob)) ? playerModel64 : playerModel32;
 	if (model != desired || humanoidModel != desired) {
 		model = desired;
