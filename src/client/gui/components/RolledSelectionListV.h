@@ -23,6 +23,15 @@ public:
 	virtual void renderHoleBackground(/*float x0, float x1,*/ float y0, float y1, int a0, int a1);
 	virtual void setRenderSelection(bool _renderSelection);
 	virtual void setComponentSelected(bool selected);
+	void setSize(int _width, int _height, int _x0, int _x1, int _y0, int _y1) {
+		width = _width;
+		height = _height;
+		x0 = (float)_x0;
+		x1 = (float)_x1;
+		y0 = (float)_y0;
+		y1 = (float)_y1;
+		capYPosition();
+	}
 protected:
 	void setRenderHeader(bool _renderHeader, int _headerHeight);
 

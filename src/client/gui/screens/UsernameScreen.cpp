@@ -25,6 +25,7 @@ void UsernameScreen::init()
     tabButtons.push_back(&_btnDone);
     textBoxes.push_back(&tUsername);
     setupPositions();
+    tUsername.setFocus(minecraft);
 }
 
 void UsernameScreen::setupPositions()
@@ -32,16 +33,16 @@ void UsernameScreen::setupPositions()
     int cx = width / 2;
     int cy = height / 2;
 
+    tUsername.width = 140;
+    tUsername.height = 20;
+    tUsername.x = (width - tUsername.width) / 2;
+    tUsername.y = cy - 4;
+
     // Make the done button match the touch-style option tabs
     _btnDone.width  = 66;
     _btnDone.height = 26;
     _btnDone.x = cx - (_btnDone.width / 2);
-    _btnDone.y = cy + 52;
-
-    tUsername.width = 120;
-    tUsername.height = 20;
-    tUsername.x = (width - tUsername.width) / 2;
-    tUsername.y = _btnDone.y - 60;
+    _btnDone.y = tUsername.y + tUsername.height + 16;
 }
 
 void UsernameScreen::tick()

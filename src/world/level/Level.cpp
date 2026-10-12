@@ -235,6 +235,15 @@ void Level::tick() {
 			raknetInstance->send(packet);
 		}
 	}
+
+	// Periodic auto-save every 600 ticks (30 seconds)
+	long curLevelTime = levelData.getTime();
+	if (curLevelTime > 0 && (curLevelTime % 600) == 0) {
+		saveGame();
+		if (_chunkSource) {
+			_chunkSource->saveAll(true);
+		}
+	}
 	TIMER_POP_PUSH("tickPending");
 	MCPE_CRASH_TRACE("[IW] Level::tick pending begin count=%d\n", (int)_tickNextTickSet.size());
 	tickPendingTicks(false);

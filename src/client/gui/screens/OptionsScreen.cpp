@@ -130,6 +130,7 @@ void OptionsScreen::setupPositions() {
 			(*it)->width = width - categoryButtons[0]->width;
 
 			(*it)->setViewHeight(height - bHeader->height);
+			(*it)->setupPositions();
 		}
 	}
 
@@ -140,11 +141,8 @@ void OptionsScreen::setupPositions() {
 void OptionsScreen::render(int xm, int ym, float a) {
 	renderBackground();
 
-	int xmm = xm * width / minecraft->width;
-	int ymm = ym * height / minecraft->height - 1;
-
 	if (currentOptionsGroup != NULL)
-		currentOptionsGroup->render(minecraft, xmm, ymm);
+		currentOptionsGroup->render(minecraft, xm, ym);
 
 	super::render(xm, ym, a);
 }

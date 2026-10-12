@@ -590,6 +590,10 @@ void Player::readAdditionalSaveData(CompoundTag* entityTag) {
 		loadArmor(armor, entityTag->getList("Armor"));
 	}
 
+	abilities.loadSaveData(entityTag);
+	if (!abilities.mayfly)
+		abilities.flying = false;
+
     dimension = entityTag->getInt("Dimension");
 
 	//return;
@@ -629,6 +633,8 @@ void Player::addAdditonalSaveData(CompoundTag* entityTag) {
 
 	ListTag* armorTag = saveArmor(armor);
 	entityTag->put("Armor", armorTag);
+
+	abilities.addSaveData(entityTag);
 
     entityTag->putInt("Dimension", dimension);
 	//return;

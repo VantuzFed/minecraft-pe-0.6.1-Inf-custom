@@ -343,6 +343,10 @@ void SelectWorldScreen::setupPositions() {
 	bHeader.x   = bBack.width;
 	bHeader.width   = width - (bBack.width + bCreate.width);
 	bHeader.height   = bCreate.height;
+
+	if (worldsList) {
+		worldsList->setSize(width, height, 0, width, 24, height - 32);
+	}
 }
 
 void SelectWorldScreen::buttonClicked(Button* button)

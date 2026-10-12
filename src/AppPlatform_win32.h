@@ -136,6 +136,37 @@ public:
 		ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
 	}
 
+	virtual std::string getClipboardText() {
+		if (!OpenClipboard(NULL)) return "";
+		HANDLE hData = GetClipboardData(CF_TEXT);
+		if (!hData) {
+			CloseClipboard();
+			return "";
+		}
+		const char* pszText = static_cast<const char*>(GlobalLock(hData));
+		std::string result = pszText ? std::string(pszText) : std::string();
+		GlobalUnlock(hData);
+		CloseClipboard();
+		return result;
+	}
+
+	virtual void setClipboardText(const std::string& text) {
+		if (!OpenClipboard(NULL)) return;
+		EmptyClipboard();
+		HGLOBAL hGlob = GlobalAlloc(GMEM_MOVEABLE, text.size() + 1);
+		if (hGlob) {
+			void* pGlob = GlobalLock(hGlob);
+			if (pGlob) {
+				memcpy(pGlob, text.c_str(), text.size() + 1);
+				GlobalUnlock(hGlob);
+				SetClipboardData(CF_TEXT, hGlob);
+			} else {
+				GlobalFree(hGlob);
+			}
+		}
+		CloseClipboard();
+	}
+
 private:
 };
 

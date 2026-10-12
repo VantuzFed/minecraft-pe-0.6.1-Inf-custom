@@ -136,6 +136,9 @@ public:
 		keyboardVisible = false;
 	}
 	virtual bool isKeyboardVisible() {return keyboardVisible;}
+
+	virtual std::string getClipboardText() { return ""; }
+	virtual void setClipboardText(const std::string& text) {}
 protected:
 	bool keyboardVisible;
 };

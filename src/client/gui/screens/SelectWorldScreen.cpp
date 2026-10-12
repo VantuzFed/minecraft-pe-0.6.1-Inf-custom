@@ -343,6 +343,10 @@ void SelectWorldScreen::setupPositions() {
 	bDelete.x   = width / 2 - 4 - bDelete.width - bDelete.width / 2;
 	bCreate.x   = width / 2					- bCreate.width / 2;
 	bBack.x     = width / 2 + 4 + bCreate.width - bBack.width / 2;
+
+	if (worldsList) {
+		worldsList->setSize(width, height, 0, width, 26, height - 32);
+	}
 }
 
 void SelectWorldScreen::render( int xm, int ym, float a )

@@ -142,6 +142,74 @@ jobs:
             ${{github.workspace}}/build/MinecraftPE
             ${{github.workspace}}/build/MinecraftPE-server
 
+  build-rpi:
+    name: Build Raspberry Pi (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            processor: aarch64
+            cc: aarch64-linux-gnu-gcc
+            cxx: aarch64-linux-gnu-g++
+            pkg: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          - arch: armhf
+            processor: arm
+            cc: arm-linux-gnueabihf-gcc
+            cxx: arm-linux-gnueabihf-g++
+            pkg: gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup caches
+        uses: ./.github/actions/setup-cache
+        with:
+          host: linux
+          target: rpi-${{ matrix.arch }}
+
+      - name: Create Build Environment
+        run: cmake -E make_directory ${{github.workspace}}/build
+
+      - name: Setup Environment
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends build-essential ${{ matrix.pkg }} libgl-dev libwayland-dev xorg-dev libxkbcommon-dev
+
+      - name: Configure CMake
+        shell: bash
+        working-directory: ${{github.workspace}}/build
+        run: |
+          cmake $GITHUB_WORKSPACE \
+            -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+            -DCMAKE_SYSTEM_NAME=Linux \
+            -DCMAKE_SYSTEM_PROCESSOR=${{ matrix.processor }} \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DSTATIC_DEPS=ON \
+            -DCMAKE_DISABLE_FIND_PACKAGE_OpenSSL=ON \
+            -DALSOFT_BACKEND_PIPEWIRE=OFF \
+            -DALSOFT_RTKIT=OFF \
+            -DRT_LIBRARY=rt \
+            -DMATH_LIBRARY=m
+
+      - name: Build
+        working-directory: ${{github.workspace}}/build
+        shell: bash
+        run: |
+          cmake --build . --config $BUILD_TYPE --target MinecraftPE --parallel
+          cmake --build . --config $BUILD_TYPE --target MinecraftPE-server --parallel
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcpe-rpi-${{ matrix.arch }}
+          path: |
+            ${{github.workspace}}/build/MinecraftPE
+            ${{github.workspace}}/build/MinecraftPE-server
+
   build-android: # pray to god
     name: Build Android (${{ matrix.abi }})
     runs-on: ubuntu-latest
@@ -280,7 +348,7 @@ jobs:
   publish:
     name: Publish
     runs-on: ubuntu-latest
-    needs: [ build-windows, build-ios, build-linux, build-android, build-web ]
+    needs: [ build-windows, build-ios, build-linux, build-rpi, build-android, build-web ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -311,6 +379,18 @@ jobs:
         with:
           files: mcpe-linux/MinecraftPE-server
           dest: minecraftpe-server-${{ steps.ref.outputs.hash }}.zip
+
+      - name: Zip Raspberry Pi (arm64) Artifacts
+        uses: vimtor/action-zip@v1.2
+        with:
+          files: mcpe-rpi-arm64/MinecraftPE mcpe-rpi-arm64/MinecraftPE-server
+          dest: minecraftpe-${{ steps.ref.outputs.hash }}-rpi-arm64.zip
+
+      - name: Zip Raspberry Pi (armhf) Artifacts
+        uses: vimtor/action-zip@v1.2
+        with:
+          files: mcpe-rpi-armhf/MinecraftPE mcpe-rpi-armhf/MinecraftPE-server
+          dest: minecraftpe-${{ steps.ref.outputs.hash }}-rpi-armhf.zip
 
       - name: Rename Android Artifacts
         run: |
@@ -348,6 +428,8 @@ jobs:
             ./minecraftpe-server-${{ steps.ref.outputs.hash }}.zip
             ./minecraftpe-${{ steps.ref.outputs.hash }}-windows.zip
             ./minecraftpe-${{ steps.ref.outputs.hash }}-linux.zip
+            ./minecraftpe-${{ steps.ref.outputs.hash }}-rpi-arm64.zip
+            ./minecraftpe-${{ steps.ref.outputs.hash }}-rpi-armhf.zip
             ./minecraftpe-${{ steps.ref.outputs.hash }}-android-arm64-v8a.apk
             ./minecraftpe-${{ steps.ref.outputs.hash }}-android-armeabi-v7a.apk
             ./minecraftpe-${{ steps.ref.outputs.hash }}-ios.ipa

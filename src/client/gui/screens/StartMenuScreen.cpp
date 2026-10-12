@@ -40,12 +40,12 @@ void StartMenuScreen::init()
 		bHost = new Button(    2, 0, 0, 200, 20, "Singleplayer");
 		bJoin = new Button(    3, 0, 0, 200, 20, "Multiplayer");
 		bOptions = new Button( 4, 0, 0, 200, 20, "Options...");
-		bQuit = new Button( 5, 0, 0, 200, 20, "Ouit Game");
+		bQuit = new Button( 5, 0, 0, 200, 20, "Quit Game");
 	} else {
 		bHost = new Button(    2, 0, 0, 160, 24, "Start Game");
 		bJoin = new Button(    3, 0, 0, 160, 24, "Join Game");
 		bOptions = new Button( 4, 0, 0, 160, 24, "Options");
-		bQuit = new Button( 5, 0, 0, 160, 24, "Ouit Game");
+		bQuit = new Button( 5, 0, 0, 160, 24, "Quit Game");
 	}
 	bJoin->active = bHost->active = bOptions->active = true;
 
@@ -107,14 +107,19 @@ void StartMenuScreen::init()
 
 void StartMenuScreen::setupPositions() {
 	if (minecraft->options.getIntValue(OPTIONS_MENU_STYLE) == 2){
-		int yBase = (height / 2) - 20;
+		int totalH = 3 * 24 + 20;
+		int yBase = Mth::Min((height / 2) - 20, height - 24 - totalH);
+		if (yBase < 44) yBase = 44;
 
 		bHost->y =	 yBase;
 		bJoin->y =	 bHost->y + 24;
 		bOptions->y = bJoin->y + 24;
 		bQuit->y = bOptions->y + 24;
 	} else {
-		int yBase = height / 2;
+		int totalH = 3 * 28 + 24;
+		int yBase = Mth::Min(height / 2, height - 24 - totalH);
+		if (yBase < 44) yBase = 44;
+
 		bHost->y =	 yBase;
 		bJoin->y =	 bHost->y + 24 + 4;
 		bOptions->y = bJoin->y + 24 + 4;

@@ -35,7 +35,6 @@ if (${PLATFORM} STREQUAL "Desktop")
         include_directories(misc/windows)
         set(EXTRA_LIBS ws2_32 winhttp)
     elseif(UNIX)
-        find_library(pthread NAMES pthread)
         set(EXTRA_LIBS pthread m)
     endif()
 
@@ -65,14 +64,35 @@ if(${PLATFORM} MATCHES "Web")
         INTERFACE_LINK_OPTIONS "-sUSE_GLFW=3"
     )
 else()
-    set(PNG_LIB png_shared)
-    set(AL_LIBTYPE "SHARED")
+    option(STATIC_DEPS "Link zlib, libpng, and OpenAL statically" OFF)
+    if(STATIC_DEPS)
+        set(ZLIB_LIB zlibstatic)
+        set(ZLIB_SHARED_OPT "OFF")
+        set(PNG_LIB png_static)
+        set(PNG_SHARED_OPT "OFF")
+        set(AL_LIBTYPE "STATIC")
+    else()
+        set(ZLIB_LIB zlib)
+        set(ZLIB_SHARED_OPT "ON")
+        set(PNG_LIB png_shared)
+        set(PNG_SHARED_OPT "ON")
+        set(AL_LIBTYPE "SHARED")
+    endif()
 
     CPMAddPackage(
         NAME "zlib"
         GIT_REPOSITORY "https://github.com/madler/zlib"
         GIT_TAG "v1.3.2"
+        OPTIONS
+            "ZLIB_BUILD_SHARED ${ZLIB_SHARED_OPT}"
+            "ZLIB_BUILD_TESTING OFF"
     )
+
+    if(NOT TARGET ZLIB::ZLIB)
+        add_library(ZLIB::ZLIB ALIAS ${ZLIB_LIB})
+    endif()
+    set(ZLIB_LIBRARY ${ZLIB_LIB} CACHE STRING "" FORCE)
+    set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE STRING "" FORCE)
 
     CPMAddPackage(
         NAME "libpng"
@@ -80,7 +100,8 @@ else()
         GIT_TAG "v1.6.55"
         OPTIONS
             "ZLIB_ROOT ${zlib_SOURCE_DIR}"
-            "ZLIB_INCLUDE_DIRS ${zlib_SOURCE_DIR}"
+            "ZLIB_INCLUDE_DIRS ${zlib_SOURCE_DIR};${zlib_BINARY_DIR}"
+            "PNG_SHARED ${PNG_SHARED_OPT}"
             "PNG_TOOLS OFF"
             "PNG_TESTS OFF"
     )
@@ -375,9 +396,13 @@ if(${PLATFORM} MATCHES "Web")
     target_compile_definitions(${PROJECT_NAME} PUBLIC "__EMSCRIPTEN__" "NO_SOUND" "NO_NETWORK")
 endif()
 
+if(${PLATFORM} MATCHES "Web")
+    set(ZLIB_LIB zlib)
+endif()
+
 # Client
 target_compile_definitions(${PROJECT_NAME} PUBLIC "OPENGL_ES" "NO_EGL" ${PLATFORM})
-target_link_libraries(${PROJECT_NAME} zlib ${PNG_LIB} OpenAL::OpenAL glfw ${EXTRA_LIBS})
+target_link_libraries(${PROJECT_NAME} ${ZLIB_LIB} ${PNG_LIB} OpenAL::OpenAL glfw ${EXTRA_LIBS})
 
 if (OpenSSL_FOUND)
     target_link_libraries(${PROJECT_NAME} OpenSSL::SSL OpenSSL::Crypto)

@@ -50,13 +50,40 @@ void TextBox::mouseClicked(Minecraft* minecraft, int x, int y, int buttonNum) {
 }
 
 void TextBox::charPressed(Minecraft* minecraft, char c)  {
+    if (Keyboard::isKeyDown(Keyboard::KEY_LEFT_CTRL)) {
+        return;
+    }
     if (focused && c >= 32 && c < 127 && (int)text.size() < 256) {
         text.push_back(c);
     }
 }
 
 void TextBox::keyPressed(Minecraft* minecraft, int key) {
-    if (focused && key == Keyboard::KEY_BACKSPACE && !text.empty()) {
+    if (!focused) return;
+
+    if (Keyboard::isKeyDown(Keyboard::KEY_LEFT_CTRL)) {
+        if (key == Keyboard::KEY_V && minecraft && minecraft->platform()) {
+            std::string clip = minecraft->platform()->getClipboardText();
+            for (size_t i = 0; i < clip.size() && (int)text.size() < 256; ++i) {
+                char c = clip[i];
+                if (c >= 32 && c < 127) {
+                    text.push_back(c);
+                }
+            }
+            return;
+        }
+        if (key == Keyboard::KEY_C && minecraft && minecraft->platform()) {
+            minecraft->platform()->setClipboardText(text);
+            return;
+        }
+        if (key == Keyboard::KEY_X && minecraft && minecraft->platform()) {
+            minecraft->platform()->setClipboardText(text);
+            text.clear();
+            return;
+        }
+    }
+
+    if (key == Keyboard::KEY_BACKSPACE && !text.empty()) {
         text.pop_back();
     }
 }

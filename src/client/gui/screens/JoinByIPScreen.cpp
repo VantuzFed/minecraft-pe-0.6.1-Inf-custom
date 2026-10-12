@@ -83,6 +83,7 @@ void JoinByIPScreen::init()
 #endif
 
 	tIP.text = minecraft->options.getStringValue(OPTIONS_LAST_IP);
+	tIP.setFocus(minecraft);
 }
 
 void JoinByIPScreen::setupPositions() {
@@ -117,6 +118,10 @@ void JoinByIPScreen::keyPressed(int eventKey)
 {
     if (eventKey == Keyboard::KEY_ESCAPE) {
         minecraft->screenChooser.setScreen(SCREEN_STARTMENU);
+        return;
+    }
+    if (eventKey == Keyboard::KEY_RETURN && !tIP.text.empty()) {
+        buttonClicked(&bJoin);
         return;
     }
     // let base class handle navigation and text box keys

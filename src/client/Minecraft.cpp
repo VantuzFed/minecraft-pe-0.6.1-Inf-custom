@@ -9,6 +9,10 @@
 #include <cstdlib>
 
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 #if defined(APPLE_DEMO_PROMOTION)
 #define NO_NETWORK
 #endif
@@ -716,8 +720,13 @@ void Minecraft::tickInput() {
 		bool isPressed = (Keyboard::getEventKeyState() == KeyboardAction::KEYDOWN);
 		player->setKey(key, isPressed);
 
-		if (key == options.getIntValue(OPTIONS_KEY_SPRINT)) {
-			player->setSprinting(isPressed);
+		int sprintKey = options.getIntValue(OPTIONS_KEY_SPRINT);
+		if (sprintKey != 0 && key == sprintKey) {
+			if (isPressed && options.getBooleanValue(OPTIONS_ALLOW_SPRINT)) {
+				if (player->input && player->input->ya > 0 && !player->input->sneaking) {
+					player->setSprinting(true);
+				}
+			}
 		}
 
 		if (isPressed) {
@@ -1104,6 +1113,9 @@ void Minecraft::setScreen( Screen* screen )
 
 	this->screen = screen;
 	if (screen != NULL) {
+		if (player) {
+			player->releaseAllKeys();
+		}
 		releaseMouse();
 		//ScreenSizeCalculator ssc = new ScreenSizeCalculator(options, width, height);
 		int screenWidth = (int)(width * Gui::InvGuiScale); //ssc.getWidth();
@@ -1226,46 +1238,34 @@ void Minecraft::setSize(int w, int h) {
 	int screenWidth;
 	int screenHeight;
 	//#ifdef PLATFORM_DESKTOP
-	if (options.getBooleanValue(OPTIONS_WINDOW_SCALE)){ // scales with resolution using a formula instead of having hardcoded if checks
-		int guiScale = options.getIntValue(OPTIONS_GUI_SCALE);
-		if (guiScale == 0) {
-			guiScale = 1000;
+	if (options.getBooleanValue(OPTIONS_WINDOW_SCALE)) { // scales with resolution using a formula instead of having hardcoded if checks
+		int guiScaleOpt = options.getIntValue(OPTIONS_GUI_SCALE);
+		int scale = 1;
+		while (scale < 1000 && width / (scale + 1) >= 320 && height / (scale + 1) >= 240) {
+			scale++;
 		}
-
-		// determine gui scale, optionally overriding auto
-
-
-		Gui::GuiScale = (float)Mth::Min(guiScale, Mth::Max(1, Mth::Min(width / 320, height / 240)));
-
-
-
+		if (guiScaleOpt > 0 && scale > guiScaleOpt) {
+			scale = guiScaleOpt;
+		}
+		Gui::GuiScale = (float)scale;
 	} else {
-
-
 		int guiScale = options.getIntValue(OPTIONS_GUI_SCALE);
 
 		// determine gui scale, optionally overriding auto
 		if (guiScale != 0) {
-			// manual selection: 1->small, 2->medium, 3->large, 4->larger, 5->largest
-			switch (guiScale) {
-			case 1: Gui::GuiScale = 2.0f; break;
-			case 2: Gui::GuiScale = 3.0f; break;
-			case 3: Gui::GuiScale = 4.0f; break;
-			case 4: Gui::GuiScale = 5.0f; break;
-			case 5: Gui::GuiScale = 6.0f; break;
-			default: Gui::GuiScale = 1.0f; break; // auto
-			}
+			int maxScale = Mth::Max(1, Mth::Min(width / 320, height / 240));
+			Gui::GuiScale = (float)Mth::Min(guiScale, maxScale);
 		} else {
 			// auto compute from resolution
 			if (width >= 1000) {
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
 				Gui::GuiScale = (width > 2000)? 8.0f : 4.0f;
 #else
 				Gui::GuiScale = 4.0f;
 #endif
 			}
 			else if (width >= 800) {
-#ifdef __APPLE__
+#if defined(__APPLE__) && defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
 				Gui::GuiScale = 4.0f;
 #else
 				Gui::GuiScale = 3.0f;
@@ -1275,16 +1275,12 @@ void Minecraft::setSize(int w, int h) {
 				Gui::GuiScale = 2.0f;
 			else
 				Gui::GuiScale = 1.0f;
+
+			int maxScale = Mth::Max(1, Mth::Min(width / 320, height / 240));
+			if (Gui::GuiScale > (float)maxScale) {
+				Gui::GuiScale = (float)maxScale;
+			}
 		}
-
-
-
-		// if (platform()) {
-		// 	float pixelsPerMillimeter = options.getProgressValue(&Option::PIXELS_PER_MILLIMETER);
-		// 	pixelCalc.setPixelsPerMillimeter(pixelsPerMillimeter);
-		// 	pixelCalcUi.setPixelsPerMillimeter(pixelsPerMillimeter * Gui::InvGuiScale);
-		// }
-
 	}
 
 

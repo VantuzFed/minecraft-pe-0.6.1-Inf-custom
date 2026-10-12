@@ -497,27 +497,37 @@ void LocalPlayer::aiStep() {
 	bool wasJumping = input->jumping;
 #ifndef STANDALONE_SERVER
     bool screenCovering = minecraft->screen && !minecraft->screen->passEvents;
-	if (!screenCovering)
+	if (screenCovering) {
+		releaseAllKeys();
+		sprinting = false;
+	} else {
 		input->tick(this);
+	}
 
-	// Sprint: detect W double-tap
+	// Sprint: detect W double-tap or Sprint key held
 	{
-		bool forwardHeld = (input->ya > 0);
-		if (forwardHeld && !prevForwardHeld && minecraft->options.getBooleanValue(OPTIONS_ALLOW_SPRINT)) {
-			// leading edge of W press
-			if (sprintDoubleTapTimer > 0)
+		bool forwardHeld = !screenCovering && (input->ya > 0);
+		bool allowSprint = minecraft->options.getBooleanValue(OPTIONS_ALLOW_SPRINT);
+		int sprintKey = minecraft->options.getIntValue(OPTIONS_KEY_SPRINT);
+		bool sprintKeyHeld = !screenCovering && (sprintKey != 0) && Keyboard::isKeyDown(sprintKey);
+
+		if (allowSprint && forwardHeld && !input->sneaking && !horizontalCollision) {
+			if (sprintKeyHeld) {
 				sprinting = true;
-			else
-				sprintDoubleTapTimer = 7;
+			} else if (!prevForwardHeld) {
+				// leading edge of W press
+				if (sprintDoubleTapTimer > 0)
+					sprinting = true;
+				else
+					sprintDoubleTapTimer = 7;
+			}
 		}
-		if (!forwardHeld) {
+		if (!forwardHeld || !allowSprint || input->sneaking || horizontalCollision) {
 			sprinting = false;
 		}
 		if (sprintDoubleTapTimer > 0) sprintDoubleTapTimer--;
 		prevForwardHeld = forwardHeld;
 	}
-	if (input->sneaking)
-		sprinting = false;
 
     if (input->sneaking) {
         if (ySlideOffset < 0.2f) ySlideOffset = 0.2f;
@@ -620,6 +630,14 @@ void LocalPlayer::move(double xa, double ya, double za) {
 
 void LocalPlayer::updateAi() {
     super::updateAi();
+#ifndef STANDALONE_SERVER
+    if (minecraft->screen && !minecraft->screen->passEvents) {
+        this->xxa = 0.0f;
+        this->yya = 0.0f;
+        this->jumping = false;
+        return;
+    }
+#endif
     this->xxa = input->xa;
     this->yya = input->ya;
     this->jumping = input->jumping || autoJumpTime > 0;

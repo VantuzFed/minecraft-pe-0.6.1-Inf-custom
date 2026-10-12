@@ -148,6 +148,18 @@ public:
 #endif
 	}
 
+	virtual std::string getClipboardText() override {
+		if (!window) return "";
+		const char* s = glfwGetClipboardString(window);
+		return s ? std::string(s) : std::string();
+	}
+
+	virtual void setClipboardText(const std::string& text) override {
+		if (window) {
+			glfwSetClipboardString(window, text.c_str());
+		}
+	}
+
 	GLFWwindow* window;
 
 private:
