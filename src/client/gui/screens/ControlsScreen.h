@@ -8,7 +8,7 @@
 
 class ControlsScreen : public Screen {
 public:
-	ControlsScreen(Screen* parent);
+	ControlsScreen(Screen* parent = nullptr);
 	virtual ~ControlsScreen();
 
 	virtual void init() override;
@@ -18,7 +18,6 @@ public:
 	virtual void keyPressed(int eventKey) override;
 
 private:
-	Screen* m_parent;
 	Button m_btnDone;
 	Button m_btnAutoJump;
 	Button m_btnInvertMouse;

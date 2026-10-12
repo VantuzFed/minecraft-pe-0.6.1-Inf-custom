@@ -1,15 +1,16 @@
 #include "ControlsScreen.h"
+#include "OptionsScreen.h"
 #include "../../Minecraft.h"
 #include "../../../locale/I18n.h"
 #include "platform/input/Keyboard.h"
 
 ControlsScreen::ControlsScreen(Screen* parent)
-:	m_parent(parent),
-	m_btnDone(200, ""),
+:	m_btnDone(200, ""),
 	m_btnAutoJump(201, ""),
 	m_btnInvertMouse(202, ""),
 	m_selectedKeyOpt(-1)
 {
+	(void)parent;
 }
 
 ControlsScreen::~ControlsScreen() {
@@ -135,7 +136,7 @@ void ControlsScreen::render(int xm, int ym, float a) {
 void ControlsScreen::buttonClicked(Button* button) {
 	if (button->id == m_btnDone.id) {
 		minecraft->options.save();
-		minecraft->setScreen(m_parent);
+		minecraft->setScreen(new OptionsScreen());
 		return;
 	}
 
@@ -177,7 +178,7 @@ void ControlsScreen::keyPressed(int eventKey) {
 
 	if (eventKey == Keyboard::KEY_ESCAPE) {
 		minecraft->options.save();
-		minecraft->setScreen(m_parent);
+		minecraft->setScreen(new OptionsScreen());
 		return;
 	}
 
